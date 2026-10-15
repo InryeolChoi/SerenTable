@@ -149,8 +149,8 @@ docker compose exec -T postgres pg_restore -U serentable -d serentable_restore -
 
 ## 현재 검증과 다음 Task
 
-2026-10-15 사용자 Blaybus 상태: 첫 화면 모바일 검증 / Railway 배포 / DB 연결과 CI 구성 / 최소 React·FastAPI 앱 구성 완료. 새 Task `배포 안전장치·원격 작업 검증`은 진행 전이며 기존 인수 기준을 이어받는다.
+2026-10-15 사용자 Blaybus 상태: 첫 화면 모바일 검증 / Railway 배포 / DB 연결과 CI 구성 / 최소 React·FastAPI 앱 구성 완료. 새 Task `배포 안전장치·원격 작업 검증`은 진행 중이며 기존 인수 기준을 이어받는다.
 
-Railway 설정 조회에서 API·worker의 `source.checkSuites`는 모두 false였다. 위 표의 Wait for CI 켜기는 목표 설정이며 완료 증거가 아니다. 서비스별 GitHub 소스 설정에서 활성화하고, 실패한 CI가 차단하는 실제 배포 기록을 남겨야 한다. 비용·백업 설정과 모바일 Codex 수행은 별도 검증한다.
+초기 조회에서 꺼져 있던 API·worker의 `source.checkSuites`를 true로 활성화했다. 임시 검증 브랜치의 실패 CI는 두 배포 모두 SKIPPED, 정상 복구 CI는 두 배포 모두 SUCCESS였다. 두 서비스의 main 복구와 공개 상태 응답을 확인했다([실제 기록](./ci-gate-verification.md)). 비용·백업 설정과 모바일 Codex 수행은 남아 있다.
 
 worker Pre-deploy에 상시 실행 명령을 넣으면 종료를 기다리며 배포가 멈춘다. worker의 Pre-deploy는 비워 두고 Start Command에 `python -m serentable.worker`를 넣는다. 해당 위치 오류를 수정한 뒤 배포 `8cc2fc2a-b9a7-4026-9c66-11a1c33381c4`의 SUCCESS, 실행 replica 1개와 heartbeat를 확인했다. heartbeat 응답만으로 배포 성공을 판단하지 않는다.
