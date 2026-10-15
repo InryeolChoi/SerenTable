@@ -7,7 +7,8 @@
 - 본격 구현 시작: 2026-10-16.
 - 개발 완료 목표: 2026-10-20.
 - 제출 마감: 2026-10-21 23:59, Asia/Seoul.
-- React·FastAPI·실제 PostgreSQL 연결과 별도 실행기의 기반 구현을 준비했다. 실제 Railway 배포와 모바일 기기 검증은 아직 완료하지 않았다.
+- React·FastAPI·PostgreSQL·별도 worker 기반을 main에 병합하고 Railway에 배포했다. 사용자가 첫 화면 모바일 검증을 완료로 표시했다. 로그인·신청 등 제품 기능과 배포 안전장치·원격 작업 검증은 후속 Task다.
+- 현재 배포: https://chanceplate.up.railway.app
 
 ## 확정된 방향
 

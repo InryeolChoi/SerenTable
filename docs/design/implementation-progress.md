@@ -4,7 +4,7 @@
 
 ## 작업 위치와 브랜치
 
-- 통합 브랜치: `integration/mvp`.
+- 최초 통합 브랜치: `integration/mvp`. PR #12가 main의 `1407e23`에 병합되었고 현재 Railway 배포 브랜치는 `main`이다.
 - 기준 커밋: 원격 main의 `b92b1d6`. 명세 PR #11이 병합된 상태에서 시작했다.
 - 현재 Work: 개발·배포 기반 확보 → 첫 배포·CI·DB 연결, GitHub Issue #2.
 - 구현자는 별도 작업 트리/브랜치에서 승인된 외부 행동 경계를 대상으로 TDD를 진행한다. 구현 후 통합 브랜치에 병합하고 독립 검증·리뷰를 수행한다.
@@ -14,7 +14,7 @@
 | Work | 상태 | 현재 실행 범위 또는 선행 조건 |
 |---|---|---|
 | #1 요구사항·설계·자료 정리 | 완료 | PR #11 병합, 세 Task의 문서·승인 검증 경계·자료 검토 확인. Issue 종료 |
-| #2 첫 배포·CI·DB 연결 | 일부 Task 완료, 배포 대기 | 화면·API·실제 PostgreSQL·마이그레이션·실행기·CI 기반 구현 및 로컬 검증 완료. Railway 외부 계정/프로젝트 설정과 실기기·원격 검증은 미완료 |
+| #2 첫 배포·CI·DB 연결 | 등록 5개 중 4개 Task 완료 | 실제 Railway API·DB·worker 배포 및 사용자 모바일 완료 상태 반영. 배포 안전장치·원격 작업 검증은 진행 전 |
 | #3 로그인·프로필·동의 | 대기 | #2 인수 기준 및 U01/U02/U16의 제품 정책 확정 필요. 라이브러리 등 일반 기술 선택과 사업 정책을 구분 |
 | #4 일정 신청·이용권·모의 결제 | 대기 | #3, 모의 구독·환불·취소 정책 U03/U04 필요 |
 | #5 규칙·데이터·정답 기준 | 정책 결정 필요 | 기술적으로는 #1 완료로 자료 검토 가능하나 기본 순서는 #4 다음. U05~U09/U14/U17/U19 확정 필요 |
@@ -27,7 +27,7 @@
 ## 외부 접근과 검증 조건
 
 - 로컬 Docker Desktop을 시작했고 Docker 서버 `29.8.2`를 확인했다. 실제 PostgreSQL을 사용한 통합 테스트를 준비한다.
-- 초기 확인에서 Railway CLI와 로컬 로그인 설정은 없었다. 실제 배포·과금·서비스 생성이 수행되었다고 기록하지 않는다.
+- 초기 로컬 Railway 로그인은 없었으나 이후 사용자가 서비스를 구성하고 Railway 연결 도구도 연결했다. 공개 배포는 검증했으며 비용·예산 설정은 아직 확인하지 않았다.
 - 제품 동작에 영향을 주지 않는 런타임·의존성·검사 도구 선택은 구현자가 근거와 함께 정리한다. 구독·매칭·신고 등 사업 정책을 임의로 확정하지 않는다.
 - 실제 사용자 시간은 추정하지 않는다. 테스트 결과와 실행 환경·미완료 조건을 분리해 기록한다.
 
@@ -39,7 +39,7 @@
 
 ## Work #2 구현과 검증 결과
 
-검토 산출물: [Draft PR #12](https://github.com/InryeolChoi/SerenTable/pull/12). 제품 기능이나 Work 전체 완료를 뜻하지 않는다. 관련 실행 지침은 [첫 배포 실행 지침](../operations/foundation-runbook.md)이다.
+검토 산출물: [병합된 PR #12](https://github.com/InryeolChoi/SerenTable/pull/12). 제품 기능이나 Work 전체 완료를 뜻하지 않는다. 관련 실행 지침은 [첫 배포 실행 지침](../operations/foundation-runbook.md)이다.
 
 - Python 3.12·Node 22·PostgreSQL 17, uv 잠금 파일, SQLAlchemy/psycopg·Alembic을 기반 도구로 선택했다. U18 중 런타임·DB 도구·자동 검사 구성만 구현했고 외부 운영 설정은 남아 있다.
 - React CSR의 홈·참가자·운영자 준비 화면을 FastAPI 이미지에 포함한다. 로그인·관리자 권한·업무 데이터는 아직 없다.
@@ -49,11 +49,11 @@
 - 커밋 `1029210`의 [GitHub push CI](https://github.com/InryeolChoi/SerenTable/actions/runs/38740355994)가 실제 통과했다. PR·`main`·`integration/mvp` push에서 DB 마이그레이션·HTTP·화면·이미지 검사를 수행한다.
 - 로컬 DB를 `pg_dump`로 백업하고 별도 빈 `serentable_restore_work2` DB에 복원했다. 복원 DB의 API readiness 200과 별도 worker 실행 후 worker-health 200을 확인했다. Railway 백업 설정·복원 검증과는 별개다.
 - 독립 Standards 리뷰는 지적 0건이었다. Spec 리뷰에서는 로컬 테스트 DB 설정 명령 누락 1건을 발견하여 실행 지침을 보완했다. 보완한 환경변수·마이그레이션·테스트 명령으로 HTTP 7개 통과를 다시 확인했다.
-- 사용자가 Railway는 아직 연결하지 않았다고 확인했다. 실제 배포 Task는 계정 연결 후 재개하며, 후속 Work를 완료한 것으로 처리하지 않는다.
+- 초기 Railway 미연결 상태는 해소되었다. 실제 API·DB·worker 배포와 사용자 모바일 확인 결과를 아래 최신 상태에 반영한다.
 
 ### Blaybus에 반영할 Task 기록
 
-두 Task의 공통 위치는 `개발·배포 기반 확보 > 첫 배포·CI·DB 연결`이다. 사용자가 각 Task의 작업 내용 기록란에 아래 문구를 넣고 완료 상태로 바꾸도록 요청한다. 실제 투입 시간은 사용자가 기록한다.
+아래 Task의 공통 위치는 `개발·배포 기반 확보 > 첫 배포·CI·DB 연결`이다. 사용자가 각 Task의 작업 내용 기록란에 아래 문구를 넣고 완료 상태로 바꾸도록 요청한다. 실제 투입 시간은 사용자가 기록한다.
 
 **Task: 최소 React·FastAPI 앱 구성 — 완료**
 
@@ -71,12 +71,42 @@
 관련 PR: https://github.com/InryeolChoi/SerenTable/pull/12
 ```
 
-**Task: Railway 배포 및 모바일 검증 — 진행 중**
+**Task: Railway 배포 — 완료**
 
 ```text
-수행: 동일 이미지의 API/worker와 PostgreSQL 구성, GitHub Wait for CI, 명령·환경변수·healthcheck·비용·백업·원격 검증 절차를 문서화했습니다.
-남은 사항: Railway 계정 연결/실제 배포, CI 실패 배포 차단, 실제 휴대전화 접속, 모바일 Codex 원격 작업, Railway 비용·백업 설정 및 복원 검증입니다. 모바일 크기 자동 테스트를 실기기 검증으로 대체하지 않습니다.
+수행: main의 React CSR·FastAPI·PostgreSQL·별도 worker를 Railway에 배포했습니다. worker 상시 명령이 Pre-deploy에 들어간 오류를 수정하여 Start Command로 옮겼습니다.
+검증: 공개 /api/health의 main 버전 1407e23, DB readiness 200, worker 최신 배포 SUCCESS·실행 replica 1개·로그 heartbeat 및 worker-health 200을 확인했습니다. heartbeat만으로 배포 완료를 판단하지 않습니다.
+배포: https://chanceplate.up.railway.app
+관련 PR: https://github.com/InryeolChoi/SerenTable/pull/12 (병합 완료)
+```
+
+**Task: 첫 화면 모바일 검증 — 완료**
+
+```text
+수행/검증: 사용자가 휴대전화에서 참가자·운영자 화면 이동 시 주소와 제목 변경을 확인했습니다. 사용자가 제공한 23:26 Blaybus 화면에서 이 Task를 완료로 표시한 것을 확인했습니다. 제품 로그인/업무 기능 완료와 구분합니다. 기기 모델·OS·브라우저나 개별 새로고침 결과를 추정하지 않습니다.
 관련 PR: https://github.com/InryeolChoi/SerenTable/pull/12
 ```
 
-Work #2와 Agenda는 완료 처리하지 않는다. Task 추가나 등록 트리 수정은 없다.
+**Task: 배포 안전장치·원격 작업 검증 — 진행 전**
+
+사용자가 추천 후 추가를 완료했다고 확인했다. 새 기능 범위가 아니라 기존 Work 인수 조건의 남은 검증을 분리한 Task다.
+
+| 순서 | 완료 기준 | 현재 증거/상태 |
+|---|---|---|
+| 1 | API·worker Wait for CI 활성화 및 실패한 CI의 배포 차단 확인 | 실제 설정 조회: 두 서비스 모두 source.checkSuites=false. CI 성공만으로 배포 차단 완료라 하지 않음 |
+| 2 | 비용 알림/상한과 Railway 백업·복원 준비 확인 | 월 3~5만원 목표. 실제 설정 미확인, 로컬 별도 DB 복원은 통과 |
+| 3 | 모바일 Codex 지시→GitHub PR→CI 실제 수행 | 아직 수행 근거 없음 |
+
+외부 설정·기기 접근에 따라 30~60분을 예상하며 실제 투입 시간은 사용자가 기록한다. 새로운 Work/Issue를 만들지 않고 Issue #2에서 추적한다. 종합 인수 조건까지 충족한 뒤 Work와 Agenda 완료 여부를 판단하고, 다음 Agenda의 로그인·프로필·동의 Work로 진행한다.
+
+## 사용자 Task 구조 변경 반영
+
+2026-10-15 23:26 화면 기준 네 Task 완료와 뒤이은 추가 완료 답변을 반영했다. 등록 순서는 최신 Blaybus 화면 표시를 따른다.
+
+1. 첫 화면 모바일 검증 — 완료
+2. Railway 배포 — 완료
+3. DB 연결과 CI 구성 — 완료
+4. 최소 React·FastAPI 앱 구성 — 완료
+5. 배포 안전장치·원격 작업 검증 — 진행 전
+
+Work `첫 배포·CI·DB 연결`은 진행 중이다. 이 변경은 기존 ‘Railway 배포 및 모바일 검증’ 통합 Task를 대체한다. 사용자 원본 data/는 수정하거나 Git에 추가하지 않는다.
