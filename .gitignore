@@ -14,3 +14,7 @@ coverage/
 tmp/
 # 제공받은 원본 자료는 로컬에서 참조한다.
 docs/*.pdf
+
+frontend/test-results/
+frontend/playwright-report/
+.ruff_cache/
