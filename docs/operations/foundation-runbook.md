@@ -1,6 +1,6 @@
 # 첫 배포·CI·DB 연결 실행 지침
 
-대상: 개발·배포 기반 확보 → 첫 배포·CI·DB 연결, Issue #2. 기반 구현은 인증·매칭·업무 처리를 완성하지 않는다. 참가자/어드민 경로는 공개 준비 화면이며 관리 데이터가 없다. 실제 Railway 자원과 모바일 기기 검증은 별도 완료 증거가 필요하다.
+대상: 개발·배포 기반 확보 → 첫 배포·CI·DB 연결, Issue #2. 기반 구현은 인증·매칭·업무 처리를 완성하지 않는다. 참가자/어드민 경로는 공개 준비 화면이며 관리 데이터가 없다. 현재 공개 URL은 https://chanceplate.up.railway.app 이다. 실제 배포·모바일 확인 결과와 남은 운영 검증은 [실행 기록](../design/implementation-progress.md)에 구분한다.
 
 ## 런타임과 의존성
 
@@ -95,7 +95,7 @@ CI는 모든 PR과 `main`, `integration/mvp` push에서 실행한다. 별도 Pos
 |---|---|---|
 | 소스·루트 | GitHub SerenTable, 루트 `/` | 동일 |
 | 빌드 | 루트 Dockerfile | 동일 |
-| 배포 브랜치 | 초기 `integration/mvp`, 최종 승인 후 `main` | 동일 |
+| 배포 브랜치 | `main` (PR #12 병합 후 적용) | 동일 |
 | Wait for CI | 켜기 | 켜기 |
 | 시작 명령 | `python -m serentable.server` | `python -m serentable.worker` |
 | pre-deploy 명령 | `alembic upgrade head` | 없음 |
@@ -145,3 +145,12 @@ docker compose exec -T postgres pg_restore -U serentable -d serentable_restore -
 - [비용 제어](https://docs.railway.com/pricing/cost-control)
 - [볼륨 백업](https://docs.railway.com/volumes/backups)
 - [uv GitHub Actions](https://docs.astral.sh/uv/guides/integration/github/)
+
+
+## 현재 검증과 다음 Task
+
+2026-10-15 사용자 Blaybus 상태: 첫 화면 모바일 검증 / Railway 배포 / DB 연결과 CI 구성 / 최소 React·FastAPI 앱 구성 완료. 새 Task `배포 안전장치·원격 작업 검증`은 진행 중이며 기존 인수 기준을 이어받는다.
+
+초기 조회에서 꺼져 있던 API·worker의 `source.checkSuites`를 true로 활성화했다. 임시 검증 브랜치의 실패 CI는 두 배포 모두 SKIPPED, 정상 복구 CI는 두 배포 모두 SUCCESS였다. 두 서비스의 main 복구와 공개 상태 응답을 확인했다([실제 기록](./ci-gate-verification.md)). 비용·백업 설정과 모바일 Codex 수행은 남아 있다.
+
+worker Pre-deploy에 상시 실행 명령을 넣으면 종료를 기다리며 배포가 멈춘다. worker의 Pre-deploy는 비워 두고 Start Command에 `python -m serentable.worker`를 넣는다. 해당 위치 오류를 수정한 뒤 배포 `8cc2fc2a-b9a7-4026-9c66-11a1c33381c4`의 SUCCESS, 실행 replica 1개와 heartbeat를 확인했다. heartbeat 응답만으로 배포 성공을 판단하지 않는다.
