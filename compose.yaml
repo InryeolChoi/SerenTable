@@ -1,0 +1,41 @@
+x-runtime: &runtime
+  image: serentable-foundation:local
+  build: .
+  environment:
+    DATABASE_URL: postgresql://serentable:localonly@postgres:5432/serentable
+    APP_VERSION: local-compose
+  init: true
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: serentable
+      POSTGRES_PASSWORD: localonly
+      POSTGRES_DB: serentable
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U serentable -d serentable"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  migrate:
+    <<: *runtime
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+  app:
+    <<: *runtime
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  worker:
+    <<: *runtime
+    command: ["python", "-m", "serentable.worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+volumes:
+  postgres_data:
