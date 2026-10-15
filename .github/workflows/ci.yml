@@ -1,0 +1,50 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main, integration/mvp]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: serentable
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: serentable_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U serentable -d serentable_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://serentable:ci-only@127.0.0.1:5432/serentable_test
+      TEST_DATABASE_URL: postgresql://serentable:ci-only@127.0.0.1:5432/serentable_test
+      PYTHONPATH: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.13.1'
+          python-version: '3.12'
+          enable-cache: true
+      - run: npm ci --prefix frontend
+      - run: npm run build --prefix frontend
+      - run: uv sync --locked
+      - run: uv run ruff check backend tests migrations
+      - run: uv run ruff format --check backend tests migrations
+      - run: uv run alembic upgrade head
+      - run: uv run pytest -q
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npm run test:e2e --prefix frontend
+      - name: Build runtime image
+        run: docker build --tag serentable:ci .
