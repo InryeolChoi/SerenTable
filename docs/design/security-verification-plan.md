@@ -1,12 +1,16 @@
 # 개인정보·권한·보안 검증 기준
 
-**Task:** 개발·배포 기반 확보 → 핵심 데이터·화면·보안 설계 → 개인정보·권한·보안 검증 기준 정리  
-**추적:** [Task Issue #19](https://github.com/InryeolChoi/SerenTable/issues/19), [Work Issue #15](https://github.com/InryeolChoi/SerenTable/issues/15)  
+**Task:** 개발·배포 기반 확보 → 핵심 데이터·화면·보안 설계 → 개인정보·권한·보안 검증 기준 정리
+
+**추적:** [Task Issue #19](https://github.com/InryeolChoi/SerenTable/issues/19), [Work Issue #15](https://github.com/InryeolChoi/SerenTable/issues/15)
+
 **기준일:** 2026-10-16, Asia/Seoul. 보안 설계와 읽기 전용 현황 점검 산출물이다. 인증·업무 데이터·보안 기능을 구현하거나 배포 안전성을 인증한 결과가 아니다.
 
 ## 적용 범위와 결정 상태
 
 [구현 명세서](./mvp-implementation-spec.md), [요구사항 대조](./requirements-source-comparison.md), [자료 감사](./data-assets-review.md), [승인한 설계 배치](./design-readiness-plan.md)를 기준으로 한다. PRD의 확정 전 개인정보 비공개, 확정 후 제한된 소개, 본인 정보 수정, 테이블 한정 채팅, 비공개 사람별 선호·신고, 허용된 운영자 접근과 주요 변경 이력을 유지한다.
+
+같은 Work의 [핵심 ERD·상태 설계](./core-data-model.md), [공통 UI·핵심 화면 흐름](./ui-flow-design.md)과 객체 소유권·확정 상태·공개 범위를 맞춘다.
 
 아래 세 종류를 구분한다.
 
