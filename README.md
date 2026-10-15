@@ -34,11 +34,11 @@
 - [별도 작업 실행기](docs/adr/0006-separate-job-runner.md)
 - [실제 신청 폼 참고](docs/design/application-form-reference.md)
 - [이용권 범위](docs/adr/0007-prd-ticket-scope.md)
-- [Blaybus 계획 등록 초안](docs/design/blaybus-plan.md)
+- [Blaybus 구조·운영 기록](docs/design/blaybus-plan.md)
 
 공식 PRD가 요구사항 기준이다. 제공받은 PDF는 로컬 `docs/`에 보관하며 Git에는 포함하지 않는다. 문서의 원본 PDF 링크는 해당 파일이 있는 로컬 환경에서 확인할 수 있다. 현장 Q&A와 PRD의 차이는 설계 인터뷰에 명시한다.
 
-사용자가 Blaybus Workspace 등록을 완료했다. 계획·실제 진행·투입 시간은 Blaybus에 기록하고 GitHub의 설계·PR·검증 근거를 연결한다. Blaybus는 사용자가 수동 갱신하며, AI가 자동 동기화했다고 기록하지 않는다. GitHub Work Issue 발행은 검토 대기 중이다.
+사용자가 Blaybus Workspace 등록을 완료했다. 계획·실제 진행·투입 시간은 Blaybus에 기록하고 GitHub의 설계·PR·검증 근거를 연결한다. Blaybus는 사용자가 수동 갱신하며, AI가 자동 동기화했다고 기록하지 않는다. [Work Issue 10개](https://github.com/InryeolChoi/SerenTable/issues)가 발행되었으며 선행 관계에 따라 착수한다.
 
 작업 완료 시 사용자에게 Blaybus 수동 갱신 위치·기록 문구·상태·증거를 안내한다. Work 완료와 Agenda 변경은 실제 조건 충족 시 요청한다. 상세 형식은 [Workspace 운영 기록](docs/design/blaybus-plan.md)을 따른다.
 

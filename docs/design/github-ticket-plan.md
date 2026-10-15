@@ -154,3 +154,23 @@
 3. 병합/분할이 필요하면 사용자에게 Blaybus 수정 위치·이유·완료 기준·일정 영향을 먼저 제공한다. 승인 전 Work를 임의 분할하거나 Issue를 추가하지 않는다.
 
 Work 10개의 분할/의존성은 기준안으로 승인되었고 제품 외부 행동 주 경계와 작은 매칭 정답 비교 보조 경계도 사용자 확인을 받았다. 이후 실제 결과를 근거로 변경안을 제시한다.
+
+
+## 발행 결과
+
+Work 10개를 순서대로 발행하고 GitHub 네이티브 차단 관계 10개를 설정했다. 모든 Issue는 열린 상태이며 `ready-for-agent` 라벨을 적용했다. 선행이 남은 Work는 해당 조건 충족 후 착수한다.
+
+| 순서 | Work Issue | 직접 선행 Issue |
+|---|---|---|
+| 1 | [#1 [A1-W1] 요구사항·설계·자료 정리](https://github.com/InryeolChoi/SerenTable/issues/1) | 없음 |
+| 2 | [#2 [A1-W2] 첫 배포·CI·DB 연결](https://github.com/InryeolChoi/SerenTable/issues/2) | [#1](https://github.com/InryeolChoi/SerenTable/issues/1) |
+| 3 | [#3 [A2-W1] 로그인·프로필·동의](https://github.com/InryeolChoi/SerenTable/issues/3) | [#2](https://github.com/InryeolChoi/SerenTable/issues/2) |
+| 4 | [#4 [A2-W2] 일정 신청·이용권·모의 결제](https://github.com/InryeolChoi/SerenTable/issues/4) | [#3](https://github.com/InryeolChoi/SerenTable/issues/3) |
+| 5 | [#5 [A3-W1] 규칙·데이터·정답 기준](https://github.com/InryeolChoi/SerenTable/issues/5) | [#1](https://github.com/InryeolChoi/SerenTable/issues/1) |
+| 6 | [#6 [A3-W2] 예약 매칭·재배치·실패 해결](https://github.com/InryeolChoi/SerenTable/issues/6) | [#4](https://github.com/InryeolChoi/SerenTable/issues/4), [#5](https://github.com/InryeolChoi/SerenTable/issues/5) |
+| 7 | [#7 [A4-W1] 식당·채팅·알림](https://github.com/InryeolChoi/SerenTable/issues/7) | [#6](https://github.com/InryeolChoi/SerenTable/issues/6) |
+| 8 | [#8 [A4-W2] 참석·피드백·다음 추천](https://github.com/InryeolChoi/SerenTable/issues/8) | [#7](https://github.com/InryeolChoi/SerenTable/issues/7) |
+| 9 | [#9 [A5-W1] 운영자 예외·안전 종합 관리](https://github.com/InryeolChoi/SerenTable/issues/9) | [#8](https://github.com/InryeolChoi/SerenTable/issues/8) |
+| 10 | [#10 [A5-W2] 통합 검증·제출](https://github.com/InryeolChoi/SerenTable/issues/10) | [#9](https://github.com/InryeolChoi/SerenTable/issues/9) |
+
+Issue 1의 본문에는 전체 구현 명세와 Work 체크리스트를 게시했다. 현재 Task의 문서 PR은 Issue 1을 참조하며 자동 종료 키워드를 사용하지 않는다. 다른 Task의 빈 PR이나 제품 구현은 생성하지 않았다.
