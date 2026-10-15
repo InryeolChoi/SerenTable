@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>우연한 식탁 · 핵심 ERD</title>
+<style>
+*{box-sizing:border-box}body{margin:0;color:#24302c;background:#f5f7f6;font:16px/1.65 system-ui,sans-serif}main{max-width:1500px;margin:auto;padding:24px}h1{margin:0 0 8px;font-size:28px}p{margin:8px 0}.note{padding:12px 16px;border-left:4px solid #38644f;background:#eaf2ed}.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:20px 0}select,button{font:inherit;min-height:44px;padding:8px 12px;border:1px solid #92a49a;border-radius:6px;background:white;color:inherit}a{color:#245a43;text-underline-offset:3px}input{min-height:44px;max-width:180px}button,a,input,select{touch-action:manipulation}:focus-visible{outline:3px solid #2864ad;outline-offset:3px}.canvas{height:68vh;min-height:380px;overflow:auto;border:1px solid #b9c9bf;background:white}.canvas img{display:block;height:auto;max-width:none}#description{font-weight:600}.legend{display:flex;flex-wrap:wrap;gap:12px 24px;font-size:14px}.legend code{font-size:15px}details{margin-top:20px}li{margin:6px 0}@media(max-width:600px){main{padding:16px}h1{font-size:24px}.canvas{height:60vh}}
+</style>
+</head>
+<body><main>
+<h1>우연한 식탁 · 핵심 ERD</h1>
+<p class="note">구현 전 관계 설계안입니다. 운영 DB에 적용된 스키마가 아닙니다. 현재 업무 DB에는 worker heartbeat만 있으며 미결정 정책은 별도로 유지합니다.</p>
+<div class="toolbar">
+<label for="diagram">그림 선택</label>
+<select id="diagram">
+<option value="application-payment">1. 신청·동의·결제·참가 권리</option>
+<option value="matching-gathering">2. 매칭·배치·식당·채팅·알림</option>
+<option value="feedback-operations">3. 참석·피드백·안전·작업·감사</option>
+</select>
+<label for="zoom">확대</label><input id="zoom" type="range" min="25" max="200" step="25" value="100"><output id="scale" for="zoom">100%</output>
+<button id="fit" type="button">화면 너비에 맞추기</button>
+<a id="svg" href="application-payment.svg" target="_blank" rel="noopener">SVG 원본 열기</a>
+<a id="png" href="application-payment.png" download>PNG 내려받기</a>
+</div>
+<p id="description" aria-live="polite"></p>
+<div class="canvas" tabindex="0" aria-label="ERD 그림 영역. 방향키와 스크롤로 이동할 수 있습니다."><img id="image" src="application-payment.svg" alt="신청·동의·결제·참가 권리 ERD"></div>
+<p class="legend"><span><code>||</code> 정확히 하나</span><span><code>o|</code> 없거나 하나</span><span><code>o{</code> 없거나 여러 개</span><span><code>PK</code> 기본키</span><span><code>FK</code> 참조키</span></p>
+<details open><summary>읽는 방법과 핵심 구분</summary><ul>
+<li><strong>Application</strong>: 한 번의 참여 의사, <strong>ApplicationCandidate</strong>: 동의한 날짜·시간·지역 후보입니다.</li>
+<li><strong>MatchParticipation</strong>: 회차별 처리 기록, <strong>TableAssignment</strong>: 실제 테이블 배치입니다.</li>
+<li>신청·결제·매칭·참석 상태는 분리합니다. 결제 완료가 테이블 확정을 뜻하지 않습니다.</li>
+<li>이동·환불·권리 사용의 경쟁, 4~6인·연령·제외 관계 조건은 그림만으로 보장되지 않습니다. 트랜잭션과 제약 책임은 <a href="../core-data-model.md">설계 원문</a>을 함께 확인합니다.</li>
+<li>그림은 설계 원문의 Mermaid 블록에서 생성했습니다. 변경 시 <code>scripts/render_erd.py</code>로 다시 생성합니다.</li>
+</ul></details>
+</main><script>
+const diagrams={
+  'application-payment':{alt:'신청·동의·결제·참가 권리 ERD',text:'신청은 여러 허용 회차 후보를 가지며, 결제·권리·회차별 매칭 기록과 연결됩니다.'},
+  'matching-gathering':{alt:'매칭·배치·식당·채팅·알림 ERD',text:'매칭 실행과 실제 배치를 구별하고 식당 재고·단체방·안내를 연결합니다.'},
+  'feedback-operations':{alt:'참석·피드백·안전·작업·감사 ERD',text:'실제 참가 결과와 비공개 선호·신고, 작업 시도·감사를 구분합니다. 그림 사이 같은 이름은 동일 개념입니다.'}
+};
+const select=document.querySelector('#diagram'),zoom=document.querySelector('#zoom'),image=document.querySelector('#image'),canvas=document.querySelector('.canvas');
+function resize(){image.style.width=canvas.clientWidth*Number(zoom.value)/100+'px';document.querySelector('#scale').value=zoom.value+'%';}
+function show(){const key=select.value;image.src=key+'.svg';image.alt=diagrams[key].alt;document.querySelector('#description').textContent=diagrams[key].text;document.querySelector('#svg').href=key+'.svg';document.querySelector('#png').href=key+'.png';canvas.scrollTo(0,0);resize();}
+select.addEventListener('change',show);zoom.addEventListener('input',resize);document.querySelector('#fit').addEventListener('click',()=>{zoom.value='100';resize();});window.addEventListener('resize',resize);show();
+</script></body></html>
