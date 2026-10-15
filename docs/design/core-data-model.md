@@ -162,8 +162,8 @@ erDiagram
     TableAssignment ||--o| Feedback : evaluates
     Feedback ||--o{ PersonPreference : expresses
     User ||--o{ PersonPreference : targets
-    User ||--o{ SafetyReport : submits
-    User ||--o{ SafetyReport : concerns
+    "User (reporter)" ||--o{ SafetyReport : submits
+    "User (subject)" ||--o{ SafetyReport : concerns
     User ||--o{ ExclusionRelation : source
     User ||--o{ ExclusionRelation : target
     SafetyReport ||--o{ SafetyAction : reviewed_with
@@ -174,7 +174,7 @@ erDiagram
     User |o--o{ AuditRecord : may_act
 ```
 
-동일 User의 두 관계는 제출자/대상자 등 역할이 다른 FK다. 시스템 메시지와 실행기 감사는 사용자 FK가 없을 수 있으며 별도 시스템 주체·원인·작업 식별을 남긴다. 신청은 실제 근거로 사용한 목적별 동의 기록을 참조하며 앱의 동의 버전/시각을 원본 설문에서 추정하지 않는다.
+동일 User의 두 관계는 제출자/대상자 등 역할이 다른 FK다. 그림의 `User (reporter)`·`User (subject)`는 선과 라벨이 겹치지 않게 역할별로 표시한 같은 User의 별칭이며 별도 테이블이 아니다. 시스템 메시지와 실행기 감사는 사용자 FK가 없을 수 있으며 별도 시스템 주체·원인·작업 식별을 남긴다. 신청은 실제 근거로 사용한 목적별 동의 기록을 참조하며 앱의 동의 버전/시각을 원본 설문에서 추정하지 않는다.
 
 이전 만남은 확정 배치·실제 참석을 근거로 하며 어떤 참석 결과를 셀지는 U08/U15다. 신청·동명·미확정 후보 조합만으로 만남 이력을 만들지 않는다. 사람별 선호는 방향이 있는 비공개 기록이며 한쪽 회피도 조합 검증에 반영하되 쌍방의 선호로 바꾸지 않는다. 제외 관계는 차단·비선호·신고의 근거, 유효/해제, 변경 주체를 구별한다. 신고 접수와 확정 조치는 별개다(U09).
 
