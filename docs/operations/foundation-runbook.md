@@ -6,7 +6,9 @@
 
 구현은 Python 3.12, Node 22 LTS, PostgreSQL 17, uv 0.13.1을 기준으로 한다. ORM은 SQLAlchemy와 psycopg, 마이그레이션은 Alembic이다. Python 의존성은 `uv.lock`, 화면은 `frontend/package-lock.json`을 고정한다. 로컬·CI·Docker에서 같은 minor와 lock을 사용한다. 초기 로컬 화면 빌드는 호스트 Node26에서도 확인했으며 실제 Node22 빌드는 Docker에서 확인한다.
 
-uv 설치와 Node22, Docker Desktop 실행 후 저장소 루트에서 실행한다.
+## Docker로 앱 동작 확인
+
+Docker Desktop만 실행한 뒤 저장소 루트에서 실행한다. Node·Python·uv는 이미지 안에서 설치되므로 호스트에 설치할 필요가 없다. 이 경로는 컨테이너 앱의 동작 확인이며 호스트 자동 테스트 실행과 구분한다.
 
 ```sh
 docker compose up --build -d
@@ -18,25 +20,72 @@ docker compose logs app worker
 
 화면은 `/`, `/participant`, `/admin`에 있다. Docker의 Node 단계가 화면을 빌드하고 Python 이미지에 포함한다. API와 작업 실행기는 같은 이미지다. 로컬 DB와 포트는 외부 공개하지 않는다. `compose.yaml`의 비밀번호는 로컬 전용 예제이며 호스팅 DB에 재사용하지 않는다. `docker compose down`은 볼륨을 보존한다. `down -v`는 데이터를 삭제하므로 기본 정리 명령으로 쓰지 않는다.
 
-코드 수정 후 로컬 프로세스로 검증하려면 `uv sync --locked`, `npm ci --prefix frontend`, `npm run build --prefix frontend`을 실행한다. `.env.example`은 참조만 하며 자동으로 읽지 않는다. `DATABASE_URL`을 실제 로컬 DB에 설정하고 `uv run alembic upgrade head` 후 `uv run uvicorn serentable.main:app --app-dir backend`으로 실행한다. 준비 화면만 확인할 때 DB 없이 liveness는 200, readiness는 503이다.
+## 호스트에서 자동 검사 실행
 
-## 자동 검사
+이 경로는 호스트에 Node22·uv 0.13.1과 Python 3.12가 필요하다. 아래 명령은 저장소 루트의 같은 셸에서 순서대로 실행한다. `.env`와 `.env.example`은 자동으로 읽지 않으므로 두 DB 변수를 명시적으로 export해야 한다. **테스트에는 운영 DB나 일반 개발 DB를 지정하지 않는다.** 별도 PostgreSQL 인스턴스를 테스트 전용으로 사용한다.
 
-CI는 모든 PR과 `main`, `integration/mvp` push에서 실행한다. PostgreSQL 서비스 컨테이너를 시작하고 화면 타입 검사/빌드, Python lint/format, Alembic upgrade, 실제 DB HTTP 통합 테스트, Chromium 모바일 크기 화면 이동/새로고침, 런타임 이미지 빌드를 필수 단계로 수행한다. 조건부 성공이나 DB 없는 skip을 사용하지 않는다.
+### 1. 별도 테스트 DB 준비
 
-테스트 DB는 운영 DB와 별도 인스턴스를 사용한다. 아래 명령의 `TEST_DATABASE_URL`은 같은 로컬 전용 테스트 DB다. 외부 제품 동작은 HTTP와 별도 worker 프로세스로 확인하고 DB 내부 레코드를 기대값으로 조회하지 않는다.
+로컬 `127.0.0.1:55432`에만 공개한 테스트 전용 컨테이너를 생성한다. Compose의 앱 DB와 별개이다. 다음 비밀번호는 로컬 테스트 예제이며 호스팅에 재사용하지 않는다.
 
 ```sh
+docker run --name serentable-foundation-pg \
+  -e POSTGRES_USER=serentable \
+  -e POSTGRES_PASSWORD=localtest \
+  -e POSTGRES_DB=serentable_test \
+  -p 127.0.0.1:55432:5432 \
+  -d postgres:17-alpine
+```
+
+이미 같은 이름의 테스트 전용 컨테이너가 있으면 생성 명령을 반복하지 않는다. `docker ps -a`에서 대상과 포트·DB 용도를 확인하고, 중지되어 있으면 `docker start serentable-foundation-pg`로 시작한다. 다른 DB가 55432를 사용하면 임의로 종료하지 말고 새 로컬 포트와 아래 두 URL을 함께 바꾼다. DB 준비를 최대 30초 기다리고 실패하면 검사를 시작하지 않는다.
+
+```sh
+(
+  for attempt in $(seq 1 30)
+  do
+    if docker exec serentable-foundation-pg pg_isready -U serentable -d serentable_test
+    then
+      exit 0
+    fi
+    sleep 1
+  done
+  exit 1
+)
+```
+
+### 2. 같은 테스트 DB를 앱과 테스트에 지정
+
+```sh
+export DATABASE_URL='postgresql://serentable:localtest@127.0.0.1:55432/serentable_test'
+export TEST_DATABASE_URL="$DATABASE_URL"
+export PYTHONPATH=backend
+uv sync --locked
+npm ci --prefix frontend
 npm run build --prefix frontend
 uv run alembic upgrade head
-PYTHONPATH=backend uv run pytest -q
+uv run pytest -q
 uv run ruff check backend tests migrations
 uv run ruff format --check backend tests migrations
+```
+
+`DATABASE_URL`은 마이그레이션과 앱/worker가, `TEST_DATABASE_URL`은 통합 테스트가 사용한다. 서로 다른 DB로 지정하면 마이그레이션과 검증 대상이 달라지므로 같은 테스트 전용 URL로 설정한다. 외부 동작은 HTTP와 별도 worker 프로세스로 확인하고 DB 내부 레코드를 기대값으로 조회하지 않는다.
+
+### 3. 브라우저 검사와 8000 포트 충돌
+
+Playwright는 테스트용 API를 `127.0.0.1:8000`에 직접 시작한다. Compose 앱이나 수동 Uvicorn이 이미 이 포트를 사용하면 기존 서버를 재사용하지 않고 실패하도록 구성되어 있다. 다른 검증이나 복원 작업이 진행 중이면 중단하지 말고 브라우저 검사를 나중에 실행한다. Compose 앱을 멈춰도 되는 시점에만 같은 Compose 프로젝트의 `docker compose stop app`으로 앱 하나를 중지한다. 별도 프로젝트 이름을 사용했다면 `docker compose -p 해당이름 stop app`으로 대상을 명시한다. DB·worker와 볼륨은 종료·삭제하지 않는다. 수동 Uvicorn은 해당 터미널에서 종료한다.
+
+8000이 비어 있고 앞 단계와 같은 DB 환경변수가 설정된 셸에서 실행한다.
+
+```sh
 npm exec --prefix frontend -- playwright install chromium
 npm run test:e2e --prefix frontend
 ```
 
-마지막 브라우저 검사는 테스트 도구의 모바일 화면 에뮬레이션이다. 실제 모바일 기기 접속 완료를 뜻하지 않는다.
+검사 후 Compose 앱을 다시 사용할 경우 중지한 동일 프로젝트에서 `docker compose start app`을 실행한다. 마지막 브라우저 검사는 모바일 화면 에뮬레이션이며 실제 모바일 기기 접속 완료를 뜻하지 않는다. 준비 화면만 별도로 확인하려면 `uv run uvicorn serentable.main:app --app-dir backend`을 사용한다. DB 변수 없이 실행한 경우 liveness는 200, readiness는 503이다.
+
+## CI 자동 검사
+
+CI는 모든 PR과 `main`, `integration/mvp` push에서 실행한다. 별도 PostgreSQL 서비스 컨테이너와 두 DB 변수를 워크플로에서 설정하고 화면 타입 검사/빌드, Python lint/format, Alembic upgrade, 실제 DB HTTP 통합 테스트, Chromium 모바일 크기 화면 이동/새로고침, 런타임 이미지 빌드를 필수 단계로 수행한다. 조건부 성공이나 DB 없는 skip을 사용하지 않는다.
 
 ## Railway 서비스 설정
 
