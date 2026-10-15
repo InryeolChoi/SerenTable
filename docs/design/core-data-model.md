@@ -12,6 +12,8 @@
 
 현재 적용된 제품 스키마는 없고 마이그레이션은 `worker_heartbeat`만 생성한다. 이 Task는 DB 적재·마이그레이션·제품 API를 만들지 않는다. 제안한 제약이나 잠금이 운영 DB에서 보장된다고 해석하지 않는다. 사용자 승인에 따라 배포 검증과 설계 Task를 병행하되 부모 Work의 배포·원격 검증, 기능별 정책 선행 조건은 유지한다.
 
+같은 Work의 [공통 UI·핵심 화면 흐름](./ui-flow-design.md), [개인정보·권한·보안 검증 기준](./security-verification-plan.md)과 상태 표시·객체 접근 범위를 함께 검토한다.
+
 ## 책임과 식별
 
 같은 FastAPI 코드베이스에서 API와 실행기가 동일한 업무 규칙을 사용한다. 아래 경계는 별도 서비스나 범용 프레임워크를 늘리는 요구가 아니다.
@@ -252,6 +254,8 @@ ScheduledJob은 시각·대상·논리 효과 키·처리 결과·다음 시도 
 외부 푸시는 발송 뒤 결과 저장 전 중단되면 중복될 수 있다. 제공자 멱등 기능이 없으면 그 가능성을 기록하고 내부 중복 방지와 구별한다. 외부 exactly-once 전달을 보장하지 않는다. 푸시 미허용·미지원도 전달 성공과 다르게 조회한다.
 
 ## 검증 계약과 반례
+
+2026-10-16 Mermaid CLI(`@mermaid-js/mermaid-cli` 11.17.0)의 `/private/tmp/serentable-mermaid/node_modules/.bin/mmdc`로 이 문서의 Mermaid 세 블록을 실제 SVG로 렌더링했고 모두 성공했다. 결과는 로컬 검증 경로 `/private/tmp/serentable-mermaid/core-data-model-1.svg`, `core-data-model-2.svg`, `core-data-model-3.svg`에 남겼다. 임시 산출물은 저장소에 포함하지 않으며, 이 검사는 다이어그램 구문·렌더링 확인이다. DB 제약의 구현이나 런타임 동작을 증명하지 않는다.
 
 실행 코드가 없어 런타임 테스트를 추가하지 않는다. 후속 구현·독립 검증은 승인된 실제 PostgreSQL + 공개 API + 별도 실행기 경계에서 수행한다. 내부 메서드나 DB 직접 조회만으로 합격시키지 않는다. 상태/이력 조회는 각 기능 API에 포함하되 무권한 시험용 상태 변경 API는 공개하지 않는다.
 
