@@ -13,15 +13,17 @@
 | API·DB·worker 실행 | 환경 상태 세 서비스 online, 실행 replica 각 1개, pendingWork 없음 | 확인 |
 | 공개 HTTP | `/api/health` 버전 `cef5df16d5adec5fbc3545ae892542341571bb18`, `/api/readiness` DB connected, `/api/worker-health` alive. 모두 HTTP 200 | 확인 |
 | worker 명령 위치 | Start `python -m serentable.worker`, Pre-deploy 빈 배열. API Pre-deploy는 `alembic upgrade head` | 확인 |
-| 배포 준비 검사 경로 | 현재 API config에 healthcheckPath 없음. 앱의 readiness API와 Railway의 배포 healthcheck 설정은 별개 | 보완 필요 |
-| 비용 제어 | 월 3~5만원 목표만 승인됨. 실제 사용량·알림·중단 한도 조회는 사용자 확인 중 | 미검증 |
-| Railway 백업 | Postgres volume 존재 확인. 예약 주기·최근 성공·클라우드 복원 여부는 미확인 | 미검증 |
+| 배포 준비 검사 경로 | 비어 있던 API healthcheckPath를 `/api/readiness`, timeout 300초로 설정. 기존 main 이미지 재배포 SUCCESS·실행 replica 1개 확인 | 보완 및 확인 |
+| 비용 제어 | 사용자 00:29 화면: Hobby, 10/15~11/15 기간 Current Usage $0.00, Included Usage $5.00, Estimated Bill $0.00. Agent 한도 $5.00은 Compute 한도와 별개. 실제 Compute 알림/중단 한도는 미확인 | 일부 확인 |
+| Railway 백업 | 사용자 00:30 Postgres Backups 화면: No Backups, 신규/예약 백업·PITR에 Pro 업그레이드 필요 안내. 해당 계정에서 예약 백업이 가능하다고 가정하지 않음 | 부재·플랜 제약 확인, 대체 복구 경로 미실행 |
 | 로컬 복원 | [기존 실제 복원 기록](../design/implementation-progress.md): 별도 빈 DB 복원 뒤 API·worker 응답 확인 | 완료, 클라우드 백업의 증거로 대체하지 않음 |
-| 모바일 원격 지시 | 접속 가능 사용자 확인 및 `REMOTE-20261016` 지시 수신. 아래 증거 연결 | 실행 중 |
+| 모바일 원격 지시 | 접속 가능 사용자 확인 및 `REMOTE-20261016` 지시 수신 → commit `73c056b` → PR #20 → CI 38760875571 success | 완료 |
 
 배포 조회: API `1875757c-c8a2-4276-92a9-b5936a89eb6a`, worker `4b7593f9-d758-4488-b13a-f7a681828be4`, Postgres `824f2670-2e44-4738-8e6d-cabde697b5be`가 SUCCESS였다. API·worker 각 실행 replica 1개를 함께 확인했으며 heartbeat만으로 배포 성공을 판단하지 않았다.
 
 API는 Southeast Asia, DB도 Southeast Asia, worker는 US West에 있다. 지역 통일은 지연·전송비 검토 후 수행할 보완 후보이며 이번 조회에서 변경하지 않았다.
+
+API healthcheck 보완 후 배포는 `7c88059a-0748-4f17-bc8b-93f0bb5154d6`로 SUCCESS였다. 적용된 설정을 다시 조회해 `/api/readiness`·300초를 확인했다. 같은 main 이미지를 재사용했고 source main/checkSuites=true를 유지했다. readiness가 통과하기 전 트래픽 전환을 막기 위한 배포 시점 검사이며 상시 장애 감시는 아니다. 이 외 클라우드 설정은 변경하지 않았다. 근거: [Railway healthcheck](https://docs.railway.com/deployments/healthchecks).
 
 ## 원격 지시에서 PR·CI까지
 
@@ -32,8 +34,8 @@ API는 Southeast Asia, DB도 Southeast Asia, worker는 US West에 있다. 지역
 | 모바일 접속 | 사용자 답변: 휴대폰에서 이 대화에 원격 접속 가능 |
 | 원격 지시 수신 | 이 대화의 `REMOTE-20261016` 요청 |
 | 호스트 작업 | Task 전용 `codex/task16-deployment-safety`에서 이 검증 기록 작성·커밋 |
-| GitHub 연결 | Task #16을 참조하는 별도 PR, 링크는 PR 생성 후 추가 |
-| CI | 해당 PR의 GitHub Actions 결과, 실행 후 추가 |
+| GitHub 연결 | commit `73c056b5b64ccd129ee7c9c5fedfd0ab907fbab7`, [Task 전용 PR #20](https://github.com/InryeolChoi/SerenTable/pull/20) |
+| CI | 해당 커밋의 [GitHub Actions 38760875571](https://github.com/InryeolChoi/SerenTable/actions/runs/38760875571) verify SUCCESS |
 
 원격 작업 중에도 호스트의 저장소·인증·승인·도구 권한을 사용한다. 호스트가 절전·오프라인이거나 앱이 종료되면 이 경로가 중단될 수 있다. 새 비밀값을 휴대폰 대화에 붙여 넣는 방식으로 연결하지 않는다. 공식 근거: [OpenAI 원격 연결](https://learn.chatgpt.com/docs/remote-connections).
 
@@ -46,12 +48,12 @@ API는 Southeast Asia, DB도 Southeast Asia, worker는 US West에 있다. 지역
 3. 실제 값과 확인 시각을 기록한다. 아직 없는 한도를 임의로 설정하지 않고, 원화 예산과 환율·청구 범위를 확인하여 결정한다. hard limit 도달 시 workload가 중단된다.
 4. 가동 첫 24시간 실제 사용량과 이후 일별 추이를 기록하여 예산 목표를 점검한다. 일시점의 적은 사용량으로 월 비용을 보장하지 않는다.
 
-현재 Railway 연결 도구에는 비용·백업 조회 수단이 없고 로컬 Railway CLI는 설치되지 않았다. Safari 화면 조작은 사용자 입력과 겹쳐 중단되었으므로 사용자에게 해당 두 화면의 값만 요청했다. 조회 실패를 미설정으로 단정하지 않는다.
+현재 Railway 연결 도구에는 비용·백업 조회 수단이 없고 로컬 Railway CLI는 설치되지 않았다. Safari 화면 조작은 사용자 입력과 겹쳐 중단되었고 사용자가 두 화면을 제공했다. 그 화면의 금액·플랜·백업 부재를 위 표에 반영했으며, Compute 한도 미확인을 미설정으로 단정하지 않는다. 현재 사용량 $0.00 표시만으로 최종 청구가 무료라고 결론내리지 않는다.
 
 ### 백업·복원
 
-1. Postgres → Backups 또는 연결 volume의 Backups에서 예약 주기·최근 성공 시각·보존 범위를 확인한다.
-2. 첫 유효 백업과, 백업이 생기기 전 데이터 손실 범위를 기록한다. 설정만으로 복원 검증을 완료 처리하지 않는다.
+1. 현재 계정은 Hobby이며 제공 화면에서 Pro 기능 제한을 확인했다. 기존 실행 지침의 예약 백업 항목은 해당 계정에서 사용 가능하다는 보장이 아니다. 이번 Task에서 유료 플랜을 변경하지 않았다.
+2. 제안: 예산 목표를 유지하고 우선 논리 백업·별도 DB 복원 경로를 마련한다. 실제 Railway 데이터의 백업을 가져올 인증된 실행 경로와 접근 제한 저장 위치·주기는 아직 미정이다. 원본 DB 비밀번호를 대화나 공개 GitHub에 넣지 않는다.
 3. [실행 지침](./foundation-runbook.md)의 논리 백업을 별도 빈 테스트 DB로 복원하여 API readiness·worker와 복원할 업무 데이터의 수/제약을 확인한다. 현 단계에는 heartbeat 외 업무 데이터가 없다.
 4. Railway의 기존 운영 volume에 Restore를 실행하면 대상 데이터를 덮어쓸 수 있다. 이번 Task에서 운영 DB 복원·서비스 삭제·새 유료 서비스 생성은 수행하지 않았다. 클라우드에서의 복구 목표·허용 중단 시간은 U18/U20의 남은 운영 결정이다.
 
@@ -59,7 +61,7 @@ API는 Southeast Asia, DB도 Southeast Asia, worker는 US West에 있다. 지역
 
 ## 완료 판단과 Blaybus 기록
 
-비용·백업 확인과 PR·CI 증거 연결이 남아 있으므로 Task #16과 부모 Work #2는 진행 중으로 유지한다. 이 PR만으로 Work 전체를 자동 종료하지 않는다. 현황 문구와 실제 PR 링크를 사용자가 Blaybus 해당 Task에 기록한다. 실제 투입 시간은 사용자가 기록한다.
+Compute 한도와 Railway 데이터의 대체 백업·복원 준비가 남아 있으므로 Task #16과 부모 Work #2는 진행 중으로 유지한다. 모바일 원격 지시→PR→CI는 완료했다. 이 PR만으로 Work 전체를 자동 종료하지 않는다. 현황 문구와 실제 PR 링크를 사용자가 Blaybus 해당 Task에 기록한다. 실제 투입 시간은 사용자가 기록한다.
 
 ## 공식 근거
 
