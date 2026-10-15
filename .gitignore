@@ -19,3 +19,7 @@ docs/*.pdf
 frontend/test-results/
 frontend/playwright-report/
 .ruff_cache/
+
+# 도구별 개인 설정은 공유 작업 규칙과 분리한다.
+.claude/settings.local.json
+CLAUDE.local.md
