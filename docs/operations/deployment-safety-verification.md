@@ -48,7 +48,7 @@ API healthcheck 보완 후 배포는 `7c88059a-0748-4f17-bc8b-93f0bb5154d6`로 S
 3. 실제 값과 확인 시각을 기록한다. 아직 없는 한도를 임의로 설정하지 않고, 원화 예산과 환율·청구 범위를 확인하여 결정한다. hard limit 도달 시 workload가 중단된다.
 4. 가동 첫 24시간 실제 사용량과 이후 일별 추이를 기록하여 예산 목표를 점검한다. 일시점의 적은 사용량으로 월 비용을 보장하지 않는다.
 
-현재 Railway 연결 도구에는 비용·백업 조회 수단이 없고 로컬 Railway CLI는 설치되지 않았다. Safari 화면 조작은 사용자 입력과 겹쳐 중단되었고 사용자가 두 화면을 제공했다. 그 화면의 금액·플랜·백업 부재를 위 표에 반영했으며, Compute 한도 미확인을 미설정으로 단정하지 않는다. 현재 사용량 $0.00 표시만으로 최종 청구가 무료라고 결론내리지 않는다.
+초기 점검 당시 Railway 연결 도구에는 비용·백업 조회 수단이 없었고 로컬 Railway CLI도 없었다. 후속 점검에서 npm 기반 CLI 로그인과 실제 비용 한도 설정을 완료했다. Safari 화면 조작은 사용자 입력과 겹쳐 중단되었고 사용자가 두 화면을 제공했다. 그 화면의 금액·플랜·백업 부재를 위 표에 반영했으며, Compute 한도 미확인을 미설정으로 단정하지 않는다. 현재 사용량 $0.00 표시만으로 최종 청구가 무료라고 결론내리지 않는다.
 
 ### 백업·복원
 
@@ -66,13 +66,16 @@ API healthcheck 보완 후 배포는 `7c88059a-0748-4f17-bc8b-93f0bb5154d6`로 S
 - 백업·복원 명령과 [실행 지침](postgres-recovery.md)을 추가했다. 호스트 PG 클라이언트 없이 서버 pg_dump와 별도 PostgreSQL 18 복원 컨테이너를 쓴다. 복원 대상 임의 URL·기존 volume·외부 포트 지정 기능은 제공하지 않는다.
 - 실제 로컬 PostgreSQL 18 원본 → custom dump → 별도 PostgreSQL 18 복원 → API readiness·worker-health 성공. 백업 전후 원본 heartbeat 값 동일, 복원 직후 heartbeat 1행, worker 갱신 후 HTTP 정상 응답을 확인했다. 기존 dump/partial 보존·손상 archive 거부·공개 자산 경로 거부·파일 모드 0600도 통과했다. 검증 명령: `python3 scripts/verify_postgres_recovery.py`.
 - 로컬 사용 앱 이미지: `sha256:bb66cb121a24e16993a913c091918294671e2dfcc66730c43ae1013bc6b5977d`. CI는 해당 PR의 새 런타임 이미지를 빌드한 뒤 같은 독립 CLI 검증을 수행하도록 추가했다. 로컬 lint/format 및 diff 검사 통과. CI 결과는 PR에서 별도 확인한다.
-- CLI SSH 백업을 위해 전용 호스트 키를 생성하고 공개키만 Railway에 등록했다. 개인키는 호스트 SSH 디렉터리에 보관하며 저장소·대화에 공개하지 않았다. CLI 브라우저 로그인과 SSH 키 등록은 완료했지만 서버 신뢰 등록은 완료하지 않았다.
-- 실제 Railway 백업은 **미실행**이다. 첫 접속에서 `ssh.railway.com` 서버 지문 신뢰 등록에 대해 자동 승인 검토가 거절했다. 독립 검증 없이 영구 신뢰 항목을 추가하려 한다는 사유다. 호스트 확인을 끄거나 신뢰 항목을 임의 추가하지 않았다. 사용자에게 SSH 신뢰 등록 승인·로그인된 웹 Console/Files·보류 중 선택을 요청했다. [Railway 직원 답변](https://station.railway.com/questions/confirm-ssh-host-fingerprint-for-ssh-rai-8cd06fc6)은 지문 공개 검증 경로 부재와 웹 Console 대안을 설명한다.
-- 실제 클라우드 데이터 백업→다운로드→격리 복원이 끝나기 전에는 로컬 결과를 클라우드 복구 증거로 사용하지 않는다. 자동 백업 일정·별도 보관 저장소·업무 데이터 복구 목표는 구성하지 않았다.
+- CLI SSH 백업을 위해 전용 클라이언트 접속 키를 생성하고 공개키만 Railway에 등록했다. 개인키는 호스트 SSH 디렉터리에 보관하며 저장소·대화에 공개하지 않았다. CLI 브라우저 로그인과 SSH 키 등록 후 사용자 명시 승인으로 아래 서버 지문 신뢰 등록을 완료했다.
+- SSH 최초 접속 지문 등록은 자동 승인 검토에서 독립 검증 부재를 사유로 처음 거절됐다. [Railway 직원 답변](https://station.railway.com/questions/confirm-ssh-host-fingerprint-for-ssh-rai-8cd06fc6)에서 공개 검증 경로 부재를 확인한 후, 사용자가 위험을 이해하고 `ssh.railway.com`의 `SHA256:+S1xg92FrnHz6pY3bpkmh1OGtWQGNANXilPzlxA7B1g` 신뢰 등록을 명시 승인했다. 동일 접속 프롬프트에 그 지문을 입력해 등록했으며 호스트 확인을 끄거나 기존 신뢰 항목을 삭제하지 않았다.
+- **실제 Railway 데이터 백업·격리 복원 완료.** 서버 내부 pg_dump로 2,707바이트 custom archive를 받았다. archive 헤더의 원본 DB/pg_dump 버전은 모두 `18.6 (Debian 18.6-1.pgdg13+2)`였다. 로컬 파일은 `/Users/inchoi/SerenTable/.local-backups/railway-20261016-recovery-01.dump`, 모드 0600, Git 제외다. 개인키와 dump는 공개 산출물에 포함하지 않았다.
+- 실제 백업 SHA-256: `79a2363ea41c5b355ee371fc32049281c98972c4a03e398ce17bad9715c28511`. 새 로컬 PostgreSQL 18 복원 직후 heartbeat 1행을 확인했고 복원 환경에서만 worker를 실행한 뒤 HTTP readiness=ready/database connected·worker-health=alive를 확인했다. 운영 DB에는 pg_restore를 실행하지 않았다. 실제 공개 API도 백업 후 readiness=ready·worker-health=alive를 재확인했다.
+- CI 첫 실행은 archive 복원 단계에서 실패했다. 임시 초기화 서버의 Unix 소켓이 먼저 열리는 상황을 지연 초기화 fixture로 재현했고, 기존 gate에서 `Readiness returned before application TCP was ready` 실패를 확인했다. 실제 TCP 연결까지 기다리는 gate로 수정한 후 같은 회귀 검사·전체 복원 검증이 통과했다. 수정 코드 `5508d58`의 [CI 38887784923](https://github.com/InryeolChoi/SerenTable/actions/runs/38887784923) verify PASS. 진단은 비밀값 없는 고정 단계명만 기록한다.
+- 이 복구 경로는 수동 논리 백업이다. 자동 백업 일정·별도 장기 보관 저장소·업무 데이터 복구 목표는 구성하지 않았다. 현재 검증 대상은 기반 heartbeat이며 업무 테이블이 생기면 데이터·제약 검증을 확장한다.
 
 ## 완료 판단과 Blaybus 기록
 
-Compute 한도는 설정·재확인 완료다. 실제 Railway 데이터의 백업·격리 복원이 남아 있으므로 Task #16과 부모 Work #2는 진행 중으로 유지한다. 모바일 원격 지시→PR→CI는 완료했다. 이 PR만으로 Work 전체를 자동 종료하지 않는다. 현황 문구와 실제 PR 링크를 사용자가 Blaybus 해당 Task에 기록한다. 실제 투입 시간은 사용자가 기록한다.
+Compute 한도는 설정·재확인 완료다. 실제 Railway 데이터의 백업·격리 복원과 코드 CI 검증을 완료했다. 후속 [PR #24](https://github.com/InryeolChoi/SerenTable/pull/24)는 검토 대상으로 제공하며, 사용자 머지 전 Task/Work Issue는 열린 상태로 유지한다. 모바일 원격 지시→PR→CI는 완료했다. 이 PR만으로 Work 전체를 자동 종료하지 않는다. 현황 문구와 실제 PR 링크를 사용자가 Blaybus 해당 Task에 기록한다. 실제 투입 시간은 사용자가 기록한다.
 
 ## 공식 근거
 
