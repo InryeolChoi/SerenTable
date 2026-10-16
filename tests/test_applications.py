@@ -122,7 +122,9 @@ def test_participant_submits_explicit_candidates_and_sees_own_status():
         # Only the chosen slots are kept, ordered by start time; nothing is derived.
         assert [item["id"] for item in body["candidates"]] == [hongdae, gangnam]
         assert body["candidates"][1]["region"] == {"code": "gangnam", "name": "강남"}
-        assert "payment" not in body and body["canceled_at"] is None
+        # Submission is not payment: nothing is paid yet and a pass is still required.
+        assert body["payments"] == [] and body["payment_required"] is True
+        assert body["canceled_at"] is None
         listed = participant.get("/api/me/applications")
         assert listed.status_code == 200
         assert listed.json()["applications"] == [body]

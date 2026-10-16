@@ -129,7 +129,8 @@ test("참가자가 복수 후보 회차를 골라 검토 후 신청하고 상태
     .locator(":scope > li")
     .filter({ hasText: firstName });
   await expect(mine).toHaveCount(1);
-  await expect(mine).toContainText("신청 완료 · 결제 전");
+  await expect(mine).toContainText("신청 완료");
+  await expect(mine).toContainText("결제: 결제 필요");
   await expect(mine).toContainText(secondName);
   for (const width of [360, 1440]) {
     await participant.setViewportSize({ width, height: 900 });
@@ -148,7 +149,8 @@ test("참가자가 복수 후보 회차를 골라 검토 후 신청하고 상태
     .filter({ hasText: firstName });
   await expect(row).toHaveCount(1);
   await expect(row).toContainText("participant-04");
-  await expect(row).toContainText("신청 완료 · 결제 전");
+  await expect(row).toContainText("신청 완료");
+  await expect(row).toContainText("결제: 결제 필요");
 
   await mine.getByRole("button", { name: "신청 취소" }).click();
   await expect(mine).toContainText("신청 취소됨");

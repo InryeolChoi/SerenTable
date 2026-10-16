@@ -6,7 +6,7 @@
 
 - 신청(Application) 하나는 참가자가 직접 고른 모집 중 회차(EventSlot) 1~20개를 후보(ApplicationCandidate)로 보존한다. 회차 ID만 받으며 날짜×지역 곱집합을 만들지 않는다. 상한 20은 기술 결정이다.
 - 상태는 PRD의 DRAFT/SUBMITTED/CANCELED를 DB CHECK로 고정한다. 검토 단계는 화면 메모리에서만 유지하고 서버는 제출 시 바로 SUBMITTED를 만든다(DRAFT 저장 API 없음, 기술 결정). 검토 화면을 새로고침하면 선택이 사라지고 선택 화면으로 안내한다.
-- 제출 조건(APP-03): 본인 프로필 `complete`, 필수 동의(`privacy`·`operation` 현재 버전 수락) 완료, 모든 후보의 `closes_at > 현재`. 제출 때 근거로 쓴 최신 동의 기록 ID를 신청에 저장한다. **제출은 결제가 아니다.** 결제·이용권(Task ①-c)과 Payment/Entitlement 테이블은 만들지 않는다.
+- 제출 조건(APP-03): 본인 프로필 `complete`, 필수 동의(`privacy`·`operation` 현재 버전 수락) 완료, 모든 후보의 `closes_at > 현재`. 제출 때 근거로 쓴 최신 동의 기록 ID를 신청에 저장한다. **제출은 결제가 아니다.** 결제·이용권은 Task ①-c [이용권·모의 결제 계약](./payment-contract.md)에서 다룬다.
 - 중복 방지(확정 범위): 같은 참가자는 같은 회차를 살아 있는(취소되지 않은) 신청 두 건에 동시에 둘 수 없다. 서로 겹치지 않는 회차로 별도 신청을 내는 것은 막지 않는다.
 - 같은 요청 재전송: 클라이언트가 만든 `request_key`(UUID)가 같고 후보 집합이 같으면 이전 신청을 200으로 그대로 반환한다(상태가 바뀌었으면 바뀐 상태 그대로, 회차가 그 사이 마감돼도 동일 결과). 같은 키로 다른 후보를 보내면 409. 화면은 선택이 바뀔 때마다 새 키를 만든다.
 - 참가자 취소: 본인 SUBMITTED 신청을 후보 중 가장 이른 신청 마감 전까지 CANCELED로 바꾸고 같은 트랜잭션에서 후보 소유를 해제한다. 이미 취소된 신청은 같은 결과를 반환한다. 환불·결제 취소(U04)와 확정 이후 취소(U13)는 범위 밖이다.
@@ -39,13 +39,13 @@
 | POST /api/me/applications/{id}/cancel | 참가자 + CSRF | 본인 신청 → 200 `{application}`. 타인·없는 ID 404 `application_not_found`, 가장 이른 마감 경과 409 `application_cancel_closed` |
 | GET /api/admin/applications | 운영자 | 전체 `{applications:[Application & {participant:{id,login_id}}]}` 읽기 전용 |
 
-`Application = {id, state, submitted_at, canceled_at, candidates:[EventSlot]}`(후보는 시작 시각순, EventSlot은 [회차 계약](./event-slot-contract.md) 형식). 결제 필드는 없다. 판정 순서는 인증 401 → 역할 403 → CSRF 403 → 본문 422 → 재전송 → 프로필 → 동의 → 회차 → 중복. 응답은 `Cache-Control: no-store`.
+`Application = {id, state, submitted_at, canceled_at, candidates:[EventSlot]}`(후보는 시작 시각순, EventSlot은 [회차 계약](./event-slot-contract.md) 형식). ①-c 이후 `payments`·`coverage`·`payment_required`가 추가됐다([결제 계약](./payment-contract.md)). 판정 순서는 인증 401 → 역할 403 → CSRF 403 → 본문 422 → 재전송 → 프로필 → 동의 → 회차 → 중복. 응답은 `Cache-Control: no-store`.
 
 ## 화면
 
 - `/participant/apply`: 모집 중 회차를 체크박스로 복수 선택 → "선택 확인".
 - `/participant/apply/review`: 선택 후보 목록, "제출은 결제가 아님·후보 간 배정 규칙 미정" 안내, "신청 제출"/"선택 수정". 오류 시 선택 유지, 마감 회차는 목록 재조회 후 제외.
-- `/participant`: "내 신청" 목록과 상태(`신청 완료 · 결제 전`, `신청 취소됨`), 취소 가능할 때만 "신청 취소".
+- `/participant`: "내 신청" 목록과 상태(`신청 완료`, `신청 취소됨`. ①-c부터 결제 상태는 별도 "결제:" 줄), 취소 가능할 때만 "신청 취소".
 - `/admin/applications`: 운영자 읽기 전용 "신청 현황".
 
 ## 검증
