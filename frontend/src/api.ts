@@ -124,8 +124,8 @@ export type MatchParticipation = {
   state: MatchingState;
   reason_code: string | null;
   event_slot_id: string | null;
-  /** Confirmed table. Only the size is shown: member visibility is U16, still undecided. */
-  table: { id: string; member_count: number } | null;
+  /** Current confirmed table: only approved display names are introduced. */
+  table: { id: string; member_count: number; members: { display_name: string }[] } | null;
 };
 export type MatchRunMember = {
   application_id: string;

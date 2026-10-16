@@ -241,7 +241,7 @@ def pay_for_application(
             application = (
                 connection.execute(
                     text("""SELECT id, user_id, state FROM application
-                    WHERE id = :id AND user_id = :user_id"""),
+                    WHERE id = :id AND user_id = :user_id FOR UPDATE"""),
                     {"id": application_id, "user_id": user.id},
                 )
                 .mappings()

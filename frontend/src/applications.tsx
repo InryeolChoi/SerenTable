@@ -308,6 +308,12 @@ function ApplicationItem({
       </p>
       <p className="small">결제: {paymentSummary(application)}</p>
       <p className="small">매칭: {matchingSummary(application)}</p>
+      {application.matching?.state === "CONFIRMED" && application.matching.table && (
+        <p className="small">
+          같은 식탁 소개: {application.matching.table.members
+            .map((member) => member.display_name).join(", ")}
+        </p>
+      )}
       <ul className="candidates">
         {application.candidates.map((slot) => (
           <li key={slot.id}>

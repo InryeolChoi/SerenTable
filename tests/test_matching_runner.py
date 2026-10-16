@@ -5,6 +5,8 @@ The runner's seat count is compared against the independent oracle
 requires; the oracle is not imported by the runner itself.
 """
 
+import logging
+import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -137,6 +139,17 @@ def test_the_planner_keeps_the_tables_within_the_slot_capacity():
     assert [reason for _, reason in plan.unseated] == ["no_valid_table", "no_valid_table"]
 
 
+@pytest.mark.parametrize("capacity, expected", [(24, 13), (8, 8)])
+def test_thirteen_compatible_people_are_not_lost_to_greedy_table_sizes(capacity, expected):
+    participants = [Participant(application_id=f"a{i}", birth_year=1995) for i in range(13)]
+    plan = plan_allocation(participants, capacity)
+    assert plan.seated_count == expected
+    assert {member for table in plan.tables for member in table} == {
+        f"a{i}" for i in range(expected)
+    }
+    assert all(4 <= len(table) <= 6 for table in plan.tables)
+
+
 def test_matching_does_not_run_before_the_matching_time():
     with TestClient(app) as operator:
         login(operator, "operator")
@@ -168,6 +181,11 @@ def test_four_paid_applications_are_seated_at_one_table_and_reported_over_http()
         assert listed[0]["matching"]["reason_code"] is None
         assert listed[0]["matching"]["event_slot_id"] == slot_id
         assert listed[0]["matching"]["table"]["member_count"] == 4
+        # The approved minimal introduction must not include contact/Instagram/name.
+        assert (
+            listed[0]["matching"]["table"]["members"]
+            == [{"display_name": COMPLETE_PROFILE["display_name"]}] * 4
+        )
 
         # Operator view: one read-only run generation with its members and reasons.
         history = operator.get("/api/admin/match-runs")
@@ -367,3 +385,65 @@ def test_only_one_concurrent_runner_seats_a_slot():
             assert after.execute(text("SELECT count(*) FROM match_run")).scalar() == 1
             assert after.execute(text("SELECT count(*) FROM table_assignment")).scalar() == 4
         assert set(stored_states().values()) == {"CONFIRMED"}
+
+
+def test_late_failure_record_cannot_replace_a_successful_retry():
+    """A genuine database failure pauses at the log boundary, after rollback."""
+    failed, resume = threading.Event(), threading.Event()
+
+    class PauseFailure(logging.Handler):
+        def emit(self, record):
+            if record.getMessage() == "matching_run_failed":
+                failed.set()
+                assert resume.wait(15)
+
+    handler = PauseFailure()
+    worker_logger = logging.getLogger("serentable.worker")
+    with ExitStack() as stack:
+        operator = stack.enter_context(TestClient(app))
+        members = [stack.enter_context(TestClient(app)) for _ in range(3)]
+        login(operator, "operator")
+        for index, participant in enumerate(members, 1):
+            prepare(participant, f"participant-0{index}")
+        slot = due_slot(operator)
+        for participant in members:
+            apply_and_pay(participant, slot)
+        time.sleep(3.6)
+        # A PostgreSQL sequence survives rollback: only the first RUNNING insert fails.
+        with database_engine().begin() as connection:
+            connection.execute(text("CREATE SEQUENCE test_matching_failure"))
+            connection.execute(
+                text("""CREATE FUNCTION test_matching_failure() RETURNS trigger
+                LANGUAGE plpgsql AS $$ BEGIN
+                IF NEW.state = 'RUNNING' AND nextval('test_matching_failure') = 1 THEN
+                    RAISE EXCEPTION 'synthetic database failure';
+                END IF; RETURN NEW; END $$""")
+            )
+            connection.execute(
+                text("""CREATE TRIGGER test_matching_failure
+                BEFORE INSERT ON match_run FOR EACH ROW
+                EXECUTE FUNCTION test_matching_failure()""")
+            )
+        worker_logger.addHandler(handler)
+        try:
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                pending = pool.submit(run_slot_matching, slot)
+                try:
+                    assert failed.wait(10)
+                    successful = run_slot_matching(slot)
+                    assert successful["state"] == "SUCCEEDED"
+                finally:
+                    resume.set()
+                pending.result(timeout=10)
+        finally:
+            resume.set()
+            worker_logger.removeHandler(handler)
+            with database_engine().begin() as connection:
+                connection.execute(text("DROP TRIGGER test_matching_failure ON match_run"))
+                connection.execute(text("DROP FUNCTION test_matching_failure()"))
+                connection.execute(text("DROP SEQUENCE test_matching_failure"))
+        runs = operator.get("/api/admin/match-runs").json()["match_runs"]
+        assert [run["state"] for run in runs] == ["SUCCEEDED"]
+        for participant in members:
+            application = participant.get("/api/me/applications").json()["applications"][0]
+            assert application["matching"]["state"] == "NO_MATCH"

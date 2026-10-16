@@ -142,11 +142,14 @@ def submit_application(
                 raise HTTPException(409, "consent_incomplete")
             # FOR SHARE lets a later close/match step that locks the slot order itself after us.
             open_slots = connection.execute(
-                text("""SELECT id FROM event_slot
-                WHERE id = ANY(:ids) AND closes_at > :now FOR SHARE"""),
+                text("""SELECT id, closes_at FROM event_slot
+                WHERE id = ANY(:ids) FOR SHARE"""),
                 {"ids": payload.event_slot_ids, "now": now},
             ).all()
-            if len(open_slots) != len(payload.event_slot_ids):
+            now = locked_now(connection)
+            if len(open_slots) != len(payload.event_slot_ids) or any(
+                slot.closes_at <= now for slot in open_slots
+            ):
                 raise field_error("event_slot_ids", "slot_not_recruiting")
             if connection.execute(
                 text("""SELECT 1 FROM application_candidate
@@ -216,6 +219,8 @@ def cancel_application(
                         {"id": application_id},
                     ).scalars()
                 )
+                # Matching may have held this slot until after the deadline.
+                now = locked_now(connection)
                 if earliest_close <= now:
                     raise HTTPException(409, "application_cancel_closed")
                 connection.execute(

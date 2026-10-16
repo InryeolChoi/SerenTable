@@ -5,11 +5,6 @@ import { call, display, login, participantPassword } from "./support";
 // The accounts the seed creates; a table needs at least four of them.
 const members = ["participant-01", "participant-02", "participant-03", "participant-04"];
 
-// The name keeps this spec after payments.spec.ts: the suite shares one seeded database,
-// and seating four people buys participant-03 a pass, whose 이용권 list payments.spec.ts
-// asserts by count.
-
-
 /** Run the separate runner once. It is the only way matching starts (MAT-01). */
 function runMatchingWorker() {
   execFileSync(
@@ -124,6 +119,9 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
   const confirmed = mine.filter({ hasText: full.name });
   await expect(confirmed).toContainText("매칭: 매칭 확정 (CONFIRMED)");
   await expect(confirmed).toContainText("같은 테이블 4명");
+  await expect(confirmed).toContainText("같은 식탁 소개:");
+  for (const suffix of ["01", "02", "03", "04"])
+    await expect(confirmed).toContainText(`매칭 식탁 ${suffix}`);
   // A slot the runner left out says why, instead of staying "waiting" forever.
   await expect(mine.filter({ hasText: partial.name })).toContainText(
     "매칭: 매칭 실패 (NO_MATCH) · 함께 앉을 인원이 부족합니다",

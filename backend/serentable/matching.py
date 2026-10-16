@@ -21,8 +21,6 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from functools import cache
-from itertools import combinations
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
@@ -44,12 +42,7 @@ MIN_TABLE_SIZE = 4
 MAX_TABLE_SIZE = 6
 MAX_AGE_GAP = 8
 
-# The oracle brute-forces up to twelve participants and refuses larger input. The runner
-# cannot refuse a slot, so larger inputs fall back to a deterministic greedy pass. Seat
-# count optimality above twelve is therefore not claimed (execution scale is U19).
-MAX_EXHAUSTIVE_PARTICIPANTS = 12
-
-ALGORITHM_VERSION = "hard-constraints-v1"
+ALGORITHM_VERSION = "age-ordered-dp-v2"
 RULE_VERSION = "u06-u07-2026-10-17"
 
 # Why an application was left unseated; stored per member and shown to participants.
@@ -88,10 +81,7 @@ def plan_allocation(participants, capacity):
     roster = list(participants)
     searchable = [index for index, person in enumerate(roster) if person.birth_year is not None]
     years = [roster[index].birth_year for index in searchable]
-    if len(years) <= MAX_EXHAUSTIVE_PARTICIPANTS:
-        grouped = _exhaustive(years, capacity)
-    else:
-        grouped = _greedy(years, capacity)
+    grouped = _ordered_allocation(years, capacity)
     tables = tuple(
         tuple(roster[searchable[index]].application_id for index in members) for members in grouped
     )
@@ -106,61 +96,45 @@ def plan_allocation(participants, capacity):
     )
 
 
-def _age_gap_ok(years, members):
-    values = [years[index] for index in members]
-    return max(values) - min(values) <= MAX_AGE_GAP
+def _ordered_allocation(years, capacity):
+    """Exact count and submission-priority allocation for the current age-only rules.
 
+    Any valid selected set can be partitioned in birth-year order without crossing
+    tables: uncross two overlapping groups by sorting their union, preserving sizes.
+    Both spans remain <= 8. Therefore the only unfinished group we need to remember is
+    the last one. Equal states have identical possible continuations; retain the largest
+    submission-priority bitmask. Arbitrary exclusion edges need a different algorithm.
+    """
+    # (open group's minimum year, open size, seated count) -> (priority mask, tables)
+    states = {(None, 0, 0): (0, ())}
+    for index in sorted(range(len(years)), key=lambda i: (years[i], i)):
+        year = years[index]
+        priority = 1 << (len(years) - 1 - index)
+        following = dict(states)  # Skip this participant.
 
-def _exhaustive(years, capacity):
-    """Backtracking search for the maximum seated count, submission order as tie-break."""
+        def retain(key, mask, tables):
+            previous = following.get(key)
+            if previous is None or mask > previous[0]:
+                following[key] = (mask, tables)
 
-    @cache
-    def best(remaining, room):
-        # (seated count, per-position seated flag in submission order, tables)
-        if len(remaining) < MIN_TABLE_SIZE or room < MIN_TABLE_SIZE:
-            return 0, (0,) * len(remaining), ()
-        first, rest = remaining[0], remaining[1:]
-        count, flags, tables = best(rest, room)
-        flags = (0,) + flags
-        for size in range(MIN_TABLE_SIZE - 1, min(MAX_TABLE_SIZE, room)):
-            for others in combinations(rest, size):
-                members = (first,) + others
-                if not _age_gap_ok(years, members):
-                    continue
-                left = tuple(index for index in rest if index not in others)
-                rest_count, rest_flags, rest_tables = best(left, room - len(members))
-                sub = iter(rest_flags)
-                candidate_flags = (1,) + tuple(
-                    1 if index in others else next(sub) for index in rest
-                )
-                candidate_count = len(members) + rest_count
-                if (candidate_count, candidate_flags) > (count, flags):
-                    count, flags = candidate_count, candidate_flags
-                    tables = (members,) + rest_tables
-        return count, flags, tables
-
-    _, _, tables = best(tuple(range(len(years))), capacity)
-    return tables
-
-
-def _greedy(years, capacity):
-    """Deterministic fallback beyond the exhaustive bound: seat in submission order."""
-    tables: list[list[int]] = []
-    for index in range(len(years)):
-        for table in tables:
-            if len(table) >= MAX_TABLE_SIZE or len(table) >= capacity:
+        for (minimum, size, seated), (mask, tables) in states.items():
+            if seated >= capacity:
                 continue
-            if _age_gap_ok(years, [*table, index]):
-                table.append(index)
-                break
-        else:
-            if sum(len(table) for table in tables) + MIN_TABLE_SIZE <= capacity:
-                tables.append([index])
-    # A table that never reached four members is not a table at all.
-    complete = [table for table in tables if len(table) >= MIN_TABLE_SIZE]
-    while sum(len(table) for table in complete) > capacity:
-        complete.pop()
-    return [tuple(table) for table in complete]
+            if size and size < MAX_TABLE_SIZE and year - minimum <= MAX_AGE_GAP:
+                retain(
+                    (minimum, size + 1, seated + 1),
+                    mask | priority,
+                    tables[:-1] + (tables[-1] + (index,),),
+                )
+            if size == 0 or size >= MIN_TABLE_SIZE:
+                retain((year, 1, seated + 1), mask | priority, tables + ((index,),))
+        states = following
+    _, _, tables = max(
+        (seated, mask, tables)
+        for (_, size, seated), (mask, tables) in states.items()
+        if size == 0 or size >= MIN_TABLE_SIZE
+    )
+    return tables
 
 
 def _reason(roster, years, searchable, index, capacity):
@@ -416,10 +390,26 @@ def _record_exception(slot_id, reason="runner_error"):
     The failed transaction rolled back, so this opens a new one; if that also fails there
     is nothing left to record and the next cycle simply tries again.
     """
-    targets = _safe_targets(slot_id)
     try:
         with database_engine().begin() as connection:
+            slot = connection.execute(
+                text("SELECT id FROM event_slot WHERE id = :id FOR UPDATE"), {"id": slot_id}
+            ).scalar()
+            if (
+                slot is None
+                or connection.execute(
+                    text("""SELECT 1 FROM match_run
+                WHERE event_slot_id = :id AND state = 'SUCCEEDED'"""),
+                    {"id": slot_id},
+                ).scalar()
+            ):
+                return None
             now = locked_now(connection)
+            targets = (
+                connection.execute(text(TARGET_SQL), {"slot_id": slot_id, "now": now})
+                .mappings()
+                .all()
+            )
             connection.execute(
                 text("""UPDATE match_run SET state = 'ABANDONED',
                 reason_code = 'stale_generation', finished_at = :now
@@ -452,7 +442,8 @@ def _record_exception(slot_id, reason="runner_error"):
                     "now": now,
                 },
             )
-            for application_id, user_id in targets:
+            for target in targets:
+                application_id, user_id = target["application_id"], target["user_id"]
                 connection.execute(
                     text("""INSERT INTO match_run_member
                     (match_run_id, application_id, user_id, outcome, reason_code)
@@ -480,20 +471,6 @@ def _record_exception(slot_id, reason="runner_error"):
     return {"event_slot_id": str(slot_id), "state": "FAILED", "reason_code": reason}
 
 
-def _safe_targets(slot_id):
-    try:
-        with database_engine().connect() as connection:
-            now = locked_now(connection)
-            return [
-                (row["application_id"], row["user_id"])
-                for row in connection.execute(
-                    text(TARGET_SQL), {"slot_id": slot_id, "now": now}
-                ).mappings()
-            ]
-    except SQLAlchemyError:
-        return []
-
-
 def _constraint(error):
     return getattr(getattr(error.orig, "diag", None), "constraint_name", "")
 
@@ -503,6 +480,24 @@ def participation_details(connection, application_ids):
     if not application_ids:
         return {}
     details = {application_id: None for application_id in application_ids}
+    introductions = {}
+    # Only a current, confirmed assignment grants access to that same table's names.
+    # Never serialize profile JSON or identifiers belonging to another participant.
+    for member in connection.execute(
+        text("""SELECT own.application_id, p.data ->> 'display_name' AS display_name
+        FROM table_assignment own
+        JOIN match_participation mp ON mp.application_id = own.application_id
+          AND mp.dining_table_id = own.dining_table_id AND mp.state = 'CONFIRMED'
+        JOIN table_assignment peer ON peer.dining_table_id = own.dining_table_id
+          AND peer.ended_at IS NULL
+        LEFT JOIN participant_profile p ON p.user_id = peer.user_id
+        WHERE own.application_id = ANY(:ids) AND own.ended_at IS NULL
+        ORDER BY peer.created_at, peer.id"""),
+        {"ids": list(application_ids)},
+    ).mappings():
+        introductions.setdefault(member["application_id"], []).append(
+            {"display_name": member["display_name"] or "참가자"}
+        )
     for row in connection.execute(
         text("""SELECT mp.application_id, mp.state, mp.reason_code, mp.event_slot_id,
             mp.dining_table_id, t.member_count
@@ -516,7 +511,11 @@ def participation_details(connection, application_ids):
             "reason_code": row["reason_code"],
             "event_slot_id": str(row["event_slot_id"]) if row["event_slot_id"] else None,
             "table": (
-                {"id": str(row["dining_table_id"]), "member_count": row["member_count"]}
+                {
+                    "id": str(row["dining_table_id"]),
+                    "member_count": row["member_count"],
+                    "members": introductions.get(row["application_id"], []),
+                }
                 if row["dining_table_id"]
                 else None
             ),
