@@ -21,9 +21,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from serentable.auth import (
     Principal,
     private_response,
-    require_csrf_user,
+    require_csrf_participant,
     require_operator,
-    require_user,
+    require_participant,
 )
 from serentable.database import database_engine
 
@@ -230,7 +230,7 @@ def read_profile(connection, user_id):
 
 
 @router.get("/api/me/profile")
-def get_profile(user: Principal = Depends(require_user)):
+def get_profile(user: Principal = Depends(require_participant)):
     try:
         with database_engine().connect() as connection:
             return private_response(profile_state(read_profile(connection, user.id)))
@@ -239,7 +239,7 @@ def get_profile(user: Principal = Depends(require_user)):
 
 
 @router.put("/api/me/profile")
-def save_profile(payload: Profile, user: Principal = Depends(require_csrf_user)):
+def save_profile(payload: Profile, user: Principal = Depends(require_csrf_participant)):
     try:
         with database_engine().begin() as connection:
             connection.execute(
@@ -324,7 +324,7 @@ def consent_state(connection, user_id):
 
 
 @router.get("/api/me/consents")
-def get_consents(user: Principal = Depends(require_user)):
+def get_consents(user: Principal = Depends(require_participant)):
     try:
         with database_engine().connect() as connection:
             return private_response(consent_state(connection, user.id))
@@ -333,7 +333,7 @@ def get_consents(user: Principal = Depends(require_user)):
 
 
 @router.put("/api/me/consents")
-def save_consents(payload: ConsentInput, user: Principal = Depends(require_csrf_user)):
+def save_consents(payload: ConsentInput, user: Principal = Depends(require_csrf_participant)):
     try:
         with database_engine().begin() as connection:
             # Serialize all purpose changes for this owner, including first writes.

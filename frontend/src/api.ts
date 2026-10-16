@@ -102,6 +102,8 @@ function validationMessage(status: number, detail: unknown) {
     if (fields.length)
       return `${fields.join(", ")}의 입력 형식을 확인해 주세요. 입력 내용은 유지됩니다.`;
   }
+  if (status === 503 && detail === "login_busy")
+    return "로그인 요청이 잠시 몰렸습니다. 잠시 후 다시 시도해 주세요.";
   return errorMessage(status);
 }
 function errorMessage(status: number) {

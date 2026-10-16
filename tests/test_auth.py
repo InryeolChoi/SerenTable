@@ -450,3 +450,21 @@ def test_malformed_origin_setting_fails_safely(monkeypatch):
         response = browser.get("/api/auth/csrf")
     assert response.status_code == 503
     assert response.json() == {"detail": "auth_configuration_unavailable"}
+
+
+def test_login_busy_is_distinct_from_account_limit(client):
+    from serentable.auth import hash_slots
+
+    # Occupy both hashing slots as two in-flight logins would.
+    assert hash_slots.acquire(blocking=False) and hash_slots.acquire(blocking=False)
+    try:
+        busy = sign_in(client)
+    finally:
+        hash_slots.release()
+        hash_slots.release()
+    assert busy.status_code == 503
+    assert busy.json() == {"detail": "login_busy"}
+    assert busy.headers["retry-after"] == "1"
+    assert busy.headers["cache-control"] == "no-store"
+    assert client.get("/api/auth/me").status_code == 401
+    assert sign_in(client).status_code == 200

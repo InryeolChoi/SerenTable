@@ -156,9 +156,17 @@ def require_user(request: Request) -> Principal:
     return Principal(str(row["id"]), row["login_id"], row["role"])
 
 
-def require_csrf_user(request: Request) -> Principal:
-    """Authenticate, then check CSRF, before FastAPI validates the request body."""
+def require_participant(request: Request) -> Principal:
+    """Participant-only data such as the private profile; operators are refused."""
     user = require_user(request)
+    if user.role != "participant":
+        raise HTTPException(403, "participant_required")
+    return user
+
+
+def require_csrf_participant(request: Request) -> Principal:
+    """Authorize, then check CSRF, before FastAPI validates the request body."""
+    user = require_participant(request)
     require_csrf(request)
     return user
 
@@ -199,8 +207,9 @@ def login(payload: LoginInput, request: Request):
     config = settings(request)
     now = datetime.now(timezone.utc)
     # A process-wide limit is defined below; each account is also serialized in PG.
+    # Busy hashing is a server capacity condition, distinct from the per-account 429.
     if not hash_slots.acquire(blocking=False):
-        raise HTTPException(429, "login_temporarily_limited")
+        raise HTTPException(503, "login_busy", headers={"Retry-After": "1"})
     try:
         with database_engine().begin() as connection:
             key = digest(payload.login_id)
