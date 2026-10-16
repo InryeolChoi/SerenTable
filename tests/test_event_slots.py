@@ -25,7 +25,7 @@ def slot_database(monkeypatch):
     from sqlalchemy import text
 
     with database_engine().begin() as connection:
-        connection.execute(text("DELETE FROM event_slot"))
+        connection.execute(text("TRUNCATE event_slot CASCADE"))
 
 
 def login(client, login_id):

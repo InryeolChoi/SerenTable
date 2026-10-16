@@ -22,7 +22,7 @@ def profile_database(monkeypatch):
 
     with database_engine().begin() as connection:
         if connection.execute(text("SELECT to_regclass('participant_profile')")).scalar():
-            connection.execute(text("TRUNCATE participant_profile, consent_record"))
+            connection.execute(text("TRUNCATE participant_profile, consent_record CASCADE"))
 
 
 def login(client, login_id="participant-01"):

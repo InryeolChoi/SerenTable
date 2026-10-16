@@ -21,7 +21,7 @@ const timeOnly = new Intl.DateTimeFormat("ko-KR", {
 });
 const show = (iso: string) => dateTime.format(new Date(iso));
 
-function SlotSummary({ slot }: { slot: EventSlot }) {
+export function SlotSummary({ slot }: { slot: EventSlot }) {
   return (
     <>
       <strong>
@@ -240,7 +240,7 @@ export function ParticipantEventsPage() {
         날짜·시간·지역과 신청 마감을 확인하세요. 시각은 서울 기준입니다.
       </p>
       <p className="muted">
-        회차 신청은 다음 단계에서 열립니다. 지금은 일정만 확인할 수 있습니다.
+        신청은 ‘일정 신청’ 화면에서 후보 회차를 골라 제출합니다.
       </p>
       {error && (
         <>
