@@ -5,26 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>우연한 식탁 · UI 설계 검토</title>
 <style>
-:root { --paper:#fffdfb; --ink:#332627; --wine:#783a46; --green:#4a6045; --line:#e4dad6; --muted:#67585a; --warn:#785408; }
+:root { --paper:#fff9ed; --ink:#422817; --brown:#8b4e27; --green:#405b3a; --line:#d7c6af; --muted:#6a5847; --warn:#785408; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 "Apple SD Gothic Neo","Malgun Gothic",sans-serif; }
 button,input,select,textarea { font:inherit; }
 button,a,input,select,textarea { touch-action:manipulation; }
-button { min-height:44px; border:1px solid var(--wine); padding:10px 18px; border-radius:8px; color:var(--wine); background:white; cursor:pointer; font-weight:600; }
-button.primary { background:var(--wine); color:white; }
+button { min-height:44px; border:1px solid var(--brown); padding:10px 18px; border-radius:8px; color:var(--brown); background:white; cursor:pointer; font-weight:600; }
+button.primary { background:var(--brown); color:white; }
 button:disabled { cursor:not-allowed; opacity:.55; }
-a { color:var(--wine); text-underline-offset:3px; }
+a { color:var(--brown); text-underline-offset:3px; }
 :focus-visible { outline:3px solid #336ea4; outline-offset:3px; }
 .skip { position:absolute; left:12px; top:-70px; z-index:10; padding:12px; background:white; }
 .skip:focus { top:10px; }
 .review { background:#f3e9df; padding:12px 20px; color:#593f28; text-align:center; font-size:14px; }
 .shell { max-width:1120px; margin:auto; padding:0 24px 50px; }
 header { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:24px 0 14px; border-bottom:1px solid var(--line); }
-.brand { font-family:"Nanum Myeongjo",serif; font-size:24px; font-weight:bold; }
+.brand { display:flex; align-items:center; gap:12px; color:var(--brown); }
+.brand img { width:64px; height:64px; flex:none; }
+.wordmark { font:600 25px/1.12 "Nanum Myeongjo","AppleMyungjo",serif; letter-spacing:.04em; }
+.wordmark span { display:block; font:inherit; color:inherit; }
 header span { font-size:14px; color:var(--muted); }
 nav { display:flex; flex-wrap:wrap; gap:8px; padding:16px 0 28px; }
 nav button { border-color:transparent; font-weight:500; padding:8px 14px; }
-nav button[aria-current="page"] { border-color:var(--wine); color:var(--wine); background:#f7eff0; }
+nav button[aria-current="page"] { border-color:var(--brown); color:var(--brown); background:#f1e3ce; }
 main { min-height:520px; }
 .panel { max-width:736px; margin:0 auto; }
 [hidden] { display:none!important; }
@@ -35,19 +38,19 @@ h3 { font-size:17px; }
 p { max-width:72ch; }
 .muted { color:var(--muted); }
 .small { font-size:14px; }
-.note { border-left:4px solid var(--wine); padding:12px 16px; background:#f7f0ef; margin:20px 0; }
+.note { border-left:4px solid var(--brown); padding:12px 16px; background:#f4eadb; margin:20px 0; }
 .warn { border-color:var(--warn); color:var(--warn); background:#faf4e7; }
 fieldset { border:0; margin:24px 0; padding:0; }
 legend { font-weight:700; margin-bottom:12px; }
 .option { display:flex; align-items:flex-start; gap:12px; padding:16px 12px; border-top:1px solid var(--line); cursor:pointer; }
 .option:last-child { border-bottom:1px solid var(--line); }
-.option input { flex:none; width:20px; height:20px; margin-top:4px; accent-color:var(--wine); }
+.option input { flex:none; width:20px; height:20px; margin-top:4px; accent-color:var(--brown); }
 .option strong,.option small { display:block; }
 .option small { font-size:14px; color:var(--muted); }
 .stack { display:grid; gap:12px; }
 .actions { display:flex; flex-wrap:wrap; gap:10px; margin:24px 0; }
 label.field { display:grid; gap:8px; margin:18px 0; font-weight:600; }
-select,textarea,input[type="text"] { width:100%; border:1px solid #9e8d8e; border-radius:6px; padding:12px; background:white; color:var(--ink); }
+select,textarea,input[type="text"] { width:100%; border:1px solid #9b846b; border-radius:6px; padding:12px; background:white; color:var(--ink); }
 textarea { min-height:100px; resize:vertical; }
 .error { color:#9b263c; font-weight:600; }
 .status-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:24px 0; }
@@ -56,10 +59,8 @@ textarea { min-height:100px; resize:vertical; }
 .status-grid dd { margin:4px 0 0; font-weight:700; }
 .good { color:var(--green); }
 .table-scene { display:flex; align-items:center; gap:24px; margin:24px 0; padding:24px 0; border-block:1px solid var(--line); }
-.table-mark { position:relative; width:124px; height:94px; flex:none; border:2px solid var(--wine); border-radius:32px; display:grid; place-items:center; font:600 20px "Nanum Myeongjo",serif; color:var(--wine); margin:12px; }
-.table-mark::before,.table-mark::after { content:""; position:absolute; left:20px; right:20px; height:10px; border-inline:10px solid #ba8c8e; }
-.table-mark::before { top:-15px; }
-.table-mark::after { bottom:-15px; }
+.table-mark { width:104px; height:104px; flex:none; display:grid; place-items:center; margin:0; }
+.table-mark img { width:100%; height:100%; }
 .summary { padding:20px; border:1px solid var(--line); border-radius:12px; margin:20px 0; }
 .summary p:last-child { margin:0; }
 .chat { list-style:none; padding:0; }
@@ -80,16 +81,16 @@ footer { margin-top:40px; border-top:1px solid var(--line); padding-top:16px; fo
 @media(max-width:600px) {
  .shell { padding:0 18px 32px; } header { padding-top:20px; align-items:flex-start; } header span { max-width:100px; text-align:right; }
  .review { text-align:left; padding:10px 18px; } h1 { font-size:28px; } nav { gap:2px; padding-bottom:24px; } nav button { padding:8px 12px; }
- .admin-grid { grid-template-columns:1fr; gap:0; } .table-scene { gap:12px; } .table-mark { width:96px; height:84px; margin-left:4px; } .table-scene h2 { margin-top:0; }
+ .admin-grid { grid-template-columns:1fr; gap:0; } .table-scene { gap:12px; } .table-mark { width:88px; height:88px; } .table-scene h2 { margin-top:0; }
  .inline { flex-direction:column; align-items:stretch; } .actions>button { flex:1 1 180px; }
 }
 </style>
 </head>
 <body>
 <a class="skip" href="#main">본문으로 이동</a>
-<div class="review"><strong>설계 검토용 스케치</strong> · 합성 데이터이며 실제 신청·결제·저장은 되지 않습니다. 금액·정책·공개 항목은 확정 전입니다.</div>
+<div class="review"><strong>설계 검토용 스케치</strong> · 합성 데이터이며 실제 신청·결제·저장은 되지 않습니다. 상품 가격은 공식 FAQ 기준이며 세부 정책·공개 항목은 일부 미정입니다.</div>
 <div class="shell">
-<header><div class="brand">우연한 식탁</div><span>공통 UI 검토<br>참가자·운영자</span></header>
+<header><div class="brand" aria-label="우연한 식탁"><img src="chance-table-symbol.svg" alt=""><div class="wordmark" aria-hidden="true"><span>우연한</span><span>식탁</span></div></div><span>공통 UI 검토<br>참가자·운영자</span></header>
 <nav aria-label="검토 화면 선택">
 <button data-page="apply" aria-current="page">신청</button><button data-page="status">내 신청</button><button data-page="resolution">실패 해결</button><button data-page="chat">단체방</button><button data-page="feedback">피드백</button><button data-page="admin">운영자</button>
 </nav>
@@ -105,12 +106,15 @@ footer { margin-top:40px; border-top:1px solid var(--line); padding-top:16px; fo
 <p id="candidate-error" class="error" hidden>참가 가능한 회차를 1개 이상 선택해 주세요.</p>
 </fieldset>
 <fieldset><legend>이용권</legend>
-<label class="option"><input type="radio" name="ticket" value="1회권" checked><span><strong>1회권</strong><small>참가비는 상품 정책 확정 후 표시합니다. 식사 예산과 별개입니다.</small></span></label>
-<label class="option"><input type="radio" name="ticket" value="모의 구독"><span><strong>모의 구독</strong><small>기간·한도·갱신은 U03 미결정입니다. 실제 정기 청구는 하지 않습니다.</small></span></label>
+<label class="option"><input type="radio" name="ticket" value="1회권" checked><span><strong>1회권 · 9,900원</strong><small>참가비이며 식사 예산과 별개입니다. 실제 결제는 하지 않습니다.</small></span></label>
+<label class="option"><input type="radio" name="ticket" value="멤버십 1개월 · 35,000원"><span><strong>멤버십 1개월 · 35,000원</strong><small>기간 내 참여 횟수 무제한. 실제 정기 청구는 하지 않습니다.</small></span></label>
+<label class="option"><input type="radio" name="ticket" value="멤버십 3개월 · 75,000원"><span><strong>멤버십 3개월 · 75,000원</strong><small>기간 내 참여 횟수 무제한. 실제 정기 청구는 하지 않습니다.</small></span></label>
+<label class="option"><input type="radio" name="ticket" value="멤버십 6개월 · 120,000원"><span><strong>멤버십 6개월 · 120,000원</strong><small>기간 내 참여 횟수 무제한. 실제 정기 청구는 하지 않습니다.</small></span></label>
+<p class="small muted">멤버십은 매칭 실패 횟수에 따라 기한이 연장됩니다. 실패 1회당 연장 일수와 적용 기준은 아직 정하지 않았습니다.</p>
 </fieldset>
 <div class="actions"><button class="primary" type="submit">신청 내용 확인</button></div>
 </form>
-<div id="apply-review" class="summary" hidden tabindex="-1"><h2>선택 내용 확인</h2><div id="candidate-summary"></div><p id="ticket-summary"></p><p class="small muted">실제 화면에서는 확정된 상품 금액·취소/환불 정책과 모의 결제 행동을 함께 확인합니다. 이 스케치에서는 결제를 실행하지 않습니다.</p><button type="button" id="review-status">내 신청 상태 스케치 보기</button></div>
+<div id="apply-review" class="summary" hidden tabindex="-1"><h2>선택 내용 확인</h2><div id="candidate-summary"></div><p id="ticket-summary"></p><p class="small muted">위 가격은 공식 FAQ 기준입니다. 실제 화면에서는 상품 금액과 확정된 취소/환불 정책을 함께 확인합니다. 이 스케치에서는 결제를 실행하지 않습니다.</p><button type="button" id="review-status">내 신청 상태 스케치 보기</button></div>
 </section>
 <section class="panel" id="status" aria-labelledby="status-title" hidden>
 <h1 id="status-title" tabindex="-1">내 신청을 확인하세요</h1><p class="muted">신청·결제·매칭은 서로 다른 상태입니다.</p>
@@ -129,7 +133,7 @@ footer { margin-top:40px; border-top:1px solid var(--line); padding-top:16px; fo
 </section>
 <section class="panel" id="chat" aria-labelledby="chat-title" hidden>
 <h1 id="chat-title" tabindex="-1">우리의 첫 식탁</h1><p class="muted">확정된 테이블 멤버만 들어오는 단체방 화면입니다.</p>
-<div class="table-scene"><div class="table-mark" aria-label="4인 확정 테이블">4인</div><div><h2>검토용 회차 A</h2><p class="small">가상 식당 · 장소 안내 준비 중<br>타인 소개 공개 항목은 U16 확정 후 적용</p></div></div>
+<div class="table-scene"><div class="table-mark" aria-hidden="true"><img src="chance-table-symbol.svg" alt=""></div><div><h2>검토용 회차 A · 4인 확정</h2><p class="small">가상 식당 · 장소 안내 준비 중<br>타인 소개 공개 항목은 U16 확정 후 적용</p></div></div>
 <div class="note small">실제 서비스에서는 식당명·주소·지도·집합 시각·예약명·가격을 안내합니다. 방 생성 성공과 실제 푸시 수신은 별도 상태입니다.</div>
 <ol class="chat" id="messages" aria-label="검토용 대화">
 <li class="system"><strong>식탁 안내</strong><p>대화가 막히면 함께 골라보세요.<br>1. 요즘 다시 보고 싶은 영화는?<br>2. 최근 새로 시작한 일은?<br>3. 누군가에게 권하고 싶은 한 끼는?</p></li>
@@ -159,7 +163,7 @@ footer { margin-top:40px; border-top:1px solid var(--line); padding-top:16px; fo
 </section>
 <div id="announcement" role="status" aria-live="polite" hidden></div>
 </main>
-<footer>이 파일은 UI 설계 검토 산출물입니다. 검토 메뉴 전환은 실제 제품의 권한 이동이 아닙니다. 실제 계정·서버·결제·채팅에 연결되어 있지 않습니다.</footer>
+<footer><p>우연한 식탁 · 운영사 와썹하우스</p><p class="small">서비스 심볼·워드마크는 제공 자료를 참고한 재현 시안이며 공식 원본이 아닙니다. 심볼의 좌석 6개는 브랜드 표현이며 실제 참가 인원을 뜻하지 않습니다.</p>이 파일은 UI 설계 검토 산출물입니다. 검토 메뉴 전환은 실제 제품의 권한 이동이 아닙니다. 실제 계정·서버·결제·채팅에 연결되어 있지 않습니다.</footer>
 </div>
 <script>
 const pages=[...document.querySelectorAll('main > section')];
