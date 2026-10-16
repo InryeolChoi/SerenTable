@@ -182,3 +182,30 @@ def test_anonymous_and_missing_csrf_cannot_save_private_data():
         assert client.put("/api/me/profile", json=complete_profile()).status_code == 403
         assert client.put("/api/me/consents", json={"consents": []}).status_code == 403
         assert client.get("/api/me/profile").json()["profile"] is None
+
+
+def test_simultaneous_identical_consent_returns_same_recorded_state():
+    from concurrent.futures import ThreadPoolExecutor
+
+    with TestClient(app) as client:
+        login(client)
+        token = client.get("/api/auth/csrf").json()["csrf_token"]
+        cookies = dict(client.cookies)
+        payload = {
+            "consents": [{"purpose": "privacy", "version": "demo-2026-10-16", "accepted": True}]
+        }
+
+        def submit(_):
+            with TestClient(app) as parallel:
+                parallel.cookies.update(cookies)
+                return parallel.put(
+                    "/api/me/consents",
+                    json=payload,
+                    headers={"Origin": "http://testserver", "X-CSRF-Token": token},
+                )
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            responses = list(pool.map(submit, range(4)))
+        assert all(response.status_code == 200 for response in responses)
+        assert all(response.json() == responses[0].json() for response in responses)
+        assert client.get("/api/me/consents").json() == responses[0].json()
