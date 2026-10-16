@@ -31,14 +31,14 @@
 
 | API | 입력/결과 |
 |---|---|
-| GET /api/profile/options | 아래 필드의 선택지와 한국어 label. 비개인 정보 metadata만 제공 |
+| GET /api/profile/options | `{mbtis,interests,self_traits,desired_traits,meal_budget_bands}` 각각 `[{value,label}]`. 성별은 자유 텍스트로 기록값 보존. 비개인 정보 metadata만 제공 |
 | GET /api/me/profile | `{profile: Profile|null, complete: boolean, missing_fields: string[]}` |
 | PUT /api/me/profile | 수정 가능한 프로필 전체 draft → 같은 응답. 허용 외 필드 422, 본인 세션 소유만 저장 |
 | GET /api/consent/policies | `{policies:[{purpose,version,title,body,required}]}`. 목적은 `privacy`, `operation`, 버전은 `demo-2026-10-16` |
 | GET /api/me/consents | `{consents:[{purpose,version,accepted,recorded_at}],complete:boolean}` |
 | PUT /api/me/consents | `{consents:[{purpose,version,accepted}]}` → 같은 현재 상태. 서버가 시각·소유자를 정하며 목적별 true/false·버전 변경 이력을 보존 |
 | GET /api/admin/participants | 운영자만 `{participants:[{id,login_id,display_name,profile_complete}]}` |
-| GET /api/admin/participants/{id} | 운영자만 합성 참가자의 본인 프로필/동의와 동일한 필드 계약. 암호/세션 데이터 제외 |
+| GET /api/admin/participants/{id} | 운영자만 `{user:User,profile:Profile|null,profile_complete:boolean,missing_fields:string[],consents:[{purpose,version,accepted,recorded_at}],consents_complete:boolean}`. 암호/세션 데이터 제외 |
 
 `Profile` 필드:
 
