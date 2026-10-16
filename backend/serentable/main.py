@@ -6,9 +6,11 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
+from serentable.auth import router as auth_router
 from serentable.database import database_engine
 
 app = FastAPI(title="SerenTable", docs_url=None, redoc_url=None, openapi_url=None)
+app.include_router(auth_router)
 
 
 @app.get("/api/health")
