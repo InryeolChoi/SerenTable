@@ -2,15 +2,42 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from serentable.auth import router as auth_router
 from serentable.database import database_engine
 
 app = FastAPI(title="SerenTable", docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(auth_router)
+
+
+@app.exception_handler(RequestValidationError)
+async def private_validation_error(request, error):
+    # Preserve field locations while excluding submitted secrets and PII.
+    details = [
+        {key: item[key] for key in ("type", "loc", "msg") if key in item} for item in error.errors()
+    ]
+    return JSONResponse(
+        status_code=422, content={"detail": details}, headers={"Cache-Control": "no-store"}
+    )
+
+
+@app.middleware("http")
+async def private_api_errors(request, call_next):
+    sensitive = request.url.path.startswith(("/api/auth/", "/api/me/", "/api/admin/"))
+    try:
+        response = await call_next(request)
+    except (SQLAlchemyError, KeyError):
+        if not sensitive:
+            raise
+        response = JSONResponse(status_code=503, content={"detail": "auth_storage_unavailable"})
+    if sensitive:
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.get("/api/health")
@@ -56,6 +83,10 @@ if (WEB_ROOT / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=WEB_ROOT / "assets"), name="assets")
 
 
+@app.get("/login", include_in_schema=False)
+@app.get("/participant/profile", include_in_schema=False)
+@app.get("/participant/consent", include_in_schema=False)
+@app.get("/admin/participants", include_in_schema=False)
 @app.get("/", include_in_schema=False)
 @app.get("/participant", include_in_schema=False)
 @app.get("/admin", include_in_schema=False)
