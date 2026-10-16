@@ -155,7 +155,8 @@ def test_owner_isolation_and_operator_detail_never_expose_auth_secrets():
         listing = operator.get("/api/admin/participants")
         assert listing.status_code == 200
         assert all(
-            set(item) == {"id", "login_id", "display_name", "profile_complete"}
+            set(item)
+            == {"id", "login_id", "display_name", "profile_complete", "profile_unreadable"}
             for item in listing.json()["participants"]
         )
         detail = operator.get(f"/api/admin/participants/{user['id']}")
@@ -165,6 +166,7 @@ def test_owner_isolation_and_operator_detail_never_expose_auth_secrets():
             "profile",
             "profile_complete",
             "missing_fields",
+            "profile_unreadable",
             "consents",
             "consents_complete",
         }
@@ -209,3 +211,53 @@ def test_simultaneous_identical_consent_returns_same_recorded_state():
         assert all(response.status_code == 200 for response in responses)
         assert all(response.json() == responses[0].json() for response in responses)
         assert client.get("/api/me/consents").json() == responses[0].json()
+
+
+def test_csrf_is_rejected_before_body_validation():
+    invalid = {"birth_year": "not-a-year", "unexpected": True}
+    foreign = {"Origin": "https://attacker.example", "X-CSRF-Token": "forged"}
+    with TestClient(app) as client:
+        assert client.put("/api/me/profile", json=invalid).status_code == 401
+        login(client)
+        for path, body in (("/api/me/profile", invalid), ("/api/me/consents", {"x": 1})):
+            assert client.put(path, json=body).status_code == 403
+            response = client.put(path, json=body, headers=foreign)
+            assert response.status_code == 403
+            assert response.json() == {"detail": "csrf_rejected"}
+        login_attempt = client.post("/api/auth/login", json={"login_id": "Bad!"}, headers=foreign)
+        assert login_attempt.status_code == 403
+        assert put(client, "/api/me/profile", invalid).status_code == 422
+
+
+def test_unreadable_stored_profile_is_reported_per_row():
+    from serentable.database import database_engine
+    from sqlalchemy import text
+
+    with TestClient(app) as owner, TestClient(app) as drifted, TestClient(app) as operator:
+        login(owner)
+        drifted_user = login(drifted, "participant-02")
+        put(owner, "/api/me/profile", complete_profile())
+        # No API can store an invalid profile; this simulates rows written by an older schema.
+        with database_engine().begin() as connection:
+            connection.execute(
+                text("""INSERT INTO participant_profile(user_id,data)
+                VALUES (:id, CAST(:data AS jsonb))"""),
+                {"id": drifted_user["id"], "data": '{"birth_year": "not-a-year"}'},
+            )
+        login(operator, "operator")
+        listing = operator.get("/api/admin/participants")
+        assert listing.status_code == 200
+        rows = {item["login_id"]: item for item in listing.json()["participants"]}
+        assert rows["participant-01"]["profile_complete"] is True
+        assert rows["participant-01"]["profile_unreadable"] is False
+        assert rows["participant-02"]["profile_unreadable"] is True
+        assert rows["participant-02"]["display_name"] == ""
+        detail = operator.get(f"/api/admin/participants/{drifted_user['id']}")
+        assert detail.status_code == 200
+        assert detail.json()["profile"] is None
+        assert detail.json()["profile_unreadable"] is True
+        assert "not-a-year" not in detail.text
+        own = drifted.get("/api/me/profile")
+        assert own.status_code == 200
+        assert own.json()["unreadable"] is True
+        assert put(drifted, "/api/me/profile", complete_profile()).json()["unreadable"] is False

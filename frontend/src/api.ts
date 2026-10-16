@@ -27,6 +27,7 @@ export type ProfileState = {
   profile: Profile | null;
   complete: boolean;
   missing_fields: string[];
+  unreadable: boolean;
 };
 export type Choice = { value: string; label: string };
 export type Options = Record<
@@ -56,6 +57,7 @@ export type Participant = {
   login_id: string;
   display_name: string | null;
   profile_complete: boolean;
+  profile_unreadable: boolean;
 };
 let csrfToken: string | null = null;
 export class ApiError extends Error {
@@ -114,7 +116,26 @@ function errorMessage(status: number) {
   return "요청을 완료하지 못했습니다. 입력 내용은 유지됩니다. 잠시 후 다시 시도해 주세요.";
 }
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const mutation = init.method && !["GET", "HEAD"].includes(init.method);
+  try {
+    return await send<T>(path, init);
+  } catch (error) {
+    // The signed CSRF token expires after an hour; fetch a fresh one and retry once.
+    if (
+      !(error instanceof ApiError) ||
+      error.status !== 403 ||
+      error.detail !== "csrf_rejected" ||
+      !isMutation(init)
+    )
+      throw error;
+    csrfToken = null;
+    return send<T>(path, init);
+  }
+}
+function isMutation(init: RequestInit) {
+  return Boolean(init.method && !["GET", "HEAD"].includes(init.method));
+}
+async function send<T>(path: string, init: RequestInit): Promise<T> {
+  const mutation = isMutation(init);
   if (mutation && !csrfToken) await bootstrapCsrf();
   let response: Response;
   try {
@@ -146,6 +167,10 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 export async function bootstrapCsrf() {
   csrfToken = (await api<{ csrf_token: string }>("/api/auth/csrf")).csrf_token;
 }
+export function profileStatus(complete: boolean, unreadable: boolean) {
+  if (unreadable) return "저장 형식 확인 필요";
+  return complete ? "입력 완료" : "미완성";
+}
 export function clearCsrf() {
   csrfToken = null;
 }
@@ -171,6 +196,7 @@ export type ParticipantDetail = {
   profile: Profile | null;
   profile_complete: boolean;
   missing_fields: string[];
+  profile_unreadable: boolean;
   consents: Consent[];
   consents_complete: boolean;
 };

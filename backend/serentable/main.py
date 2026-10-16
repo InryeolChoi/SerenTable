@@ -33,7 +33,7 @@ async def private_api_errors(request, call_next):
     sensitive = request.url.path.startswith(("/api/auth/", "/api/me/", "/api/admin/"))
     try:
         response = await call_next(request)
-    except (SQLAlchemyError, KeyError):
+    except SQLAlchemyError:
         if not sensitive:
             raise
         response = JSONResponse(status_code=503, content={"detail": "auth_storage_unavailable"})

@@ -14,7 +14,7 @@
 - 인증 모듈은 `Principal(id, login_id, role)`와 FastAPI 의존성 `require_user(request) -> Principal`, `require_operator(request) -> Principal`, `require_csrf(request)`를 제공한다. 프로필 구현은 이 동일한 판정을 사용한다. 실제 함수 시그니처 변경이 필요하면 이 계약과 소비자를 함께 맞춘다.
 - 절대 세션 만료 기본 12시간, 로그아웃 때 서버 철회. `AUTH_SESSION_TTL_SECONDS`는 테스트/환경 설정으로 조절하며 만료는 실제 HTTP 행동으로 검증한다.
 - 배포는 HttpOnly·Secure·SameSite=Lax·Path=/·Domain 없는 `__Host-` 세션/CSRF 쿠키를 사용한다. HTTP 로컬/테스트만 별도 개발 쿠키 이름을 사용한다. `APP_ENV=production` 또는 Railway production 환경에서는 HTTP/비밀 설정 누락을 fail-closed로 처리한다. 준비 상태/heartbeat만 있는 기존 복원 DB에서도 앱이 시작되게 하며 인증 설정 누락은 인증 경계에서 안전하게 실패한다.
-- `APP_ORIGIN`을 동일 출처의 정확한 URL로 설정한다. 상태 변경(login/logout 포함)에 일치하는 Origin과 유효한 `X-CSRF-Token`을 요구한다. 타 세션/변조/누락/외부 출처·null 출처는 403. 로그인 후 세션·CSRF 상태 교체, 다중 탭에 불필요한 nonce 회전 없음.
+- `APP_ORIGIN`을 동일 출처의 정확한 URL로 설정한다. 상태 변경(login/logout 포함)에 일치하는 Origin과 유효한 `X-CSRF-Token`을 요구한다. 타 세션/변조/누락/외부 출처·null 출처는 403. 인증(401)과 CSRF(403)는 요청 본문 스키마 검증(422)보다 먼저 판정한다. 단, JSON 자체를 해석할 수 없는 본문은 프레임워크가 먼저 422로 거절한다. 로그인 후 세션·CSRF 상태 교체, 다중 탭에 불필요한 nonce 회전 없음. CSRF 토큰은 1시간 후 만료되며 화면은 `csrf_rejected` 403을 받으면 nonce를 유지한 채 새 토큰을 받아 한 번만 재시도한다.
 - signing key는 `AUTH_SIGNING_KEY` 런타임 환경 변수다. 개발·CI에는 명시한 합성 값, 배포에는 별도 생성 키를 쓴다. 비밀을 프론트/로그/URL에 넣지 않는다.
 - 로그인 실패는 존재/미존재 동일 401. 기본 계정별 실패 5회/5분 후 임시 429와 DB 기반 재시작 지속성을 검증한다. 임의 X-Forwarded-For를 신뢰하지 않고 고비용 해시는 sync route/제한된 실행 경계에서 처리한다.
 - 모든 민감 API 응답은 `Cache-Control: no-store`. 오류는 FastAPI 형식 `{detail: 고정 코드}`, 유효성 검증은 422로 구분하고 DB 장애는 비밀 없는 503으로 처리한다.
@@ -32,13 +32,13 @@
 | API | 입력/결과 |
 |---|---|
 | GET /api/profile/options | `{mbtis,interests,self_traits,desired_traits,meal_budget_bands}` 각각 `[{value,label}]`. 성별은 자유 텍스트로 기록값 보존. 비개인 정보 metadata만 제공 |
-| GET /api/me/profile | `{profile: Profile|null, complete: boolean, missing_fields: string[]}` |
+| GET /api/me/profile | `{profile: Profile|null, complete: boolean, missing_fields: string[], unreadable: boolean}`. 이전 스키마로 저장되어 현재 검증을 통과하지 못한 행은 `profile:null, unreadable:true`로 반환하고 저장값을 노출하지 않는다. 다시 저장하면 해소된다 |
 | PUT /api/me/profile | 수정 가능한 프로필 전체 draft → 같은 응답. 허용 외 필드 422, 본인 세션 소유만 저장 |
 | GET /api/consent/policies | `{policies:[{purpose,version,title,body,required}]}`. 목적은 `privacy`, `operation`, 버전은 `demo-2026-10-16` |
 | GET /api/me/consents | `{consents:[{purpose,version,accepted,recorded_at}],complete:boolean}` |
 | PUT /api/me/consents | `{consents:[{purpose,version,accepted}]}` → 같은 현재 상태. 서버가 시각·소유자를 정하며 목적별 true/false·버전 변경 이력을 보존 |
-| GET /api/admin/participants | 운영자만 `{participants:[{id,login_id,display_name,profile_complete}]}` |
-| GET /api/admin/participants/{id} | 운영자만 `{user:User,profile:Profile|null,profile_complete:boolean,missing_fields:string[],consents:[{purpose,version,accepted,recorded_at}],consents_complete:boolean}`. 암호/세션 데이터 제외 |
+| GET /api/admin/participants | 운영자만 `{participants:[{id,login_id,display_name,profile_complete,profile_unreadable}]}`. 읽을 수 없는 행 하나가 목록 전체를 실패시키지 않는다 |
+| GET /api/admin/participants/{id} | 운영자만 `{user:User,profile:Profile|null,profile_complete:boolean,missing_fields:string[],profile_unreadable:boolean,consents:[{purpose,version,accepted,recorded_at}],consents_complete:boolean}`. 암호/세션 데이터 제외 |
 
 `Profile` 필드:
 

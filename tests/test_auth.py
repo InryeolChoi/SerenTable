@@ -120,6 +120,12 @@ def test_auth_boundary_hides_configuration_and_database_failure(monkeypatch):
         assert response.json() == {"detail": "auth_storage_unavailable"}
         assert response.headers.get("cache-control") == "no-store"
         assert "private" not in response.text
+    monkeypatch.delenv("DATABASE_URL")
+    with TestClient(app, raise_server_exceptions=False) as client:
+        client.cookies.set("dev-serentable_session", "untrusted-value")
+        response = client.get("/api/auth/me")
+        assert response.status_code == 503
+        assert response.json() == {"detail": "auth_storage_unavailable"}
 
 
 def test_invalid_login_payload_does_not_echo_secret(client):

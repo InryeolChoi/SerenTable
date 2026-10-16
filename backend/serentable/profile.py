@@ -5,12 +5,13 @@ from datetime import datetime, timezone
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     StringConstraints,
+    ValidationError,
     field_validator,
     model_validator,
 )
@@ -20,7 +21,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from serentable.auth import (
     Principal,
     private_response,
-    require_csrf,
+    require_csrf_user,
     require_operator,
     require_user,
 )
@@ -195,7 +196,11 @@ def profile_options():
 
 
 def profile_state(profile):
-    data = Profile.model_validate(profile).model_dump() if profile is not None else None
+    try:
+        data = Profile.model_validate(profile).model_dump() if profile is not None else None
+    except ValidationError:
+        # Schema drift in one stored row must not hide every other participant.
+        return {"profile": None, "complete": False, "missing_fields": [], "unreadable": True}
     required = (
         "name",
         "display_name",
@@ -210,7 +215,12 @@ def profile_state(profile):
         "meal_budget_bands",
     )
     missing = [field for field in required if not data or not data[field]]
-    return {"profile": data, "complete": not missing, "missing_fields": missing}
+    return {
+        "profile": data,
+        "complete": not missing,
+        "missing_fields": missing,
+        "unreadable": False,
+    }
 
 
 def read_profile(connection, user_id):
@@ -229,8 +239,7 @@ def get_profile(user: Principal = Depends(require_user)):
 
 
 @router.put("/api/me/profile")
-def save_profile(payload: Profile, request: Request, user: Principal = Depends(require_user)):
-    require_csrf(request)
+def save_profile(payload: Profile, user: Principal = Depends(require_csrf_user)):
     try:
         with database_engine().begin() as connection:
             connection.execute(
@@ -324,8 +333,7 @@ def get_consents(user: Principal = Depends(require_user)):
 
 
 @router.put("/api/me/consents")
-def save_consents(payload: ConsentInput, request: Request, user: Principal = Depends(require_user)):
-    require_csrf(request)
+def save_consents(payload: ConsentInput, user: Principal = Depends(require_csrf_user)):
     try:
         with database_engine().begin() as connection:
             # Serialize all purpose changes for this owner, including first writes.
@@ -373,10 +381,11 @@ def list_participants(operator: Principal = Depends(require_operator)):
                         {
                             "id": str(row["id"]),
                             "login_id": row["login_id"],
-                            "display_name": (row["data"] or {}).get("display_name", ""),
-                            "profile_complete": profile_state(row["data"])["complete"],
+                            "display_name": (state["profile"] or {}).get("display_name") or "",
+                            "profile_complete": state["complete"],
+                            "profile_unreadable": state["unreadable"],
                         }
-                        for row in rows
+                        for row, state in ((row, profile_state(row["data"])) for row in rows)
                     ]
                 }
             )
@@ -411,6 +420,7 @@ def participant_detail(participant_id: UUID, operator: Principal = Depends(requi
                     "profile": profile["profile"],
                     "profile_complete": profile["complete"],
                     "missing_fields": profile["missing_fields"],
+                    "profile_unreadable": profile["unreadable"],
                     "consents": consent["consents"],
                     "consents_complete": consent["complete"],
                 }
