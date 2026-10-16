@@ -43,7 +43,8 @@ def test_worker_records_heartbeat_visible_over_http(monkeypatch):
 
 def test_participant_and_admin_routes_serve_built_csr_on_refresh():
     with TestClient(app) as client:
-        for route in ("/", "/participant", "/admin"):
+        payment = "/participant/payment/00000000-0000-4000-8000-000000000000"
+        for route in ("/", "/participant", "/admin", payment):
             response = client.get(route)
             assert response.status_code == 200
             assert '<div id="root"></div>' in response.text

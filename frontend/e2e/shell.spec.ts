@@ -1,21 +1,19 @@
 import { test, expect, type Page } from "@playwright/test";
+import {
+  login as signIn,
+  operatorPassword,
+  participantPassword,
+} from "./support";
 
 async function login(
   page: Page,
   role: "participant" | "operator" = "participant",
 ) {
-  await page.goto("/login");
-  await page
-    .getByLabel("계정 ID", { exact: true })
-    .fill(role === "operator" ? "operator" : "participant-01");
-  await page
-    .getByLabel("비밀번호", { exact: true })
-    .fill(
-      role === "operator"
-        ? "synthetic-operator-password"
-        : "synthetic-participant-password",
-    );
-  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await signIn(
+    page,
+    role === "operator" ? "operator" : "participant-01",
+    role === "operator" ? operatorPassword : participantPassword,
+  );
   await expect(
     page.getByRole("heading", {
       name: role === "operator" ? "합성 참가자 관리" : "내 식탁 준비",

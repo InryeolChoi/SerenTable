@@ -18,36 +18,17 @@ import {
   type Participant,
   type ParticipantDetail,
 } from "./api";
+import { AdminEventsPage, ParticipantEventsPage } from "./events";
+import {
+  AdminApplicationsPage,
+  ApplyPage,
+  MyApplications,
+} from "./applications";
+import { MyEntitlements, PaymentPage } from "./payments";
 import symbol from "./chance-table-symbol.svg";
+import { message, Notice, useScopedApi } from "./ui";
 import "./style.css";
 
-function message(error: unknown) {
-  return error instanceof Error ? error.message : "요청을 완료하지 못했습니다.";
-}
-function Notice({
-  children,
-  error = false,
-}: {
-  children: React.ReactNode;
-  error?: boolean;
-}) {
-  return (
-    <p
-      className={error ? "notice error" : "notice"}
-      role={error ? "alert" : "status"}
-    >
-      {children}
-    </p>
-  );
-}
-// 화면을 떠난 뒤 이전 계정의 응답이 새 화면의 입력을 덮어쓰지 않도록 취소한다.
-function useScopedApi() {
-  const controller = useRef(new AbortController());
-  useEffect(() => () => controller.current.abort(), []);
-  return function request<T>(path: string, init: RequestInit = {}) {
-    return api<T>(path, { ...init, signal: controller.current.signal });
-  };
-}
 function Login({
   onLogin,
   expired,
@@ -588,9 +569,11 @@ function ParticipantHome({ navigate }: { navigate: (path: string) => void }) {
           동의 내용 확인
         </button>
       </div>
+      <MyApplications navigate={navigate} />
+      <MyEntitlements />
       <p className="notice">
-        참가 신청·결제는 다음 개발 단계에서 제공합니다. 입력 완료는 참가 확정이
-        아닙니다.
+        신청 제출과 모의 결제 완료는 참가 확정이 아닙니다. 매칭 결과는 별도로
+        안내합니다.
       </p>
     </section>
   );
@@ -902,8 +885,48 @@ function App() {
             >
               {user.role === "operator" ? "참가자 관리" : "입력 상태"}
             </a>
+            {user.role === "operator" && (
+              <a
+                href="/admin/events"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate("/admin/events");
+                }}
+              >
+                회차 관리
+              </a>
+            )}
+            {user.role === "operator" && (
+              <a
+                href="/admin/applications"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate("/admin/applications");
+                }}
+              >
+                신청 현황
+              </a>
+            )}
             {user.role === "participant" && (
               <>
+                <a
+                  href="/participant/events"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/participant/events");
+                  }}
+                >
+                  모집 회차
+                </a>
+                <a
+                  href="/participant/apply"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/participant/apply");
+                  }}
+                >
+                  일정 신청
+                </a>
                 <a
                   href="/participant/profile"
                   onClick={(e) => {
@@ -946,7 +969,23 @@ function App() {
               </button>
             </section>
           ) : user.role === "operator" ? (
-            <AdminPage />
+            path === "/admin/events" ? (
+              <AdminEventsPage />
+            ) : path === "/admin/applications" ? (
+              <AdminApplicationsPage />
+            ) : (
+              <AdminPage />
+            )
+          ) : path === "/participant/apply" ||
+            path === "/participant/apply/review" ? (
+            <ApplyPage path={path} navigate={navigate} />
+          ) : path.startsWith("/participant/payment/") ? (
+            <PaymentPage
+              applicationId={path.slice("/participant/payment/".length)}
+              navigate={navigate}
+            />
+          ) : path === "/participant/events" ? (
+            <ParticipantEventsPage />
           ) : path === "/participant/profile" ? (
             <ProfilePage
               draft={draft}

@@ -15,8 +15,9 @@ export default defineConfig({
   use: { baseURL: origin, trace: "retain-on-failure" },
   projects: [{ name: "mobile-chromium", use: { ...devices["Pixel 7"] } }],
   webServer: {
+    // Each run starts from an empty local schema (the reset refuses non-local databases).
     command:
-      "uv run --project .. python -m serentable.seed_demo_accounts && uv run --project .. uvicorn serentable.main:app --app-dir ../backend --host 127.0.0.1 --port 8000",
+      "node e2e/reset-database.mjs && uv run --project .. python -m serentable.seed_demo_accounts && uv run --project .. uvicorn serentable.main:app --app-dir ../backend --host 127.0.0.1 --port 8000",
     url: `${origin}/api/health`,
     env: { ...authEnvironment, PYTHONPATH: "../backend" },
     reuseExistingServer: false,
