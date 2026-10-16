@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, devices, type Page } from "@playwright/test";
 import { call, display, login, participantPassword } from "./support";
 
 // The accounts the seed creates; a table needs at least four of them.
@@ -87,14 +87,14 @@ async function openMyApplications(page: Page) {
 
 test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운영자 화면에 결과가 보인다", async ({
   browser,
-}) => {
+}, testInfo) => {
   const closeInSeconds = 15;
-  const operatorContext = await browser.newContext();
+  const operatorContext = await browser.newContext({ ...devices["Pixel 7"] });
   const operator = await operatorContext.newPage();
   await login(operator, "operator", "synthetic-operator-password");
 
   const participantContexts = await Promise.all(
-    members.map(() => browser.newContext()),
+    members.map(() => browser.newContext({ ...devices["Pixel 7"] })),
   );
   const participants = await Promise.all(
     participantContexts.map((context) => context.newPage()),
@@ -134,6 +134,8 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
   const suggestions = unseated.getByRole("region", { name: "대체 일정" });
   await expect(suggestions).toContainText(alternative.name);
   await expect(suggestions).toContainText("조회만으로 일정이나 결제가 변경되지 않습니다");
+  expect(await participants[0].evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  await unseated.screenshot({ path: testInfo.outputPath("matching-alternatives-mobile.png") });
   // Every seated participant sees the same confirmation.
   for (const participant of participants.slice(1)) {
     const rows = await openMyApplications(participant);
