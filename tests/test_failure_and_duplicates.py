@@ -13,6 +13,7 @@ from serentable.clock import locked_now
 from serentable.database import database_engine
 from serentable.eligibility import matching_eligible_applications
 from serentable.main import app
+from sqlalchemy import text
 from support import login, send
 from test_applications import (  # noqa: F401
     application_database,
@@ -53,6 +54,37 @@ def test_payment_after_the_earliest_candidate_close_is_refused():
             assert (late.status_code, late.json()) == (409, {"detail": "payment_closed"})
         (listed,) = participant.get("/api/me/applications").json()["applications"]
         assert listed["payments"] == [] and listed["coverage"] is None
+        assert participant.get("/api/me/entitlements").json()["entitlements"] == []
+
+
+def test_payment_waits_for_a_pending_cancellation_and_rechecks_application_state():
+    with TestClient(app) as operator, TestClient(app) as participant:
+        login(operator, "operator")
+        _, application = submitted(operator, participant, "participant-01")
+        # Hold the real cancellation transaction open while the payment arrives.
+        connection, transaction = hold_lock(
+            "SELECT id FROM application WHERE id = :id FOR UPDATE", {"id": application["id"]}
+        )
+        try:
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                pending = pool.submit(pay, participant, application["id"], "single")
+                time.sleep(0.5)
+                connection.execute(
+                    text("""UPDATE application SET state='CANCELED',
+                    canceled_at=clock_timestamp() WHERE id=:id"""),
+                    {"id": application["id"]},
+                )
+                connection.execute(
+                    text("UPDATE application_candidate SET live=false WHERE application_id=:id"),
+                    {"id": application["id"]},
+                )
+                transaction.commit()
+                result = pending.result(timeout=10)
+        finally:
+            if transaction.is_active:
+                transaction.rollback()
+            connection.close()
+        assert (result.status_code, result.json()) == (409, {"detail": "application_not_payable"})
         assert participant.get("/api/me/entitlements").json()["entitlements"] == []
 
 

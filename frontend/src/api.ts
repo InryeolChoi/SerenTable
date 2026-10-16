@@ -110,6 +110,43 @@ export type Entitlement = {
   state: "HELD" | "ACTIVE" | "EXPIRED";
   policy_version: string;
 };
+export type MatchingState =
+  | "WAITING"
+  | "MATCHING"
+  | "REALLOCATING"
+  | "CONFIRMED"
+  | "ALTERNATIVE_OFFERED"
+  | "TRANSFERRED"
+  | "NO_MATCH"
+  | "EXCEPTION";
+/** The matching axis of an application; null until a matching run reaches it. */
+export type MatchParticipation = {
+  state: MatchingState;
+  reason_code: string | null;
+  event_slot_id: string | null;
+  /** Current confirmed table: only approved display names are introduced. */
+  table: { id: string; member_count: number; members: { display_name: string }[] } | null;
+};
+export type MatchRunMember = {
+  application_id: string;
+  login_id: string;
+  outcome: "SEATED" | "UNSEATED" | "EXCEPTION";
+  reason_code: string | null;
+  dining_table_id: string | null;
+};
+export type MatchRun = {
+  id: string;
+  attempt: number;
+  state: "RUNNING" | "SUCCEEDED" | "FAILED" | "ABANDONED";
+  seated_count: number;
+  reason_code: string | null;
+  algorithm_version: string;
+  rule_version: string;
+  started_at: string;
+  finished_at: string | null;
+  event_slot: EventSlot;
+  members: MatchRunMember[];
+};
 export type Application = {
   id: string;
   state: "DRAFT" | "SUBMITTED" | "CANCELED";
@@ -124,6 +161,7 @@ export type Application = {
   payment_required: boolean;
   /** Candidate slots whose matching would include this application (paid by the close). */
   matching_eligible_slot_ids: string[];
+  matching: MatchParticipation | null;
   participant?: { id: string; login_id: string };
 };
 let csrfToken: string | null = null;

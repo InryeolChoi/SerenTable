@@ -73,6 +73,59 @@ def apply(participant, slot_ids, key=None):
     )
 
 
+def test_cancellation_rechecks_deadline_after_waiting_for_the_slot_lock():
+    with TestClient(app) as operator, TestClient(app) as participant:
+        login(operator, "operator")
+        login(participant, "participant-01")
+        make_ready(participant)
+        slot = create_slot(operator, close_in=timedelta(seconds=2))
+        application_id = apply(participant, [slot]).json()["application"]["id"]
+        connection, transaction = hold_lock(
+            "SELECT id FROM event_slot WHERE id = :id FOR UPDATE", {"id": slot}
+        )
+        try:
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                pending = pool.submit(
+                    send, participant, "POST", f"/api/me/applications/{application_id}/cancel"
+                )
+                time.sleep(2.2)
+                transaction.rollback()
+                result = pending.result(timeout=10)
+        finally:
+            if transaction.is_active:
+                transaction.rollback()
+            connection.close()
+        assert result.status_code == 409
+        assert result.json()["detail"] == "application_cancel_closed"
+        assert participant.get("/api/me/applications").json()["applications"][0]["state"] == (
+            "SUBMITTED"
+        )
+
+
+def test_submission_rechecks_deadline_after_waiting_for_the_slot_lock():
+    with TestClient(app) as operator, TestClient(app) as participant:
+        login(operator, "operator")
+        login(participant, "participant-01")
+        make_ready(participant)
+        slot = create_slot(operator, close_in=timedelta(seconds=2))
+        connection, transaction = hold_lock(
+            "SELECT id FROM event_slot WHERE id = :id FOR UPDATE", {"id": slot}
+        )
+        try:
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                pending = pool.submit(apply, participant, [slot])
+                time.sleep(2.2)
+                transaction.rollback()
+                result = pending.result(timeout=10)
+        finally:
+            if transaction.is_active:
+                transaction.rollback()
+            connection.close()
+        assert result.status_code == 422
+        assert result.json()["detail"][0]["type"] == "slot_not_recruiting"
+        assert participant.get("/api/me/applications").json()["applications"] == []
+
+
 def test_participant_submits_explicit_candidates_and_sees_own_status():
     with TestClient(app) as operator, TestClient(app) as participant:
         login(operator, "operator")
