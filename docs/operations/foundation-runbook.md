@@ -107,7 +107,7 @@ CI는 모든 PR과 `main`, `integration/mvp` push에서 실행한다. 별도 Pos
 
 API가 마이그레이션을 소유한다. 첫 배포는 API pre-deploy 성공 후 worker를 시작한다. 동시에 처음 배포하면 worker는 schema가 생길 때까지 비밀값 없는 오류 로그를 기록하고 10초 간격으로 복구한다. 마이그레이션은 앱 시작 때 API/worker가 동시에 실행하지 않는다. 이후 파괴적 schema 변경은 새·이전 버전 공존과 복구 방법을 검토한 뒤 배포한다.
 
-`PORT`는 Railway 제공 값을 읽으며 기본값은 8000이다. `PYTHONPATH`는 이미지에 포함된다. 버전은 `APP_VERSION`, 없으면 `RAILWAY_GIT_COMMIT_SHA`, 둘 다 없으면 development를 반환한다. 커밋 SHA를 실제 배포와 대조한다. worker는 기반 heartbeat만 실행하며 예약 매칭·발송·잠금·재시도 엔진은 아직 구현하지 않았다.
+`PORT`는 Railway 제공 값을 읽으며 기본값은 8000이다. `PYTHONPATH`는 이미지에 포함된다. 버전은 `APP_VERSION`, 없으면 `RAILWAY_GIT_COMMIT_SHA`, 둘 다 없으면 development를 반환한다. 커밋 SHA를 실제 배포와 대조한다. PR #31의 worker는 heartbeat 뒤 마감된 회차를 자동 매칭하며 회차 잠금·성공 세대 재실행 방지·실패 재시도를 포함한다. 발송·대안·환불은 미구현이다. PR이 main에 머지·배포되기 전에는 운영 반영 완료로 보지 않는다.
 
 Wait for CI는 실제 서비스별 설정이다. YAML 파일만으로 활성화되지 않는다. 실패한 CI가 배포를 막는지 실제 배포 내역을 확인해야 한다. 필수 검사를 조건부 skip/neutral 처리하거나 취소 상태를 성공으로 해석하지 않는다. 배포 브랜치를 바꾸면 CI push 트리거도 함께 검토한다. PR 검증만으로 배포 브랜치 CI를 대체하지 않는다. 통합 PR 완료 전 `main` 자동 병합은 하지 않는다.
 

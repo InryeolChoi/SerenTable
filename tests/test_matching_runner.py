@@ -447,3 +447,49 @@ def test_late_failure_record_cannot_replace_a_successful_retry():
         for participant in members:
             application = participant.get("/api/me/applications").json()["applications"][0]
             assert application["matching"]["state"] == "NO_MATCH"
+
+
+def test_cancel_and_matching_do_not_deadlock_on_the_assignment_foreign_key(monkeypatch):
+    import serentable.applications as applications_api
+
+    paused, resume = threading.Event(), threading.Event()
+    actual_clock = applications_api.locked_now
+    first = True
+
+    def pause_after_application_lock(connection):
+        nonlocal first
+        moment = actual_clock(connection)
+        if first:
+            first = False
+            paused.set()
+            assert resume.wait(15)
+        return moment
+
+    with ExitStack() as stack:
+        operator = stack.enter_context(TestClient(app))
+        members = [stack.enter_context(TestClient(app)) for _ in range(4)]
+        login(operator, "operator")
+        for index, participant in enumerate(members, 1):
+            prepare(participant, f"participant-0{index}")
+        slot = due_slot(operator)
+        application_ids = [apply_and_pay(participant, slot) for participant in members]
+        # Only time acquisition is paused; requests, FK checks and locks are real.
+        monkeypatch.setattr(applications_api, "locked_now", pause_after_application_lock)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            canceled = pool.submit(
+                send, members[0], "POST", f"/api/me/applications/{application_ids[0]}/cancel"
+            )
+            try:
+                assert paused.wait(5)
+                time.sleep(3.6)
+                matching = pool.submit(run_slot_matching, slot)
+                time.sleep(0.3)
+            finally:
+                resume.set()
+            result = canceled.result(timeout=10)
+            summary = matching.result(timeout=10)
+        assert result.status_code == 409
+        assert summary["state"] == "SUCCEEDED"
+        assert summary["seated_count"] == 4
+        runs = operator.get("/api/admin/match-runs").json()["match_runs"]
+        assert [run["state"] for run in runs] == ["SUCCEEDED"]

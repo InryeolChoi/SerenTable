@@ -204,7 +204,7 @@ def cancel_application(
             # Another participant's id is indistinguishable from a missing one.
             state = connection.execute(
                 text("""SELECT state FROM application
-                WHERE id = :id AND user_id = :user_id FOR UPDATE"""),
+                WHERE id = :id AND user_id = :user_id FOR NO KEY UPDATE"""),
                 {"id": application_id, "user_id": user.id},
             ).scalar()
             if state is None:
