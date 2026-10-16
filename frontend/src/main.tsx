@@ -39,6 +39,14 @@ function Notice({
     </p>
   );
 }
+// 화면을 떠난 뒤 이전 계정의 응답이 새 화면의 입력을 덮어쓰지 않도록 취소한다.
+function useScopedApi() {
+  const controller = useRef(new AbortController());
+  useEffect(() => () => controller.current.abort(), []);
+  return function request<T>(path: string, init: RequestInit = {}) {
+    return api<T>(path, { ...init, signal: controller.current.signal });
+  };
+}
 function Login({
   onLogin,
   expired,
@@ -46,6 +54,7 @@ function Login({
   onLogin: (user: User) => void;
   expired: boolean;
 }) {
+  const request = useScopedApi();
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
@@ -56,7 +65,7 @@ function Login({
     setError("");
     try {
       await bootstrapCsrf();
-      const result = await api<{ user: User }>("/api/auth/login", {
+      const result = await request<{ user: User }>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ login_id: loginId, password }),
       });
@@ -197,7 +206,7 @@ function FoodField({
           <textarea
             required
             value={answer.details ?? ""}
-            maxLength={1000}
+            maxLength={500}
             onChange={(e) =>
               setDraft({
                 ...draft,
@@ -219,6 +228,7 @@ function ProfilePage({
   setDraft: (draft: Profile) => void;
   navigate: (path: string) => void;
 }) {
+  const request = useScopedApi();
   const [options, setOptions] = useState<Options | null>(null);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
@@ -229,8 +239,8 @@ function ProfilePage({
     setError("");
     try {
       const [choices, state] = await Promise.all([
-        api<Options>("/api/profile/options"),
-        api<ProfileState>("/api/me/profile"),
+        request<Options>("/api/profile/options"),
+        request<ProfileState>("/api/me/profile"),
       ]);
       setOptions(choices);
       if (!draft) setDraft(state.profile ?? emptyProfile());
@@ -250,7 +260,7 @@ function ProfilePage({
     setSaved("");
     setError("");
     try {
-      const result = await api<ProfileState>("/api/me/profile", {
+      const result = await request<ProfileState>("/api/me/profile", {
         method: "PUT",
         body: JSON.stringify(draft),
       });
@@ -296,7 +306,11 @@ function ProfilePage({
           {textFields.map(([name, title]) => (
             <label key={name}>
               {title}
-              <span className="small muted">입력 완료에 필요</span>
+              <span className="small muted">
+                {name === "instagram_id"
+                  ? "입력 완료에 필요 · @ 없이 영문·숫자·마침표·밑줄만 입력"
+                  : "입력 완료에 필요"}
+              </span>
               <input
                 value={draft[name] ?? ""}
                 maxLength={
@@ -332,7 +346,7 @@ function ProfilePage({
             성별
             <input
               value={draft.gender ?? ""}
-              maxLength={40}
+              maxLength={100}
               onChange={(e) => setDraft({ ...draft, gender: e.target.value })}
             />
           </label>
@@ -394,6 +408,7 @@ function ProfilePage({
   );
 }
 function ConsentPage() {
+  const request = useScopedApi();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [choices, setChoices] = useState<Consent[]>([]);
   const [current, setCurrent] = useState<ConsentState | null>(null);
@@ -406,8 +421,8 @@ function ConsentPage() {
     setError("");
     try {
       const [terms, state] = await Promise.all([
-        api<{ policies: Policy[] }>("/api/consent/policies"),
-        api<ConsentState>("/api/me/consents"),
+        request<{ policies: Policy[] }>("/api/consent/policies"),
+        request<ConsentState>("/api/me/consents"),
       ]);
       setPolicies(terms.policies);
       setCurrent(state);
@@ -439,7 +454,7 @@ function ConsentPage() {
     setSaved(false);
     try {
       setCurrent(
-        await api<ConsentState>("/api/me/consents", {
+        await request<ConsentState>("/api/me/consents", {
           method: "PUT",
           body: JSON.stringify({ consents: choices }),
         }),
@@ -526,13 +541,14 @@ function ConsentPage() {
   );
 }
 function ParticipantHome({ navigate }: { navigate: (path: string) => void }) {
+  const request = useScopedApi();
   const [profile, setProfile] = useState<ProfileState | null>(null);
   const [consent, setConsent] = useState<ConsentState | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
     Promise.all([
-      api<ProfileState>("/api/me/profile"),
-      api<ConsentState>("/api/me/consents"),
+      request<ProfileState>("/api/me/profile"),
+      request<ConsentState>("/api/me/consents"),
     ])
       .then(([p, c]) => {
         setProfile(p);
@@ -579,6 +595,7 @@ function ParticipantHome({ navigate }: { navigate: (path: string) => void }) {
   );
 }
 function AdminPage() {
+  const request = useScopedApi();
   const [list, setList] = useState<Participant[]>([]);
   const [options, setOptions] = useState<Options | null>(null);
   const [loading, setLoading] = useState(true);
@@ -591,8 +608,8 @@ function AdminPage() {
     setError("");
     try {
       const [result, metadata] = await Promise.all([
-        api<{ participants: Participant[] }>("/api/admin/participants"),
-        api<Options>("/api/profile/options"),
+        request<{ participants: Participant[] }>("/api/admin/participants"),
+        request<Options>("/api/profile/options"),
       ]);
       setList(result.participants);
       setOptions(metadata);
@@ -612,7 +629,7 @@ function AdminPage() {
     setPending(true);
     try {
       setDetail(
-        await api<ParticipantDetail>(
+        await request<ParticipantDetail>(
           `/api/admin/participants/${encodeURIComponent(person.id)}`,
         ),
       );

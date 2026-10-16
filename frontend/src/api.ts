@@ -63,8 +63,44 @@ export class ApiError extends Error {
     public status: number,
     public detail: unknown,
   ) {
-    super(errorMessage(status));
+    super(validationMessage(status, detail));
   }
+}
+const fieldNames: Record<string, string> = {
+  name: "이름 원문",
+  display_name: "표시명",
+  contact: "연락처",
+  instagram_id: "Instagram ID",
+  birth_year: "출생연도",
+  gender: "성별",
+  occupation: "직업",
+  mbtis: "MBTI",
+  interests: "관심사",
+  self_traits: "본인 성향",
+  desired_traits: "희망 성향",
+  meal_budget_bands: "식사 예산",
+  food_restrictions: "못 먹는 음식",
+  allergies: "알레르기",
+};
+function validationMessage(status: number, detail: unknown) {
+  if (status === 422 && Array.isArray(detail)) {
+    const fields = [
+      ...new Set(
+        detail.flatMap((item) =>
+          Array.isArray(item?.loc)
+            ? item.loc
+                .map((part: unknown) =>
+                  typeof part === "string" ? fieldNames[part] : undefined,
+                )
+                .filter(Boolean)
+            : [],
+        ),
+      ),
+    ];
+    if (fields.length)
+      return `${fields.join(", ")}의 입력 형식을 확인해 주세요. 입력 내용은 유지됩니다.`;
+  }
+  return errorMessage(status);
 }
 function errorMessage(status: number) {
   if (status === 401)
@@ -97,6 +133,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     );
   }
   const data = await response.json().catch(() => ({}));
+  if (init.signal?.aborted) throw new DOMException("Aborted", "AbortError");
   if (!response.ok) {
     if (response.status === 401 && !path.startsWith("/api/auth/")) {
       csrfToken = null;
