@@ -72,7 +72,9 @@ test("참가자가 복수 후보 회차를 골라 검토 후 신청하고 상태
 
   // The missing consent is reported, and the selection survives the detour.
   await participant.getByRole("button", { name: "신청 제출" }).click();
-  await expect(participant.getByRole("alert")).toContainText("필수 동의");
+  await expect(
+    participant.getByRole("alert").filter({ hasText: "필수 동의" }),
+  ).toBeVisible();
   await call(participant, "PUT", "/api/me/consents", {
     consents: [
       { purpose: "operation", version: "demo-2026-10-16", accepted: true },
@@ -85,9 +87,9 @@ test("참가자가 복수 후보 회차를 골라 검토 후 신청하고 상태
   ).toBeChecked();
   await participant.getByRole("button", { name: "선택 확인" }).click();
   await participant.getByRole("button", { name: "신청 제출" }).click();
-  await expect(participant.getByRole("status")).toContainText(
-    "신청을 제출했습니다",
-  );
+  await expect(
+    participant.getByRole("status").filter({ hasText: "신청을 제출했습니다" }),
+  ).toBeVisible();
 
   await participant
     .getByRole("link", { name: "입력 상태", exact: true })

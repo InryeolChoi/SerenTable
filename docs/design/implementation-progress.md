@@ -120,3 +120,68 @@ Work `첫 배포·CI·DB 연결`은 진행 중이다. 이 변경은 기존 ‘Ra
 ## 2026-10-16 최신 구현 경계
 
 Work #2 PR #24는 공통 브랜치에 머지됐다. Work #15 ERD·브랜드 보완과 고정 범위 독립 검토를 마쳤으며 PR #22/#23 최신 CI가 통과했다. 현재 실제 상태는 [인계 기록](../agents/HANDOFF.md) 상단과 [Work #3 계약](account-profile-contract.md)을 따른다. 아래 과거 기록의 비용·브랜드 미완료는 당시 스냅샷이다. 로그인·프로필·동의는 현재 구현 중이며 인증 첫 수직 검증을 전체 기능 완료로 보지 않는다.
+
+## Work #4 구현과 검증 결과
+
+Work #4 `일정 신청·이용권·모의 결제`(Agenda `참가 신청·이용권·결제`, GitHub Issue [#4](https://github.com/InryeolChoi/SerenTable/issues/4))의 구현 결과다. 통합 브랜치 `codex/apply-matching-integration`의 작업이 PR [#27](https://github.com/InryeolChoi/SerenTable/pull/27)로 main에 **병합**되었고(merge `05287e2`, 2026-10-16T14:36:13Z), 같은 PR로 들어간 Work #5 필수조건 독립 검증기(`tests/oracle`)는 Work #5 소관이다.
+
+검증 경계: 아래 수치는 로컬 실제 PostgreSQL 17 테스트 전용 컨테이너(`serentable-foundation-pg`, 127.0.0.1:55432)에서 확인한 값이며 CI(`.github/workflows/ci.yml` verify job)가 같은 명령을 수행한다. 스위트 전체를 실행당 DB 스키마 재생성과 함께 개별 실행했고 `--repeat-each`는 쓰지 않았다(webServer 초기화가 실행당 1회라 상태 의존 스펙에서 거짓 실패가 난다).
+
+- pytest **105 passed**, ruff check/format(CI 범위 `backend tests migrations`) PASS, 프런트 빌드 PASS.
+- Playwright 전체 스위트 **9/9 PASS**(3회 개별 실행). 브라우저는 모바일 Chromium 에뮬레이션이며 실제 기기·배포 환경 검증이 아니다.
+- CI: PR #27 head `f24ba46` [38915264719](https://github.com/InryeolChoi/SerenTable/actions/runs/38915264719), `c62a6ed` [38916165226](https://github.com/InryeolChoi/SerenTable/actions/runs/38916165226) SUCCESS.
+- **미완료:** 배포 환경 브라우저 E2E(데모 계정 자격 증명이 세션에 없음), U03/U04 정책 확정, 매칭 실행기 회차 `FOR UPDATE` 선행 조건.
+
+### Blaybus에 반영할 Task 기록
+
+아래 Task의 공통 위치는 `참가 신청·이용권·결제 > 일정 신청·이용권·모의 결제`다. 사용자가 각 Task의 기록란에 문구를 넣고 상태를 바꾸도록 요청한다. 실제 투입 시간은 사용자가 기록한다. 등록된 다섯 Task 중 네 개는 이미 구현·검증이 끝났고, 다섯째는 이번 PR #28의 범위다.
+
+**Task: 모집 회차·지역 설정 — 완료 요청**
+
+```text
+수행 내용: 서울 4개 지역 고정 목록과 운영자의 회차 생성·조회 API·화면(회차 만들기·회차 목록, 서울 시각 표시)을 구현했습니다. 마이그레이션 0004_event_slot을 추가했습니다.
+검증 결과: 실제 PostgreSQL에서 pytest 105 passed, Playwright 전체 스위트 9/9 PASS(3회 개별 실행), CI SUCCESS. 같은 지역·시작 시각 중복 생성 거절과 신청 마감 ≤ 매칭 예정 ≤ 시작 시각 검증을 화면 오류 알림으로 확인했습니다.
+관련 PR: https://github.com/InryeolChoi/SerenTable/pull/26 (닫힘, 내용이 #27로 통합) / https://github.com/InryeolChoi/SerenTable/pull/27 (병합)
+추가 증거: https://github.com/InryeolChoi/SerenTable/actions/runs/38916165226
+남은 작업: 회차 수정·취소는 후속 Work(매칭·재배치) 범위입니다. 배포 환경 브라우저 확인은 미완료입니다.
+```
+
+**Task: 일정 신청 — 완료 요청**
+
+```text
+수행 내용: 참가자가 모집 중인 회차를 후보로 복수 선택하고 검토 화면에서 확정해 제출한 뒤 내 신청 상태를 확인하는 흐름을 구현했습니다(선택 → 검토 → 제출 → 상태). 마이그레이션 0005_application을 추가했습니다.
+검증 결과: 실제 PostgreSQL에서 pytest 105 passed, Playwright 전체 스위트 9/9 PASS. 필수 동의 누락·불완전 프로필 거절, 선택 유지, 같은 request_key 재제출이 같은 결과를 돌려주는 것을 시험으로 확인했습니다.
+관련 PR: https://github.com/InryeolChoi/SerenTable/pull/27 (병합)
+남은 작업: 여러 후보 중 어느 회차로 확정되는지에 대한 후보 간 배정 규칙은 정책 확정 후 매칭 Work에서 다룹니다.
+```
+
+**Task: 이용권 · 모의결제 — 완료 요청**
+
+```text
+수행 내용: 1회권·멤버십 1/3/6개월 선택, 모의 결제(실패 시뮬레이션 포함)와 실패 후 재시도, 멤버십 기간 안의 무결제 신청, 보유 이용권 목록을 구현했습니다. U03 미확정 규칙은 화면에 '임시 적용 · 확정 전'으로 표시하고 마이그레이션 0006_payment를 추가했습니다.
+검증 결과: 실제 PostgreSQL에서 pytest 105 passed, Playwright 전체 스위트 9/9 PASS. 결제 실패 1회가 기록된 뒤 재시도로 결제 완료, 후보 회차 시작 전에 끝나는 이용권 거절, 결제 마감 후 결제 차단, 취소된 신청에 묶여 보유되는 1회권을 시험으로 확인했습니다.
+관련 PR: https://github.com/InryeolChoi/SerenTable/pull/27 (병합)
+남은 작업: U03 연장 단위·기산점, 멤버십 중복 구매·적용 범위, U04 시스템 실패 환불 예외는 CEO 답변 후 확정합니다. 실제 결제(PG) 연동은 범위가 아닙니다.
+```
+
+**Task: 실패·중복 요청 검증 — 완료 요청**
+
+```text
+수행 내용: 실패·중복·마감 시나리오를 실제 PostgreSQL HTTP 경계에서 검증하는 시험(tests/test_failure_and_duplicates.py)을 추가했습니다. 같은 request_key 재전송, 동시 제출, 마감 경과, 잘못된 입력을 다룹니다.
+검증 결과: pytest 105 passed(해당 파일 포함), CI SUCCESS. 동시 제출이 정확히 한 건만 생성되는 것을 확인했습니다.
+관련 PR: https://github.com/InryeolChoi/SerenTable/pull/27 (병합)
+남은 작업: 없음. 정책 확정이 필요한 항목은 '이용권 · 모의결제' Task에 적었습니다.
+```
+
+**Task: E2E 알림 단언 규약 정리 — 완료 요청**
+
+```text
+수행 내용: 한 화면에 같은 역할의 알림이 둘 이상 동시에 있을 수 있으므로, E2E 알림 단언을 문구나 알림을 담은 한 영역으로 좁히는 규약을 정하고 specs에 적용했습니다. 규약은 공통 헬퍼 frontend/e2e/support.ts에 기록했습니다. 테스트 전용 변경이며 제품 화면·API·정책·마이그레이션은 바꾸지 않았습니다.
+검증 결과: Playwright 전체 스위트 9/9 PASS(3회 개별 실행), 실제 PostgreSQL에서 pytest 105 passed, ruff·프런트 빌드 PASS. 세션 철회 뒤 로그인 화면에서 화면 전역 alert locator가 2개를 잡아 strict mode로 실패하고, 폼으로 좁힌 locator는 1개를 잡아 통과하는 것을 실측했습니다(임시 진단 스펙은 실행 후 삭제, 커밋하지 않음).
+관련 PR: https://github.com/InryeolChoi/SerenTable/pull/28 (열림)
+남은 작업: 없음. 배포 환경 브라우저 E2E는 계정 자격 증명이 없어 미완료입니다.
+```
+
+### Work #4 상태 판단
+
+Work #4의 하위 다섯 Task는 위 문구대로 모두 완료로 바꿀 수 있다. 다만 Work 자체는 완료로 바꾸지 않기를 요청한다. U03/U04 정책 확정(CEO 답변 대기)과 배포 환경 브라우저 확인이 남아 있고, 후보 간 배정 규칙·회차 수정·취소는 후속 Work의 선행 조건이기 때문이다. Issue [#4](https://github.com/InryeolChoi/SerenTable/issues/4)의 체크박스와 Blaybus 상태는 사용자가 갱신한다(이 기록 시점에 아직 반영하지 않았다).

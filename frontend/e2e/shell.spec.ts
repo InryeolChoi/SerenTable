@@ -30,7 +30,9 @@ test("합성 참가자가 실제 로그인하고 권한 거절과 로그아웃�
     .getByLabel("비밀번호", { exact: true })
     .fill("incorrect-synthetic-password");
   await page.getByRole("button", { name: "로그인", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("계정 ID 또는 비밀번호");
+  await expect(
+    page.getByRole("alert").filter({ hasText: "계정 ID 또는 비밀번호" }),
+  ).toBeVisible();
   await page
     .getByLabel("비밀번호", { exact: true })
     .fill("synthetic-participant-password");
@@ -77,9 +79,9 @@ test("미완성 프로필과 목적별 동의가 실제 DB에 저장되고 새�
       .getByLabel("확인 상태")
       .selectOption("unknown");
   await page.getByRole("button", { name: "프로필 저장", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "미완성 프로필을 저장했습니다",
-  );
+  await expect(
+    page.getByRole("status").filter({ hasText: "미완성 프로필을 저장했습니다" }),
+  ).toBeVisible();
   await page.reload();
   await expect(form.getByLabel("이름 원문")).toHaveValue("합성 참가자 하나");
   await expect(
@@ -107,9 +109,11 @@ test("미완성 프로필과 목적별 동의가 실제 DB에 저장되고 새�
       .first()
       .check();
   await page.getByRole("button", { name: "프로필 저장", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "필요한 항목이 모두 입력되었습니다",
-  );
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "필요한 항목이 모두 입력되었습니다" }),
+  ).toBeVisible();
   await page.reload();
   await expect(form.getByLabel("Instagram ID")).toHaveValue(
     "synthetic.table_01",
@@ -162,16 +166,16 @@ test("연결 실패·입력 오류·서버 세션 철회 후에도 같은 계정
     else await route.continue();
   });
   await page.getByRole("button", { name: "프로필 저장", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText(
-    "서버에 연결하지 못했습니다",
-  );
+  await expect(
+    page.getByRole("alert").filter({ hasText: "서버에 연결하지 못했습니다" }),
+  ).toBeVisible();
   await expect(form.getByLabel("표시명")).toHaveValue("만료 전 미저장 표시명");
   await page.unroute("**/api/me/profile");
   await form.getByLabel("Instagram ID").fill("invalid@synthetic");
   await page.getByRole("button", { name: "프로필 저장", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText(
-    "Instagram ID의 입력 형식",
-  );
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Instagram ID의 입력 형식" }),
+  ).toBeVisible();
   await expect(form.getByLabel("Instagram ID")).toHaveValue(
     "invalid@synthetic",
   );
@@ -188,7 +192,9 @@ test("연결 실패·입력 오류·서버 세션 철회 후에도 같은 계정
   await expect(
     page.getByRole("form", { name: "합성 계정 로그인" }),
   ).toBeVisible();
-  await expect(page.getByRole("alert")).toContainText("세션이 만료되었습니다");
+  await expect(
+    page.getByRole("alert").filter({ hasText: "세션이 만료되었습니다" }),
+  ).toBeVisible();
   await page.getByLabel("계정 ID", { exact: true }).fill("participant-01");
   await page
     .getByLabel("비밀번호", { exact: true })
@@ -265,7 +271,9 @@ test("만료된 CSRF 토큰은 새로 받아 한 번 재시도하고 입력을 �
     } else await route.continue();
   });
   await page.getByRole("button", { name: "프로필 저장", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("저장했습니다");
+  await expect(
+    page.getByRole("status").filter({ hasText: "저장했습니다" }),
+  ).toBeVisible();
   expect(rejected).toBe(1);
   expect(csrfFetches).toBe(1);
   await page.unroute("**/api/me/profile");
@@ -294,12 +302,13 @@ test("로그인 혼잡은 계정 잠금과 다른 안내를 보이고 다시 시
     .getByLabel("비밀번호", { exact: true })
     .fill("synthetic-participant-password");
   await page.getByRole("button", { name: "로그인", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText(
-    "로그인 요청이 잠시 몰렸습니다",
-  );
-  await expect(page.getByRole("alert")).not.toContainText(
-    "로그인 시도가 많습니다",
-  );
+  // Narrow to the login form: the expired-session notice is another alert on the
+  // same screen, and a filtered locator would make the negative check vacuous.
+  const loginAlerts = page
+    .getByRole("form", { name: "합성 계정 로그인" })
+    .getByRole("alert");
+  await expect(loginAlerts).toContainText("로그인 요청이 잠시 몰렸습니다");
+  await expect(loginAlerts).not.toContainText("로그인 시도가 많습니다");
   await page.getByRole("button", { name: "로그인", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "내 식탁 준비" }),

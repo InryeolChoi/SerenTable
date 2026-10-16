@@ -34,9 +34,11 @@ test("운영자가 만든 회차를 참가자가 서울 시각으로 확인한�
     .fill(seoulLocal(days, 14, minute));
   await form.getByLabel("정원").fill("12");
   await form.getByRole("button", { name: "회차 만들기" }).click();
-  await expect(operator.getByRole("alert")).toContainText(
-    "신청 마감 ≤ 매칭 예정 ≤ 시작 시각",
-  );
+  await expect(
+    operator
+      .getByRole("alert")
+      .filter({ hasText: "신청 마감 ≤ 매칭 예정 ≤ 시작 시각" }),
+  ).toBeVisible();
   await expect(form.getByLabel("정원")).toHaveValue("12");
   await form
     .getByLabel("매칭 예정", { exact: true })
@@ -81,9 +83,11 @@ test("운영자가 만든 회차를 참가자가 서울 시각으로 확인한�
     .getByLabel("매칭 예정", { exact: true })
     .fill(seoulLocal(days, 16, minute));
   await form.getByRole("button", { name: "회차 만들기" }).click();
-  await expect(operator.getByRole("alert")).toContainText(
-    "같은 지역·시작 시각의 회차가 이미 있습니다",
-  );
+  await expect(
+    operator
+      .getByRole("alert")
+      .filter({ hasText: "같은 지역·시작 시각의 회차가 이미 있습니다" }),
+  ).toBeVisible();
   await operatorContext.close();
 
   const participantContext = await browser.newContext();
