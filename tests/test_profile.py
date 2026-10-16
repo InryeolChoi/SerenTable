@@ -261,3 +261,17 @@ def test_unreadable_stored_profile_is_reported_per_row():
         assert own.status_code == 200
         assert own.json()["unreadable"] is True
         assert put(drifted, "/api/me/profile", complete_profile()).json()["unreadable"] is False
+
+
+def test_operator_cannot_read_or_save_participant_profile_or_consent():
+    with TestClient(app) as operator:
+        login(operator, "operator")
+        assert operator.get("/api/me/profile").status_code == 403
+        assert operator.get("/api/me/consents").status_code == 403
+        saved = put(operator, "/api/me/profile", complete_profile())
+        assert saved.status_code == 403
+        assert saved.json() == {"detail": "participant_required"}
+        decision = {"purpose": "privacy", "version": "demo-2026-10-16", "accepted": True}
+        consent = {"consents": [decision]}
+        assert put(operator, "/api/me/consents", consent).status_code == 403
+        assert operator.get("/api/admin/participants").status_code == 200

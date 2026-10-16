@@ -274,3 +274,36 @@ test("만료된 CSRF 토큰은 새로 받아 한 번 재시도하고 입력을 �
   await page.reload();
   await expect(form.getByLabel("직업")).toHaveValue("토큰 갱신 후 저장");
 });
+
+test("로그인 혼잡은 계정 잠금과 다른 안내를 보이고 다시 시도하면 로그인된다", async ({
+  page,
+}) => {
+  let busy = 0;
+  await page.route("**/api/auth/login", async (route) => {
+    if (busy === 0) {
+      busy += 1;
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        headers: { "Retry-After": "1" },
+        body: JSON.stringify({ detail: "login_busy" }),
+      });
+    } else await route.continue();
+  });
+  await page.goto("/login");
+  await page.getByLabel("계정 ID", { exact: true }).fill("participant-01");
+  await page
+    .getByLabel("비밀번호", { exact: true })
+    .fill("synthetic-participant-password");
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "로그인 요청이 잠시 몰렸습니다",
+  );
+  await expect(page.getByRole("alert")).not.toContainText(
+    "로그인 시도가 많습니다",
+  );
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "내 식탁 준비" }),
+  ).toBeVisible();
+});
