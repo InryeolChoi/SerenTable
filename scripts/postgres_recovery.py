@@ -272,9 +272,10 @@ def main():
     try:
         args.action(args)
     except (RuntimeError, OSError, ValueError) as error:
+        message = str(error) if isinstance(error, RuntimeError) else type(error).__name__
         parser.exit(
             1,
-            f"Recovery check failed: {str(error) if isinstance(error, RuntimeError) else type(error).__name__}; "
+            f"Recovery check failed: {message}; "
             "verify Docker, CLI login, source and archive. No raw secrets logged.\n",
         )
 
