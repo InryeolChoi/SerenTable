@@ -19,7 +19,9 @@ IMAGE = "postgres:18-alpine"
 RAILWAY = ["npm", "exec", "--yes", "--package=@railway/cli@5.69.0", "--", "railway"]
 
 
-def run(command, *, stdin=None, stdout=subprocess.PIPE, env=None, timeout=120):
+def run(
+    command, *, stdin=None, stdout=subprocess.PIPE, env=None, timeout=120, stage="external command"
+):
     try:
         return subprocess.run(
             command,
@@ -32,7 +34,7 @@ def run(command, *, stdin=None, stdout=subprocess.PIPE, env=None, timeout=120):
         ).stdout
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
         # Provider/driver diagnostics can contain credentials or record contents.
-        raise RuntimeError(f"{command[0]} command failed; raw diagnostics withheld") from None
+        raise RuntimeError(f"{stage} failed; raw diagnostics withheld") from None
 
 
 def validate_dump(path):
@@ -94,6 +96,16 @@ def backup(args):
             temporary.unlink(missing_ok=True)
 
 
+def wait_for_database(container):
+    for _ in range(30):
+        try:
+            run(["docker", "exec", container, "pg_isready", "-h", "127.0.0.1", "-U", "serentable"])
+            return
+        except RuntimeError:
+            time.sleep(1)
+    raise RuntimeError("Restore database did not become ready")
+
+
 def restore(args):
     archive = args.dump.resolve()
     validate_dump(archive)
@@ -127,16 +139,10 @@ def restore(args):
                 IMAGE,
             ],
             env=environment,
+            stage="restore database creation",
         )
         started.append(database)
-        for _ in range(30):
-            try:
-                run(["docker", "exec", database, "pg_isready", "-U", "serentable"])
-                break
-            except RuntimeError:
-                time.sleep(1)
-        else:
-            raise RuntimeError("Restore database did not become ready")
+        wait_for_database(database)
         with archive.open("rb") as stream:
             run(
                 [
@@ -153,6 +159,7 @@ def restore(args):
                     "--single-transaction",
                 ],
                 stdin=stream,
+                stage="archive restore",
             )
         count = (
             run(
@@ -195,6 +202,7 @@ def restore(args):
                 "serentable.server",
             ],
             env=app_environment,
+            stage="restored application launch",
         )
         started.append(application)
         # Refresh the restored heartbeat, since the saved one may be old.
@@ -209,6 +217,7 @@ def restore(args):
                 "--once",
             ],
             env=app_environment,
+            stage="restored worker execution",
         )
         probe = (
             "import json,urllib.request; "
@@ -266,9 +275,10 @@ def main():
     try:
         args.action(args)
     except (RuntimeError, OSError, ValueError) as error:
+        message = str(error) if isinstance(error, RuntimeError) else type(error).__name__
         parser.exit(
             1,
-            f"Recovery check failed: {type(error).__name__}; "
+            f"Recovery check failed: {message}; "
             "verify Docker, CLI login, source and archive. No raw secrets logged.\n",
         )
 

@@ -6,9 +6,11 @@ import os
 import secrets
 import subprocess
 import sys
-import time
+import tempfile
 import uuid
 from pathlib import Path
+
+from postgres_recovery import wait_for_database
 
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE = os.environ.get("RECOVERY_APP_IMAGE", "serentable-foundation:local")
@@ -30,8 +32,7 @@ def main():
         run(
             [
                 "docker",
-                "run",
-                "--detach",
+                "create",
                 "--name",
                 source,
                 "--env",
@@ -50,16 +51,19 @@ def main():
             ],
             env=environment,
         )
-        for _ in range(30):
-            result = subprocess.run(
-                ["docker", "exec", source, "pg_isready", "-U", "serentable"],
-                capture_output=True,
-            )
-            if result.returncode == 0:
-                break
-            time.sleep(1)
-        else:
-            raise RuntimeError("Source fixture did not start")
+        # Keep the initialization-only Unix socket open long enough to expose a false gate.
+        with tempfile.TemporaryDirectory() as directory_name:
+            delay = Path(directory_name) / "00-delay.sql"
+            delay.write_text("SELECT pg_sleep(4);\n")
+            delay.chmod(0o644)  # Non-secret fixture must be readable by the postgres user.
+            run(["docker", "cp", str(delay), source + ":/docker-entrypoint-initdb.d/00-delay.sql"])
+        run(["docker", "start", source])
+        wait_for_database(source)
+        tcp = subprocess.run(
+            ["docker", "exec", source, "pg_isready", "-h", "127.0.0.1", "-U", "serentable"],
+            capture_output=True,
+        )
+        assert tcp.returncode == 0, "Readiness returned before application TCP was ready"
         app_environment = {
             **os.environ,
             "DATABASE_URL": f"postgresql://serentable:{password}@127.0.0.1:5432/source_test",
@@ -112,7 +116,14 @@ def main():
         collision = [*command, "backup", "--local-source", source, "--output", str(partial_dump)]
         assert subprocess.run(collision, cwd=ROOT, capture_output=True).returncode != 0
         assert partial.read_bytes() == b"preserve an existing unfinished backup"
-        result = run([*command, "restore", "--dump", str(dump), "--app-image", IMAGE])
+        result = subprocess.run(
+            [*command, "restore", "--dump", str(dump), "--app-image", IMAGE],
+            capture_output=True,
+        )
+        if result.returncode:
+            # The recovery CLI emits only its own fixed stage/error labels.
+            sys.stderr.write(result.stderr.decode())
+            raise RuntimeError("Isolated restore CLI failed")
         report = json.loads(result.stdout)
         assert report["restore"] == "passed"
         assert report["sha256"] == digest
@@ -133,6 +144,7 @@ def main():
                     "backup_restore_rehearsal": "passed",
                     "api_readiness_and_worker": "passed",
                     "source_unchanged": True,
+                    "initialization_tcp_readiness_regression": "passed",
                     "existing_dump_and_partial_preserved": True,
                     "corrupt_archive_rejected": True,
                     "public_asset_output_rejected": True,
