@@ -1,51 +1,18 @@
-import os
-import subprocess
-import sys
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 from serentable.main import app
-
-ORIGIN = "http://testserver"
-SEOUL = timezone(timedelta(hours=9))
+from support import ORIGIN, SEOUL, login, send, truncate
 
 
 @pytest.fixture(autouse=True)
-def application_database(monkeypatch):
-    monkeypatch.setenv("DATABASE_URL", os.environ["TEST_DATABASE_URL"])
-    monkeypatch.setenv("APP_ORIGIN", ORIGIN)
-    monkeypatch.setenv("AUTH_SIGNING_KEY", "local-application-test-signing-key-1234567890")
-    monkeypatch.setenv("DEMO_PARTICIPANT_PASSWORD", "synthetic-participant-password")
-    monkeypatch.setenv("DEMO_OPERATOR_PASSWORD", "synthetic-operator-password")
-    subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=True)
-    subprocess.run([sys.executable, "-m", "serentable.seed_demo_accounts"], check=True)
-    from serentable.database import database_engine
-    from sqlalchemy import text
-
-    with database_engine().begin() as connection:
-        connection.execute(text("TRUNCATE event_slot, participant_profile, consent_record CASCADE"))
-
-
-def login(client, login_id):
-    token = client.get("/api/auth/csrf").json()["csrf_token"]
-    role = "operator" if login_id == "operator" else "participant"
-    response = client.post(
-        "/api/auth/login",
-        json={"login_id": login_id, "password": f"synthetic-{role}-password"},
-        headers={"Origin": ORIGIN, "X-CSRF-Token": token},
-    )
-    assert response.status_code == 200
-
-
-def send(client, method, path, payload=None):
-    token = client.get("/api/auth/csrf").json()["csrf_token"]
-    return client.request(
-        method, path, json=payload, headers={"Origin": ORIGIN, "X-CSRF-Token": token}
-    )
+def application_database(seeded_database):
+    # Cascades through applications to payments and entitlements.
+    truncate("event_slot, participant_profile, consent_record")
 
 
 def create_slot(operator, days=7, region="hongdae", close_in=timedelta(days=3)):

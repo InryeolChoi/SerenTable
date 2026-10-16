@@ -4,18 +4,15 @@ from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 from serentable.main import app
+from support import ORIGIN, SEOUL, login, send
 
 # application_database is the autouse real-PostgreSQL setup shared with the application
 # tests; its truncation cascades through applications to payments and entitlements.
 from test_applications import (  # noqa: F401
-    ORIGIN,
-    SEOUL,
     application_database,
     apply,
     create_slot,
-    login,
     make_ready,
-    send,
 )
 
 

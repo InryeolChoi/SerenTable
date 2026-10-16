@@ -5,9 +5,11 @@ import {
   type EventSlot,
   type ProductCode,
 } from "./api";
-import { SlotSummary } from "./events";
+import { show, SlotSummary } from "./events";
 import {
+  NoShowNotice,
   PaymentPanel,
+  paymentOpen,
   paymentSummary,
   ProductChoice,
   RefundNotice,
@@ -168,6 +170,7 @@ export function ApplyPage({
               아니며, 후보 간 배정 규칙은 아직 확정되지 않았습니다.
             </p>
             <RefundNotice />
+            <NoShowNotice />
             <div className="actions">
               <button
                 className="primary"
@@ -239,6 +242,22 @@ export function ApplyPage({
   );
 }
 
+/**
+ * The matching axis (STA-01/02), kept apart from application and payment states. No
+ * matching has run yet, so it only tells waiting from excluded; eligibility is the API's
+ * per-slot decision (paid by the slot close).
+ */
+function matchingSummary(application: Application) {
+  if (application.state === "CANCELED") return "신청 취소로 매칭 제외";
+  const eligible = application.candidates.filter((slot) =>
+    application.matching_eligible_slot_ids.includes(slot.id),
+  );
+  if (eligible.length)
+    return `매칭 대기 (WAITING) · 매칭 예정 ${[...new Set(eligible.map((slot) => show(slot.matches_at)))].join(", ")}`;
+  if (paymentOpen(application)) return "결제 필요 · 미결제 시 매칭 제외";
+  return "미결제로 매칭 제외";
+}
+
 function ApplicationItem({
   application,
   action,
@@ -249,10 +268,11 @@ function ApplicationItem({
   return (
     <li>
       <p>
-        <strong>{stateLabels[application.state]}</strong>
+        <strong>신청: {stateLabels[application.state]}</strong>
         {application.participant && ` · ${application.participant.login_id}`}
       </p>
       <p className="small">결제: {paymentSummary(application)}</p>
+      <p className="small">매칭: {matchingSummary(application)}</p>
       <ul className="candidates">
         {application.candidates.map((slot) => (
           <li key={slot.id}>
@@ -320,7 +340,7 @@ export function MyApplications({
               application={application}
               action={
                 <div className="actions">
-                  {application.payment_required && (
+                  {paymentOpen(application) && (
                     <button
                       className="primary"
                       onClick={() =>
@@ -350,7 +370,10 @@ export function MyApplications({
       <p className="small muted">
         신청 취소는 후보 회차 중 가장 이른 신청 마감 전까지 가능하며 자동 환불이
         아닙니다. 현행 기준 화요일 24:00 이후 환불 불가, 세부 환불 정책 미정.
+        결제는 가장 이른 신청 마감 전까지 가능하며 미결제 신청은 매칭에서
+        제외됩니다.
       </p>
+      <NoShowNotice />
       <button onClick={() => navigate("/participant/apply")}>일정 신청</button>
     </>
   );

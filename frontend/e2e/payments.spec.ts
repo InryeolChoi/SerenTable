@@ -1,74 +1,36 @@
-import { execFileSync } from "node:child_process";
 import { test, expect, type Page } from "@playwright/test";
+import { call, display, login, participantPassword } from "./support";
 
-const origin = "http://127.0.0.1:8000";
-const display = new Intl.DateTimeFormat("ko-KR", {
-  timeZone: "Asia/Seoul",
-  month: "long",
-  day: "numeric",
-  weekday: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-});
+// The Playwright web server resets the local schema before seeding, so no earlier run's
+// membership covers this run's applications.
 const account = "participant-03";
 
-// The E2E database persists between runs and an earlier run's membership would cover
-// this run's applications, so this synthetic account's passes are cleared first.
-test.beforeAll(() => {
-  execFileSync(
-    "uv",
-    [
-      "run",
-      "--project",
-      "..",
-      "python",
-      "-c",
-      `from sqlalchemy import text
-from serentable.database import database_engine
-with database_engine().begin() as c:
-    user = {"login": "${account}"}
-    c.execute(text("DELETE FROM entitlement WHERE user_id = (SELECT id FROM app_user WHERE login_id = :login)"), user)
-    c.execute(text("DELETE FROM payment WHERE user_id = (SELECT id FROM app_user WHERE login_id = :login)"), user)`,
-    ],
-    { env: { ...process.env, PYTHONPATH: "../backend" }, stdio: "inherit" },
-  );
-});
-
-async function login(page: Page, loginId: string, password: string) {
-  await page.goto("/login");
-  await page.getByLabel("계정 ID", { exact: true }).fill(loginId);
-  await page.getByLabel("비밀번호", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "로그인", exact: true }).click();
-  await expect(page.locator("main h1")).not.toHaveText("식탁을 시작하세요");
-}
-
-async function call(page: Page, method: string, path: string, data: unknown) {
-  const token = (await (await page.request.get("/api/auth/csrf")).json())
-    .csrf_token;
-  const response = await page.request.fetch(path, {
-    method,
-    data,
-    headers: { Origin: origin, "X-CSRF-Token": token },
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
-async function createSlot(page: Page, daysAhead: number) {
+async function createSlot(
+  page: Page,
+  daysAhead: number,
+  closesInSeconds?: number,
+) {
   const start = new Date(Date.now() + daysAhead * 86400_000);
   start.setUTCSeconds(0, 0);
   const iso = (offsetHours: number) =>
     new Date(start.getTime() + offsetHours * 3600_000).toISOString();
+  const closes =
+    closesInSeconds === undefined
+      ? iso(-48)
+      : new Date(Date.now() + closesInSeconds * 1000).toISOString();
   const body = await call(page, "POST", "/api/admin/event-slots", {
     region_code: "euljiro",
     starts_at: iso(0),
     ends_at: iso(2),
-    closes_at: iso(-48),
+    closes_at: closes,
     matches_at: iso(-24),
     capacity: 12,
   });
-  return display.format(new Date(body.event_slot.starts_at));
+  return {
+    id: body.event_slot.id as string,
+    name: display.format(new Date(body.event_slot.starts_at)),
+    matches: display.format(new Date(body.event_slot.matches_at)),
+  };
 }
 
 async function applyFor(participant: Page, slotName: string) {
@@ -87,7 +49,8 @@ async function applyFor(participant: Page, slotName: string) {
 test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도하며 멤버십이 다음 신청을 포함한다", async ({
   browser,
 }) => {
-  // Random offsets keep slots distinct across runs; the first two fall within one month.
+  // Random offsets keep slots apart from the other specs' slots; the first two fall
+  // within one month.
   const days = 5 + Math.floor(Math.random() * 10) + Math.random();
   const operatorContext = await browser.newContext();
   const operator = await operatorContext.newPage();
@@ -97,7 +60,7 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
 
   const participantContext = await browser.newContext();
   const participant = await participantContext.newPage();
-  await login(participant, account, "synthetic-participant-password");
+  await login(participant, account, participantPassword);
   await call(participant, "PUT", "/api/me/profile", {
     name: "합성 이름",
     display_name: "결제 식탁",
@@ -118,18 +81,22 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
     ],
   });
 
-  await applyFor(participant, first);
+  await applyFor(participant, first.name);
   const products = participant.getByRole("radiogroup", { name: "이용권" });
   await expect(products).toContainText("1회권 · 9,900원");
   await expect(products).toContainText("멤버십 6개월 · 120,000원");
+  // Provisional U03 rules are marked as such where the product is chosen.
+  await expect(products).toContainText("임시 적용 · 확정 전");
   await products.getByRole("radio", { name: /^1회권/ }).check();
   await participant.getByRole("button", { name: "신청 제출" }).click();
 
-  // The mock payment step: clearly not a real charge, refund policy shown before paying.
+  // The mock payment step: clearly not a real charge, refund and no-show policy shown
+  // before paying.
   const mock = participant.getByRole("region", { name: "모의 결제" });
   await expect(mock).toContainText("모의 결제 · 실제 결제가 발생하지 않습니다");
   await expect(mock).toContainText("화요일 24:00 이후 환불 불가");
   await expect(mock).toContainText("세부 환불 정책 미정");
+  await expect(mock).toContainText("노쇼·취소 정책 미정");
   await expect(mock).toContainText("결제 금액 9,900원");
   await mock.getByRole("checkbox", { name: /실패 시뮬레이션/ }).check();
   await mock.getByRole("button", { name: "모의 결제하기" }).click();
@@ -142,7 +109,7 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
 
   // A second application inside the membership period needs no payment.
   await participant.getByRole("button", { name: "내 신청 보기" }).click();
-  await applyFor(participant, second);
+  await applyFor(participant, second.name);
   await participant.getByRole("button", { name: "신청 제출" }).click();
   await expect(participant.getByRole("status").first()).toContainText(
     "보유한 멤버십으로 결제 없이",
@@ -154,9 +121,22 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
   const mine = participant
     .getByRole("list", { name: "내 신청" })
     .locator(":scope > li");
-  await expect(mine.filter({ hasText: first })).toContainText("결제 완료");
-  await expect(mine.filter({ hasText: first })).toContainText("결제 실패 1회");
-  await expect(mine.filter({ hasText: second })).toContainText("멤버십 적용");
+  const paid = mine.filter({ hasText: first.name });
+  await expect(paid).toContainText("결제 완료");
+  await expect(paid).toContainText("결제 실패 1회");
+  // Application, payment and matching are separate status lines.
+  await expect(paid).toContainText("신청: 신청 완료");
+  await expect(paid).toContainText(
+    `매칭: 매칭 대기 (WAITING) · 매칭 예정 ${first.matches}`,
+  );
+  await expect(mine.filter({ hasText: second.name })).toContainText(
+    "멤버십 적용",
+  );
+  await expect(mine.filter({ hasText: second.name })).toContainText(
+    "매칭: 매칭 대기 (WAITING)",
+  );
+  // The no-show policy is shown after submission too.
+  await expect(participant.getByText(/노쇼·취소 정책 미정/)).toBeVisible();
   const passes = participant.getByRole("list", { name: "내 이용권" });
   await expect(passes.getByRole("listitem")).toHaveCount(1);
   await expect(passes).toContainText("멤버십 1개월 · 이용 중");
@@ -172,7 +152,7 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
 
   // An application after the membership expires needs a pass; pay later from its page.
   const later = await createSlot(operator, days + 45);
-  await applyFor(participant, later);
+  await applyFor(participant, later.name);
   await participant.getByRole("button", { name: "신청 제출" }).click();
   await expect(participant.getByRole("status").first()).toContainText(
     "이용권 결제가 필요합니다",
@@ -180,8 +160,9 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
   await participant
     .getByRole("link", { name: "입력 상태", exact: true })
     .click();
-  const pending = mine.filter({ hasText: later });
+  const pending = mine.filter({ hasText: later.name });
   await expect(pending).toContainText("결제: 결제 필요");
+  await expect(pending).toContainText("매칭: 결제 필요 · 미결제 시 매칭 제외");
   await pending.getByRole("button", { name: "결제하기" }).click();
   await expect(participant).toHaveURL(/\/participant\/payment\/[0-9a-f-]+$/);
   await participant.reload();
@@ -191,14 +172,39 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
   await expect(payLater.getByRole("alert")).toContainText(
     "후보 회차가 시작되기 전에 끝납니다",
   );
+  // A single pass paid for an application that is then canceled stays held, tied to
+  // the canceled application.
+  await payLater.getByRole("radio", { name: /^1회권/ }).check();
+  await payLater.getByRole("button", { name: "모의 결제하기" }).click();
+  await expect(payLater.getByRole("status")).toContainText("결제 완료");
+  await participant.getByRole("button", { name: "내 신청 보기" }).click();
+  await pending.getByRole("button", { name: "신청 취소" }).click();
+  await expect(pending).toContainText("신청: 신청 취소됨");
+  await participant.reload();
+  await expect(passes.getByRole("listitem")).toHaveCount(2);
+  await expect(passes).toContainText("1회권 · 취소된 신청에 묶여 보유");
+
+  // After the earliest candidate closes an unpaid application cannot be paid any more.
+  const closing = await createSlot(operator, days + 50, 4);
+  await call(participant, "POST", "/api/me/applications", {
+    request_key: crypto.randomUUID(),
+    event_slot_ids: [closing.id],
+  });
+  await participant.waitForTimeout(4500);
+  await participant.reload();
+  const closed = mine.filter({ hasText: closing.name });
+  await expect(closed).toContainText("결제: 결제 마감 · 미결제");
+  await expect(closed).toContainText("매칭: 미결제로 매칭 제외");
+  await expect(closed.getByRole("button", { name: "결제하기" })).toHaveCount(0);
 
   await operator.goto("/admin/applications");
   const row = operator
     .getByRole("list", { name: "신청 목록" })
     .locator(":scope > li")
-    .filter({ hasText: first });
+    .filter({ hasText: first.name });
   await expect(row).toContainText(account);
   await expect(row).toContainText("결제 완료");
+  await expect(row).toContainText("매칭: 매칭 대기 (WAITING)");
   await expect(row.getByRole("button", { name: /결제/ })).toHaveCount(0);
   await operatorContext.close();
   await participantContext.close();

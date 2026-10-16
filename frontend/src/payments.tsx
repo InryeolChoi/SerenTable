@@ -34,6 +34,8 @@ const conflictMessages: Record<string, string> = {
   membership_too_short:
     "선택한 멤버십은 후보 회차가 시작되기 전에 끝납니다. 더 긴 이용권을 선택해 주세요.",
   application_not_payable: "취소된 신청은 결제할 수 없습니다.",
+  payment_closed:
+    "후보 회차의 신청 마감이 지나 결제할 수 없습니다. 미결제 신청은 매칭에서 제외됩니다.",
   application_not_found: "신청을 찾을 수 없습니다.",
   request_key_reused:
     "이전 결제 요청과 선택이 달라졌습니다. 다시 확인한 뒤 결제해 주세요.",
@@ -55,13 +57,32 @@ export function RefundNotice() {
   );
 }
 
+/** FAQ Q3 / U04: no-show and late-cancellation rules are not decided yet (PAY-02). */
+export function NoShowNotice() {
+  return (
+    <p className="small muted">
+      노쇼·취소 정책 미정: 노쇼 횟수·참여 제한·이용권 차감 기준과 당일 취소
+      처리는 아직 정해지지 않았습니다.
+    </p>
+  );
+}
+
+/** Payment is possible until the earliest candidate closes (the API answers 409 after). */
+export function paymentOpen(application: Application) {
+  return (
+    application.payment_required &&
+    application.candidates.every((slot) => slot.recruiting)
+  );
+}
+
 function productLabel(product: Product) {
   return `${product.name} · ${won(product.price_krw)}`;
 }
+// Provisional U03 rules (pending CEO confirmation), marked as such like "내 이용권".
 function productDetail(product: Product) {
   return product.kind === "SINGLE"
-    ? "한 번 참가 · 결제 후 보유하고 테이블 확정 시 사용 처리"
-    : `결제 완료 시각부터 ${product.period_months}개월(달력 기준) · 기간 내 참여 횟수 무제한`;
+    ? "한 번 참가 · 결제 후 보유하고 테이블 확정 시 사용 처리 · 임시 적용 · 확정 전"
+    : `결제 완료 시각부터 ${product.period_months}개월(달력 기준) · 기간 내 참여 횟수 무제한 · 임시 적용 · 확정 전`;
 }
 
 export function useCatalog() {
@@ -205,6 +226,7 @@ export function PaymentPanel({
             </strong>
           </p>
           <RefundNotice />
+          <NoShowNotice />
           <label className="check">
             <input
               type="checkbox"
@@ -242,6 +264,8 @@ export function paymentSummary(application: Application) {
     return `결제 완료 · ${latest.product.name} ${won(latest.amount_krw)} (모의)${failureNote}`;
   if (application.coverage?.source === "membership")
     return `멤버십 적용 · 결제 불필요${failureNote}`;
+  if (application.payment_required && !paymentOpen(application))
+    return `결제 마감 · 미결제${failureNote}`;
   if (latest?.state === "PENDING") return `결제 대기${failureNote}`;
   if (latest?.state === "FAILED")
     return `결제 실패 · 다시 결제 필요${failureNote}`;
@@ -278,13 +302,17 @@ export function MyEntitlements() {
               <p>
                 <strong>
                   {productNames[item.product_code]} ·{" "}
-                  {entitlementStates[item.state]}
+                  {item.application_state === "CANCELED"
+                    ? "취소된 신청에 묶여 보유"
+                    : entitlementStates[item.state]}
                 </strong>
               </p>
               <p className="small muted">
                 {item.kind === "MEMBERSHIP"
                   ? `시작 ${day.format(new Date(item.starts_at))} · 만료 ${day.format(new Date(item.expires_at!))} · 기간 내 참여 횟수 무제한`
-                  : "결제한 신청에 보유 · 테이블 확정 시 사용 처리 예정 · 취소 시 보관·재사용 규칙 미정"}
+                  : item.application_state === "CANCELED"
+                    ? "결제한 신청이 취소됨 · 자동 환불 아님 · 보관·재사용 규칙 미정"
+                    : "결제한 신청에 보유 · 테이블 확정 시 사용 처리 예정 · 취소 시 보관·재사용 규칙 미정"}
               </p>
             </li>
           ))}
@@ -327,7 +355,7 @@ export function PaymentPage({
       <h1>이용권 결제</h1>
       {error && <Notice error>{error}</Notice>}
       {application ? (
-        application.payment_required ||
+        paymentOpen(application) ||
         application.payments.some((item) => item.state === "PAID") ? (
           <PaymentPanel application={application} initialProduct={null} />
         ) : (
