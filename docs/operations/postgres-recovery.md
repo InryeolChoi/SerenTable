@@ -17,7 +17,7 @@ docker build -t serentable-foundation:local .
 python3 scripts/verify_postgres_recovery.py
 ```
 
-이 명령은 독립 PostgreSQL 18 원본에 Alembic·worker를 실행한 뒤 백업하고, 새 로컬 컨테이너에 복원하여 HTTP readiness·worker-health를 확인한다. 원본 데이터 보존·기존 백업/임시 파일 덮어쓰기 방지·손상 파일 거부·공개 자산 경로 거부도 확인한다. 임시 DB와 앱 컨테이너는 종료 시 이 실행에서 만든 것만 정리하며 기존 DB/volume을 대상으로 삼지 않는다. CI는 런타임 이미지 빌드 후 같은 명령을 실행한다.
+이 명령은 독립 PostgreSQL 18 원본에 Alembic·worker를 실행한 뒤 백업하고, 새 로컬 컨테이너에 복원하여 HTTP readiness·worker-health를 확인한다. 초기화 중 임시 서버를 준비 완료로 오인하는 회귀 상황·원본 데이터 보존·기존 백업/임시 파일 덮어쓰기 방지·손상 파일 거부·공개 자산 경로 거부도 확인한다. 임시 DB와 앱 컨테이너는 종료 시 이 실행에서 만든 것만 정리하며 기존 DB/volume을 대상으로 삼지 않는다. CI는 런타임 이미지 빌드 후 같은 명령을 실행한다.
 
 ## 2. 실제 Railway 데이터 백업
 
@@ -27,7 +27,7 @@ python3 scripts/verify_postgres_recovery.py
 npm exec --yes --package=@railway/cli@5.69.0 -- railway login
 ```
 
-CLI 로그인은 사용자가 브라우저에서 수행한다. SSH 키 등록은 `railway ssh keys add --key 공개키경로 --name 설명`을 사용한다. 개인키는 호스트의 개인 SSH 디렉터리에서만 보관하며 저장소나 대화에 넣지 않는다. 최초 SSH 서버 신뢰는 별도 확인 사항이다. 호스트 확인을 끄거나 지문 불일치 항목을 자동 삭제하지 않는다.
+CLI 로그인은 사용자가 브라우저에서 수행한다. SSH 키 등록은 `railway ssh keys add --key 공개키경로 --name 설명`을 사용한다. 이번 호스트는 `~/.ssh/serentable_railway_recovery_20261016` 전용 클라이언트 키를 사용한다. 개인키는 호스트의 개인 SSH 디렉터리에서만 보관하며 저장소나 대화에 넣지 않는다. 최초 SSH 서버 신뢰는 별도 확인 사항이다. 호스트 확인을 끄거나 지문 불일치 항목을 자동 삭제하지 않는다.
 
 프로젝트·production·Postgres ID는 스크립트에 고정되어 있다. 다른 환경에서 재사용할 때 대상부터 확인한다. 연결은 Railway SSH이며 DB TCP proxy를 생성하지 않는다. 서버의 PGUSER·PGDATABASE·PGPASSWORD를 그대로 사용하는 pg_dump는 읽기 전용 내보내기다.
 
@@ -39,7 +39,7 @@ python3 scripts/postgres_recovery.py backup \
 
 출력은 저장소의 `.local-backups/` 아래에만 허용한다. 심볼릭 링크를 해석한 경로로 확인하며 공개 자산 경로에는 저장하지 않는다. 백업은 0600, 새 전용 디렉터리는 0700으로 생성하고 Git 제외 여부도 확인한다. 기존 파일을 덮어쓰지 않고, 임시 파일 내보내기·archive 검사 성공 후 최종 이름을 만든다. 실패한 출력은 성공한 백업으로 남기지 않는다. 비밀값이 섞일 수 있는 원시 외부 명령 오류는 공개 출력에서 숨긴다.
 
-SSH 신뢰 확인을 완료할 수 없으면 Railway 로그인된 Dashboard의 Postgres Console·Files에서 백업 파일을 만드는 대안을 검토한다. 이 경우에도 실제 파일 다운로드와 아래 복원 검증을 마치기 전 완료로 기록하지 않는다. 임의 공개 DB 주소 생성은 대체 절차에 포함하지 않는다.
+SSH 신뢰 확인을 완료할 수 없으면 Railway 로그인된 Dashboard의 Postgres Console·Files에서 백업 파일을 만드는 대안을 검토한다. 이 경우에도 실제 파일 다운로드와 아래 복원 검증을 마치기 전 완료로 기록하지 않는다. 이번 실행은 사용자가 명시 승인한 지문 등록 후 SSH 경로로 실제 백업·격리 복원을 완료했다. 상세 증거는 [Task 검증 기록](deployment-safety-verification.md)을 따른다. 임의 공개 DB 주소 생성은 대체 절차에 포함하지 않는다.
 
 ## 3. 받은 백업의 실제 복원 검증
 
