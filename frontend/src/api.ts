@@ -59,6 +59,17 @@ export type Participant = {
   profile_complete: boolean;
   profile_unreadable: boolean;
 };
+export type Region = { code: string; name: string };
+export type EventSlot = {
+  id: string;
+  region: Region;
+  starts_at: string;
+  ends_at: string;
+  closes_at: string;
+  matches_at: string;
+  capacity: number;
+  recruiting: boolean;
+};
 let csrfToken: string | null = null;
 export class ApiError extends Error {
   constructor(
@@ -83,6 +94,12 @@ const fieldNames: Record<string, string> = {
   meal_budget_bands: "식사 예산",
   food_restrictions: "못 먹는 음식",
   allergies: "알레르기",
+  region_code: "지역",
+  starts_at: "시작 시각",
+  ends_at: "종료 시각",
+  closes_at: "신청 마감",
+  matches_at: "매칭 예정",
+  capacity: "정원",
 };
 function validationMessage(status: number, detail: unknown) {
   if (status === 422 && Array.isArray(detail)) {

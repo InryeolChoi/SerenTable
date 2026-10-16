@@ -187,6 +187,13 @@ def require_operator(request: Request) -> Principal:
     return user
 
 
+def require_csrf_operator(request: Request) -> Principal:
+    """Authorize, then check CSRF, before FastAPI validates the request body."""
+    user = require_operator(request)
+    require_csrf(request)
+    return user
+
+
 def user_json(user: Principal) -> dict:
     return {"id": user.id, "login_id": user.login_id, "role": user.role}
 

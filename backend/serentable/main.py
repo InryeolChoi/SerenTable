@@ -10,11 +10,13 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from serentable.auth import router as auth_router
 from serentable.database import database_engine
+from serentable.events import router as events_router
 from serentable.profile import router as profile_router
 
 app = FastAPI(title="SerenTable", docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(auth_router)
 app.include_router(profile_router)
+app.include_router(events_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -30,7 +32,9 @@ async def private_validation_error(request, error):
 
 @app.middleware("http")
 async def private_api_errors(request, call_next):
-    sensitive = request.url.path.startswith(("/api/auth/", "/api/me/", "/api/admin/"))
+    sensitive = request.url.path.startswith(
+        ("/api/auth/", "/api/me/", "/api/admin/", "/api/event-slots")
+    )
     try:
         response = await call_next(request)
     except SQLAlchemyError:
@@ -92,6 +96,8 @@ if (WEB_ROOT / "assets").is_dir():
 @app.get("/", include_in_schema=False)
 @app.get("/participant", include_in_schema=False)
 @app.get("/admin", include_in_schema=False)
+@app.get("/admin/events", include_in_schema=False)
+@app.get("/participant/events", include_in_schema=False)
 def web_shell():
     if not (WEB_ROOT / "index.html").is_file():
         raise HTTPException(status_code=503, detail="web_build_unavailable")
