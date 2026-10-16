@@ -32,7 +32,11 @@ class Settings:
 def settings(request: Request) -> Settings:
     origin = os.getenv("APP_ORIGIN", "")
     key = os.getenv("AUTH_SIGNING_KEY", "")
-    parsed = urlsplit(origin)
+    try:
+        parsed = urlsplit(origin)
+        parsed.port
+    except ValueError:
+        raise HTTPException(503, "auth_configuration_unavailable") from None
     production = (
         os.getenv("APP_ENV") == "production"
         or os.getenv("RAILWAY_ENVIRONMENT_NAME", "").lower() == "production"
