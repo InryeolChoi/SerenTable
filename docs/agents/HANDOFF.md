@@ -4,6 +4,7 @@
 
 ## 먼저 확인할 현재 상태
 
+- **2026-10-16 11:42Z 사용자 머지:** PR #13(`c5c3f4e`)·#23(`0dbd563`)이 `main`에 머지됐다(PR #22는 `eae10de`로 공통 브랜치 경유). 아래 표·기록의 "PR #13/#23 열림" 서술은 이 시점 이전 상태다. Issue #17·Work #15 종료 여부는 GitHub에서 확인한다. 통합 브랜치에 `main`을 병합(내용 변경 없음)해 PR #25 충돌 표시를 해소했고 CI 38896894745 SUCCESS.
 - 저장소: https://github.com/InryeolChoi/SerenTable . 루트 통합 브랜치 `codex/core-design-integration`, 최신 HEAD는 실제 Git에서 확인한다. Draft PR [#25](https://github.com/InryeolChoi/SerenTable/pull/25)에 통합 결과를 전달한다. main 배포와 통합 브랜치를 구분한다.
 - 사용자 승인으로 ERD 뷰어를 `docs/design/erd/erd.html`로 정식 변경했다. 승인된 이름 변경 커밋 `9ef90d0`이며 미확인 사용자 변경으로 남아 있지 않다.
 - Work #2 후속 PR #24의 공통 브랜치 머지를 확인했다(merge `3869396`, 2026-10-16T10:44:14Z). 비용·백업·원격 검증 인수 완료. 공통 PR #13은 아직 main에 미머지다.
