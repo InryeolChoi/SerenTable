@@ -19,7 +19,7 @@ const timeOnly = new Intl.DateTimeFormat("ko-KR", {
   minute: "2-digit",
   hourCycle: "h23",
 });
-const show = (iso: string) => dateTime.format(new Date(iso));
+export const show = (iso: string) => dateTime.format(new Date(iso));
 
 export function SlotSummary({ slot }: { slot: EventSlot }) {
   return (

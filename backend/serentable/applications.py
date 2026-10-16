@@ -1,7 +1,6 @@
 """Participant applications: one submission over explicitly chosen recruiting slots."""
 
 import uuid
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -15,7 +14,9 @@ from serentable.auth import (
     require_operator,
     require_participant,
 )
+from serentable.clock import iso, locked_now
 from serentable.database import database_engine
+from serentable.eligibility import eligible_slot_ids
 from serentable.events import SLOT_COLUMNS, field_error, slot_json
 from serentable.payments import payment_details
 from serentable.profile import consent_state, profile_state, read_profile
@@ -39,10 +40,6 @@ class ApplicationInput(BaseModel):
 APPLICATION_COLUMNS = "a.id, a.user_id, a.state, a.submitted_at, a.canceled_at, a.created_at"
 
 
-def iso(value):
-    return value.isoformat() if value else None
-
-
 def applications_json(connection, rows, now, with_participant=False):
     """Attach each application's candidate slots, ordered by start time."""
     ids = [row["id"] for row in rows]
@@ -58,6 +55,7 @@ def applications_json(connection, rows, now, with_participant=False):
         ).mappings():
             candidates.setdefault(slot["application_id"], []).append(slot_json(slot, now))
     payments = payment_details(connection, rows, now)
+    eligible = eligible_slot_ids(connection, ids, now)
     return [
         {
             "id": str(row["id"]),
@@ -65,6 +63,7 @@ def applications_json(connection, rows, now, with_participant=False):
             "submitted_at": iso(row["submitted_at"]),
             "canceled_at": iso(row["canceled_at"]),
             "candidates": candidates.get(row["id"], []),
+            "matching_eligible_slot_ids": eligible[row["id"]],
         }
         | payments[row["id"]]
         | (
@@ -188,11 +187,6 @@ def submit_application(
     return response
 
 
-def locked_now(connection):
-    """The database clock at this point; unlike now(), it advances within a transaction."""
-    return connection.execute(text("SELECT clock_timestamp()")).scalar()
-
-
 @router.post("/api/me/applications/{application_id}/cancel")
 def cancel_application(
     application_id: uuid.UUID, user: Principal = Depends(require_csrf_participant)
@@ -243,7 +237,7 @@ def list_all_applications(operator: Principal = Depends(require_operator)):
     try:
         with database_engine().connect() as connection:
             applications = read_applications(
-                connection, "", {}, datetime.now(timezone.utc), with_participant=True
+                connection, "", {}, locked_now(connection), with_participant=True
             )
     except SQLAlchemyError:
         raise HTTPException(503, "application_unavailable") from None
@@ -258,7 +252,7 @@ def list_own_applications(user: Principal = Depends(require_participant)):
                 connection,
                 "WHERE a.user_id = :user_id",
                 {"user_id": user.id},
-                datetime.now(timezone.utc),
+                locked_now(connection),
             )
     except SQLAlchemyError:
         raise HTTPException(503, "application_unavailable") from None

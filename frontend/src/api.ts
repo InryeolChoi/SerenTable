@@ -103,6 +103,8 @@ export type Entitlement = {
   product_code: ProductCode;
   payment_id: string;
   application_id: string | null;
+  /** State of the application a single pass is held for; null for memberships. */
+  application_state: "DRAFT" | "SUBMITTED" | "CANCELED" | null;
   starts_at: string;
   expires_at: string | null;
   state: "HELD" | "ACTIVE" | "EXPIRED";
@@ -120,6 +122,8 @@ export type Application = {
     entitlement: Entitlement;
   } | null;
   payment_required: boolean;
+  /** Candidate slots whose matching would include this application (paid by the close). */
+  matching_eligible_slot_ids: string[];
   participant?: { id: string; login_id: string };
 };
 let csrfToken: string | null = null;

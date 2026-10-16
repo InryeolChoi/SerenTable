@@ -2,7 +2,7 @@
 
 import calendar
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,10 +17,10 @@ from serentable.auth import (
     require_participant,
     require_user,
 )
+from serentable.clock import SEOUL, iso, locked_now
 from serentable.database import database_engine
 
 router = APIRouter()
-SEOUL = timezone(timedelta(hours=9))
 
 # Provisional U03 rules (pending CEO confirmation). Every rule that depends on them reads
 # this version, and it is recorded on each payment and entitlement so a later policy can
@@ -63,7 +63,7 @@ def add_calendar_months(moment: datetime, months: int) -> datetime:
 class PaymentInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     request_key: uuid.UUID
-    product_code: Literal["single", "membership_1m", "membership_3m", "membership_6m"]
+    product_code: Literal[tuple(PRODUCTS)]  # type: ignore[valid-type]
     # Mock only: deterministic failure for tests and demos ("실패 시뮬레이션").
     simulate_failure: bool = False
 
@@ -72,11 +72,8 @@ PAYMENT_COLUMNS = """p.id, p.application_id, p.state, p.product_code, p.product_
 p.product_kind, p.product_version, p.amount_krw, p.period_months, p.policy_version,
 p.simulated_failure, p.requested_at, p.completed_at"""
 ENTITLEMENT_COLUMNS = """e.id, e.user_id, e.payment_id, e.kind, e.application_id, e.starts_at,
-e.expires_at, e.policy_version, p.product_code"""
-
-
-def iso(value):
-    return value.isoformat() if value else None
+e.expires_at, e.policy_version, p.product_code,
+(SELECT a.state FROM application a WHERE a.id = e.application_id) AS application_state"""
 
 
 def payment_json(row):
@@ -112,6 +109,9 @@ def entitlement_json(row, now):
         "product_code": row["product_code"],
         "payment_id": str(row["payment_id"]),
         "application_id": str(row["application_id"]) if row["application_id"] else None,
+        # A single pass stays HELD when its application is canceled (no refund, U03/U04);
+        # this tells the two apart. Null for memberships.
+        "application_state": row["application_state"],
         "starts_at": iso(row["starts_at"]),
         "expires_at": iso(row["expires_at"]),
         "state": state,
@@ -123,8 +123,9 @@ def payment_details(connection, rows, now):
     """Payments (newest first), coverage and whether a payment is still required, per id.
 
     An application is covered by the entitlement its own PAID payment granted, or, while it
-    is SUBMITTED, by the owner's membership that is active now and lasts past every
-    candidate start (provisional U03).
+    is SUBMITTED, by the owner's membership that is active now, started by the earliest
+    candidate close and lasts past every candidate start (provisional U03). Whether an
+    application is matching-eligible per slot is `serentable.eligibility`'s decision.
     """
     ids = [row["id"] for row in rows]
     details = {
@@ -170,19 +171,24 @@ def latest_candidate_start(connection, application_id):
 
 
 def covering_membership(connection, user_id, application_id, now):
-    """The owner's active membership lasting past every candidate start, if any."""
+    """The owner's active membership lasting past every candidate start, if any.
+
+    It must have started by the earliest candidate close: a membership bought after the
+    close (for another application) never covers this one retroactively.
+    """
     return (
         connection.execute(
-            text(f"""SELECT {ENTITLEMENT_COLUMNS} FROM entitlement e
-            JOIN payment p ON p.id = e.payment_id
+            text(f"""WITH bounds AS (
+                SELECT max(s.starts_at) AS latest_start, min(s.closes_at) AS earliest_close
+                FROM application_candidate c JOIN event_slot s ON s.id = c.event_slot_id
+                WHERE c.application_id = :application_id)
+            SELECT {ENTITLEMENT_COLUMNS} FROM entitlement e
+            JOIN payment p ON p.id = e.payment_id CROSS JOIN bounds b
             WHERE e.user_id = :user_id AND e.kind = 'MEMBERSHIP'
-              AND e.starts_at <= :now AND e.expires_at > :now AND e.expires_at > :latest
+              AND e.starts_at <= least(:now, b.earliest_close)
+              AND e.expires_at > :now AND e.expires_at > b.latest_start
             ORDER BY e.expires_at DESC, e.id LIMIT 1"""),
-            {
-                "user_id": user_id,
-                "now": now,
-                "latest": latest_candidate_start(connection, application_id),
-            },
+            {"user_id": user_id, "application_id": application_id, "now": now},
         )
         .mappings()
         .first()
@@ -215,7 +221,6 @@ def pay_for_application(
             connection.execute(
                 text("SELECT id FROM app_user WHERE id = :id FOR UPDATE"), {"id": user.id}
             )
-            now = datetime.now(timezone.utc)
             prior = (
                 connection.execute(
                     text("""SELECT id, application_id, product_code, simulated_failure
@@ -247,6 +252,20 @@ def pay_for_application(
                 raise HTTPException(404, "application_not_found")
             if application["state"] != "SUBMITTED":
                 raise HTTPException(409, "application_not_payable")
+            # FOR SHARE makes a close/match step that locks the slots FOR UPDATE wait for this
+            # payment; the deadline is judged after the lock waits, by the database clock,
+            # and that clock also stamps the payment and any membership it grants.
+            earliest_close = min(
+                connection.execute(
+                    text("""SELECT s.closes_at FROM application_candidate c
+                    JOIN event_slot s ON s.id = c.event_slot_id
+                    WHERE c.application_id = :id FOR SHARE OF s"""),
+                    {"id": application_id},
+                ).scalars()
+            )
+            now = locked_now(connection)
+            if earliest_close <= now:
+                raise HTTPException(409, "payment_closed")
             coverage = payment_details(connection, [application], now)[application_id]["coverage"]
             if coverage is not None:
                 raise HTTPException(
@@ -345,7 +364,7 @@ def complete_mock_payment(
 def list_own_entitlements(user: Principal = Depends(require_participant)):
     try:
         with database_engine().connect() as connection:
-            now = datetime.now(timezone.utc)
+            now = locked_now(connection)
             rows = connection.execute(
                 text(f"""SELECT {ENTITLEMENT_COLUMNS} FROM entitlement e
                 JOIN payment p ON p.id = e.payment_id

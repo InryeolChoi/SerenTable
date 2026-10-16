@@ -1,38 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
+import { call, display, login } from "./support";
 
-const origin = "http://127.0.0.1:8000";
-const display = new Intl.DateTimeFormat("ko-KR", {
-  timeZone: "Asia/Seoul",
-  month: "long",
-  day: "numeric",
-  weekday: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-});
-
-async function login(page: Page, loginId: string, password: string) {
-  await page.goto("/login");
-  await page.getByLabel("계정 ID", { exact: true }).fill(loginId);
-  await page.getByLabel("비밀번호", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "로그인", exact: true }).click();
-  await expect(page.locator("main h1")).not.toHaveText("식탁을 시작하세요");
-}
-
-// Setup goes through the same public API the screens use, with a CSRF token.
-async function call(page: Page, method: string, path: string, data: unknown) {
-  const token = (await (await page.request.get("/api/auth/csrf")).json())
-    .csrf_token;
-  const response = await page.request.fetch(path, {
-    method,
-    data,
-    headers: { Origin: origin, "X-CSRF-Token": token },
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
-// The E2E database persists between runs, so each run uses distinct start times.
+// Random offsets keep this spec's slots apart from the other specs' slots.
 async function createSlot(page: Page, daysAhead: number, region: string) {
   const start = new Date(Date.now() + daysAhead * 86400_000);
   start.setUTCSeconds(0, 0);

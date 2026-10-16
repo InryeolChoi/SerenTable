@@ -1,13 +1,7 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
+import { login } from "./support";
 
-async function login(page: Page, loginId: string, password: string) {
-  await page.goto("/login");
-  await page.getByLabel("계정 ID", { exact: true }).fill(loginId);
-  await page.getByLabel("비밀번호", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "로그인", exact: true }).click();
-}
-
-// The E2E database persists between runs, so each run uses a distinct start time.
+// Random offsets keep this spec's slots apart from the other specs' slots.
 function seoulLocal(daysAhead: number, hour: number, minute: number) {
   const base = new Date(Date.now() + 9 * 3600_000 + daysAhead * 86400_000);
   const day = base.toISOString().slice(0, 10);

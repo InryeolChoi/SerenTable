@@ -76,6 +76,8 @@ Playwright는 테스트용 API를 `127.0.0.1:8000`에 직접 시작한다. Compo
 
 8000이 비어 있고 앞 단계와 같은 DB 환경변수가 설정된 셸에서 실행한다.
 
+Playwright 웹 서버는 시작할 때 `frontend/e2e/reset-database.mjs`로 `DATABASE_URL`의 스키마를 `alembic downgrade base && alembic upgrade head`로 재생성한 뒤 합성 계정을 시드한다. 매 실행이 빈 테이블에서 시작하므로 이전 실행의 결제·멤버십이 남지 않는다. **이 단계는 DB의 모든 데이터를 지운다.** 호스트가 `127.0.0.1` 또는 `localhost`가 아니면 실행을 거부하고 실패한다. 통합 테스트와 같은 테스트 전용 DB만 지정하고, 지워지면 안 되는 로컬 DB를 지정하지 않는다.
+
 ```sh
 npm exec --prefix frontend -- playwright install chromium
 npm run test:e2e --prefix frontend

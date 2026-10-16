@@ -39,13 +39,13 @@
 | POST /api/me/applications/{id}/cancel | 참가자 + CSRF | 본인 신청 → 200 `{application}`. 타인·없는 ID 404 `application_not_found`, 가장 이른 마감 경과 409 `application_cancel_closed` |
 | GET /api/admin/applications | 운영자 | 전체 `{applications:[Application & {participant:{id,login_id}}]}` 읽기 전용 |
 
-`Application = {id, state, submitted_at, canceled_at, candidates:[EventSlot]}`(후보는 시작 시각순, EventSlot은 [회차 계약](./event-slot-contract.md) 형식). ①-c 이후 `payments`·`coverage`·`payment_required`가 추가됐다([결제 계약](./payment-contract.md)). 판정 순서는 인증 401 → 역할 403 → CSRF 403 → 본문 422 → 재전송 → 프로필 → 동의 → 회차 → 중복. 응답은 `Cache-Control: no-store`.
+`Application = {id, state, submitted_at, canceled_at, candidates:[EventSlot]}`(후보는 시작 시각순, EventSlot은 [회차 계약](./event-slot-contract.md) 형식). ①-c 이후 `payments`·`coverage`·`payment_required`, 검토 반영 후 `matching_eligible_slot_ids`(아래 "매칭 대상 판정")가 추가됐다([결제 계약](./payment-contract.md)). 판정 순서는 인증 401 → 역할 403 → CSRF 403 → 본문 422 → 재전송 → 프로필 → 동의 → 회차 → 중복. 응답은 `Cache-Control: no-store`.
 
 ## 화면
 
 - `/participant/apply`: 모집 중 회차를 체크박스로 복수 선택 → "선택 확인".
 - `/participant/apply/review`: 선택 후보 목록, "제출은 결제가 아님·후보 간 배정 규칙 미정" 안내, "신청 제출"/"선택 수정". 오류 시 선택 유지, 마감 회차는 목록 재조회 후 제외.
-- `/participant`: "내 신청" 목록과 상태(`신청 완료`, `신청 취소됨`. ①-c부터 결제 상태는 별도 "결제:" 줄), 취소 가능할 때만 "신청 취소".
+- `/participant`: "내 신청" 목록과 상태를 축별로 분리한 줄 "신청:"(`신청 완료`, `신청 취소됨`), "결제:"(①-c), "매칭:"(STA-01/02, 대상이면 `매칭 대기 (WAITING) · 매칭 예정 <후보의 매칭 예정 시각>`, 미결제면 `결제 필요 · 미결제 시 매칭 제외`), 취소 가능할 때만 "신청 취소". 하단에 환불 안내와 노쇼·취소 정책 미정 안내(PAY-02, FAQ Q3/U04).
 - `/admin/applications`: 운영자 읽기 전용 "신청 현황".
 
 ## 검증
@@ -58,3 +58,19 @@
 - 제출·취소는 후보 회차 행을 `FOR SHARE`로 잠근다. **후속 매칭 실행기(Work #5/#6)의 선행 조건:** 마감·매칭을 시작할 때 해당 회차 행을 `FOR UPDATE`로 잠그고 DB 시각으로 마감 이후임을 확인해야, 진행 중인 제출·취소가 모두 끝난 뒤의 신청 집합을 본다.
 - 프로필 저장도 같은 `app_user` 잠금을 잡아, 완성 여부를 확인한 제출과 프로필 덮어쓰기가 서로 끼어들지 않는다.
 - 신청 상태와 후보 `live`의 일치는 현재 코드 경로(제출·취소)만 보장한다. 운영자 취소나 실행기가 상태를 바꿀 때 같은 트랜잭션에서 `live`도 갱신해야 한다.
+
+## 매칭 대상 판정 (Issue #4 "미결제 제외 조건", 2026-10-16 검토 반영)
+
+후속 매칭 실행기와 화면이 같은 정의를 쓰도록 `backend/serentable/eligibility.py` 하나에 둔다. 회차 하나와 DB 시각 `now`에 대해 신청이 **매칭 대상**이려면 모두 만족해야 한다.
+
+1. 신청이 `SUBMITTED`이고 그 회차의 후보가 살아 있다(`live`).
+2. 기준 시각 `least(now, 회차 closes_at)`까지 결제가 끝났다.
+   - 그 신청의 PAID 1회권 결제가 기준 시각 이전에 완료됐거나,
+   - 신청 소유자의 PAID 멤버십이 기준 시각 이전에 시작했고 만료가 그 회차 시작보다 늦다(U03 임시 적용 범위).
+
+결제 여부를 "지금"이 아닌 **회차 마감 시점 기준**으로 보므로, 마감 뒤 다른 신청을 위해 산 멤버십이 이미 마감된 회차의 대상 여부를 소급해 바꾸지 않는다. 마감 뒤 결제는 [결제 계약](./payment-contract.md)의 409 `payment_closed`로 막는다.
+
+- 실행기용 함수 `matching_eligible_applications(connection, slot_id, now)`는 제출순 `[{application_id, user_id}]`를 반환한다. 호출 전에 회차 행을 `FOR UPDATE`로 잠그고 `clock_timestamp()`를 읽어야 한다(위 "마감 판정과 잠금").
+- 신청 응답에 `matching_eligible_slot_ids`(후보 중 지금 기준 대상인 회차 ID, 시작 시각순)를 추가했다. 운영자 신청 현황과 참가자 "매칭:" 줄이 이 값을 읽는다. 저장된 매칭 상태가 아니라 계산값이며, 매칭이 아직 없으므로 화면은 `매칭 대기 (WAITING)`·`결제 필요 · 미결제 시 매칭 제외`·`미결제로 매칭 제외`·`신청 취소로 매칭 제외`만 구분한다.
+- 실패 결제(FAILED)는 대상 판정에 쓰지 않는다. 실패 뒤 성공한 재시도는 PAID 하나만 남기고 대상이 된다. 취소된 신청은 후보 `live`가 해제돼 즉시 대상에서 빠진다.
+- 실제 PostgreSQL HTTP 시험: `tests/test_failure_and_duplicates.py`(마감 후·잠금 대기 중 마감 결제 거절, 미결제 제외·1회권/멤버십 포함, 마감 뒤 구매 멤버십의 소급 미포함, 실패 후 재시도 PAID 1건과 대상 편입, 취소 후 대상 제외와 1회권의 취소 신청 표시).

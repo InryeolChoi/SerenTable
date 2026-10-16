@@ -1,7 +1,7 @@
 """Recruitment slots: operators define them, participants see the ones still open."""
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.exceptions import RequestValidationError
@@ -16,11 +16,10 @@ from serentable.auth import (
     require_operator,
     require_participant,
 )
+from serentable.clock import SEOUL
 from serentable.database import database_engine
 
 router = APIRouter()
-# Korea observes no daylight saving time, so a fixed offset is exact for display.
-SEOUL = timezone(timedelta(hours=9))
 
 
 class EventSlotInput(BaseModel):

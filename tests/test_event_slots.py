@@ -1,55 +1,24 @@
-import os
-import subprocess
-import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 from serentable.main import app
-
-ORIGIN = "http://testserver"
+from support import ORIGIN, SEOUL, login, send, truncate
 
 
 @pytest.fixture(autouse=True)
-def slot_database(monkeypatch):
-    monkeypatch.setenv("DATABASE_URL", os.environ["TEST_DATABASE_URL"])
-    monkeypatch.setenv("APP_ORIGIN", ORIGIN)
-    monkeypatch.setenv("AUTH_SIGNING_KEY", "local-slot-test-signing-key-1234567890")
-    monkeypatch.setenv("DEMO_PARTICIPANT_PASSWORD", "synthetic-participant-password")
-    monkeypatch.setenv("DEMO_OPERATOR_PASSWORD", "synthetic-operator-password")
-    subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=True)
-    subprocess.run([sys.executable, "-m", "serentable.seed_demo_accounts"], check=True)
-    from serentable.database import database_engine
-    from sqlalchemy import text
-
-    with database_engine().begin() as connection:
-        connection.execute(text("TRUNCATE event_slot CASCADE"))
-
-
-def login(client, login_id):
-    token = client.get("/api/auth/csrf").json()["csrf_token"]
-    role = "operator" if login_id == "operator" else "participant"
-    response = client.post(
-        "/api/auth/login",
-        json={"login_id": login_id, "password": f"synthetic-{role}-password"},
-        headers={"Origin": ORIGIN, "X-CSRF-Token": token},
-    )
-    assert response.status_code == 200
+def slot_database(seeded_database):
+    truncate("event_slot")
 
 
 def post_slot(client, payload):
-    token = client.get("/api/auth/csrf").json()["csrf_token"]
-    return client.post(
-        "/api/admin/event-slots",
-        json=payload,
-        headers={"Origin": ORIGIN, "X-CSRF-Token": token},
-    )
+    return send(client, "POST", "/api/admin/event-slots", payload)
 
 
 def slot(days=7, region="hongdae", close_in=timedelta(days=3), **changes):
-    seoul = timezone(timedelta(hours=9))
+    seoul = SEOUL
     start = (datetime.now(seoul) + timedelta(days=days)).replace(
         hour=19, minute=0, second=0, microsecond=0
     )
