@@ -18,6 +18,7 @@ from serentable.clock import iso, locked_now
 from serentable.database import database_engine
 from serentable.eligibility import eligible_slot_ids
 from serentable.events import SLOT_COLUMNS, field_error, slot_json
+from serentable.matching import participation_details
 from serentable.payments import payment_details
 from serentable.profile import consent_state, profile_state, read_profile
 
@@ -56,6 +57,7 @@ def applications_json(connection, rows, now, with_participant=False):
             candidates.setdefault(slot["application_id"], []).append(slot_json(slot, now))
     payments = payment_details(connection, rows, now)
     eligible = eligible_slot_ids(connection, ids, now)
+    matching = participation_details(connection, ids)
     return [
         {
             "id": str(row["id"]),
@@ -64,6 +66,9 @@ def applications_json(connection, rows, now, with_participant=False):
             "canceled_at": iso(row["canceled_at"]),
             "candidates": candidates.get(row["id"], []),
             "matching_eligible_slot_ids": eligible[row["id"]],
+            # The stored matching axis, or null when no run has reached this application
+            # yet; the screen then derives "waiting" from eligibility as before.
+            "matching": matching[row["id"]],
         }
         | payments[row["id"]]
         | (

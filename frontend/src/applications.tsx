@@ -3,6 +3,7 @@ import {
   ApiError,
   type Application,
   type EventSlot,
+  type MatchRun,
   type ProductCode,
 } from "./api";
 import { show, SlotSummary } from "./events";
@@ -243,17 +244,51 @@ export function ApplyPage({
 }
 
 /**
- * The matching axis (STA-01/02), kept apart from application and payment states. No
- * matching has run yet, so it only tells waiting from excluded; eligibility is the API's
- * per-slot decision (paid by the slot close).
+ * The matching axis (STA-01/02), kept apart from application and payment states. A stored
+ * run decides it; eligibility is the API's per-slot decision (paid by the slot close) and
+ * only fills in "waiting" for slots whose matching time has not arrived.
  */
+const matchingLabels: Record<string, string> = {
+  CONFIRMED: "매칭 확정",
+  NO_MATCH: "매칭 실패",
+  EXCEPTION: "매칭 예외",
+};
+/** Why a run left an application out; U03/U04/U05 wording is still provisional. */
+const matchingReasons: Record<string, string> = {
+  not_enough_eligible: "함께 앉을 인원이 부족합니다",
+  capacity: "회차 정원이 부족합니다",
+  unknown_age: "출생연도가 없어 나이 조건을 확인할 수 없습니다",
+  age_gap: "나이 차이 조건을 맞출 수 없습니다",
+  no_valid_table: "조건에 맞는 테이블을 만들 수 없습니다",
+  runner_error: "자동 매칭 오류로 운영자 확인이 필요합니다",
+  stale_generation: "중단된 실행을 정리했습니다",
+};
 function matchingSummary(application: Application) {
   if (application.state === "CANCELED") return "신청 취소로 매칭 제외";
-  const eligible = application.candidates.filter((slot) =>
-    application.matching_eligible_slot_ids.includes(slot.id),
+  const matching = application.matching;
+  if (matching?.state === "CONFIRMED") {
+    const slot = application.candidates.find(
+      (candidate) => candidate.id === matching.event_slot_id,
+    );
+    const table = matching.table ? ` · 같은 테이블 ${matching.table.member_count}명` : "";
+    return `매칭 확정 (CONFIRMED)${slot ? ` · ${show(slot.starts_at)}` : ""}${table}`;
+  }
+  // A slot that has not matched yet can still seat this application, so a run that left it
+  // out in an earlier slot does not settle it.
+  const now = Date.now();
+  const awaiting = application.candidates.filter(
+    (slot) =>
+      application.matching_eligible_slot_ids.includes(slot.id) &&
+      Date.parse(slot.matches_at) > now,
   );
-  if (eligible.length)
-    return `매칭 대기 (WAITING) · 매칭 예정 ${[...new Set(eligible.map((slot) => show(slot.matches_at)))].join(", ")}`;
+  if (awaiting.length)
+    return `매칭 대기 (WAITING) · 매칭 예정 ${[...new Set(awaiting.map((slot) => show(slot.matches_at)))].join(", ")}`;
+  if (matching && matching.state !== "WAITING" && matching.state !== "MATCHING")
+    return `${matchingLabels[matching.state] ?? matching.state} (${matching.state})${
+      matching.reason_code
+        ? ` · ${matchingReasons[matching.reason_code] ?? matching.reason_code}`
+        : ""
+    }`;
   if (paymentOpen(application)) return "결제 필요 · 미결제 시 매칭 제외";
   return "미결제로 매칭 제외";
 }
@@ -379,6 +414,90 @@ export function MyApplications({
   );
 }
 
+const runLabels: Record<MatchRun["state"], string> = {
+  RUNNING: "실행 중",
+  SUCCEEDED: "완료",
+  FAILED: "실패",
+  ABANDONED: "중단됨(정리)",
+};
+const outcomeLabels: Record<string, string> = {
+  SEATED: "확정",
+  UNSEATED: "미배정",
+  EXCEPTION: "예외",
+};
+
+/**
+ * Read-only matching history (PRD 이야기 47). Matching has no operator start and no
+ * manual edit: this screen only explains what the runner already decided (MAT-01).
+ */
+function MatchHistory() {
+  const request = useScopedApi();
+  const [runs, setRuns] = useState<MatchRun[] | null>(null);
+  const [error, setError] = useState("");
+  async function load() {
+    setError("");
+    try {
+      setRuns(
+        (await request<{ match_runs: MatchRun[] }>("/api/admin/match-runs"))
+          .match_runs,
+      );
+    } catch (error) {
+      setError(message(error));
+    }
+  }
+  useEffect(() => {
+    void load();
+  }, []);
+  return (
+    <section>
+      <h2>매칭 이력</h2>
+      <p className="lead">
+        회차별 자동 매칭 실행 세대와 결과입니다. 읽기 전용이며 운영자가 매칭을 시작하거나
+        결과를 바꿀 수 없습니다.
+      </p>
+      {error && <Notice error>{error}</Notice>}
+      {!runs ? (
+        !error && <Notice>매칭 이력을 확인하고 있습니다…</Notice>
+      ) : runs.length ? (
+        <ul className="participants" aria-label="매칭 이력 목록">
+          {runs.map((run) => (
+            <li key={run.id}>
+              <p>
+                <strong>
+                  {run.event_slot.region.name} · {show(run.event_slot.starts_at)}
+                </strong>{" "}
+                · {run.attempt}번째 실행 · {runLabels[run.state] ?? run.state}
+              </p>
+              <p className="small">
+                확정 {run.seated_count}명 · 규칙 {run.rule_version}
+                {run.reason_code
+                  ? ` · ${matchingReasons[run.reason_code] ?? run.reason_code}`
+                  : ""}
+              </p>
+              {run.members.length > 0 && (
+                <ul className="candidates">
+                  {run.members.map((member) => (
+                    <li key={member.application_id}>
+                      {member.login_id} ·{" "}
+                      {outcomeLabels[member.outcome] ?? member.outcome}
+                      {member.reason_code
+                        ? ` (${matchingReasons[member.reason_code] ?? member.reason_code})`
+                        : ""}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>아직 매칭 실행이 없습니다.</p>
+      )}
+      <button onClick={() => void load()}>매칭 이력 새로고침</button>
+    </section>
+  );
+}
+
 export function AdminApplicationsPage() {
   const request = useScopedApi();
   const [applications, setApplications] = useState<Application[] | null>(null);
@@ -401,24 +520,27 @@ export function AdminApplicationsPage() {
     void load();
   }, []);
   return (
-    <section>
-      <h1>신청 현황</h1>
-      <p className="lead">
-        참가자 신청·후보 회차·모의 결제 상태를 조회합니다. 읽기 전용입니다.
-      </p>
-      {error && <Notice error>{error}</Notice>}
-      {!applications ? (
-        !error && <Notice>신청을 확인하고 있습니다…</Notice>
-      ) : applications.length ? (
-        <ul className="participants" aria-label="신청 목록">
-          {applications.map((application) => (
-            <ApplicationItem key={application.id} application={application} />
-          ))}
-        </ul>
-      ) : (
-        <p>아직 신청이 없습니다.</p>
-      )}
-      <button onClick={() => void load()}>목록 새로고침</button>
-    </section>
+    <>
+      <section>
+        <h1>신청 현황</h1>
+        <p className="lead">
+          참가자 신청·후보 회차·모의 결제 상태를 조회합니다. 읽기 전용입니다.
+        </p>
+        {error && <Notice error>{error}</Notice>}
+        {!applications ? (
+          !error && <Notice>신청을 확인하고 있습니다…</Notice>
+        ) : applications.length ? (
+          <ul className="participants" aria-label="신청 목록">
+            {applications.map((application) => (
+              <ApplicationItem key={application.id} application={application} />
+            ))}
+          </ul>
+        ) : (
+          <p>아직 신청이 없습니다.</p>
+        )}
+        <button onClick={() => void load()}>목록 새로고침</button>
+      </section>
+      <MatchHistory />
+    </>
   );
 }
