@@ -5,7 +5,7 @@ import secrets
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from itsdangerous import URLSafeTimedSerializer
 
@@ -156,6 +156,13 @@ def require_user(request: Request) -> Principal:
     return Principal(str(row["id"]), row["login_id"], row["role"])
 
 
+def require_csrf_user(request: Request) -> Principal:
+    """Authenticate, then check CSRF, before FastAPI validates the request body."""
+    user = require_user(request)
+    require_csrf(request)
+    return user
+
+
 def require_operator(request: Request) -> Principal:
     user = require_user(request)
     if user.role != "operator":
@@ -181,7 +188,7 @@ class LoginInput(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
-@router.post("/api/auth/login")
+@router.post("/api/auth/login", dependencies=[Depends(require_csrf)])
 def login(payload: LoginInput, request: Request):
     from datetime import datetime, timedelta, timezone
 
@@ -189,7 +196,6 @@ def login(payload: LoginInput, request: Request):
 
     from serentable.database import database_engine
 
-    require_csrf(request)
     config = settings(request)
     now = datetime.now(timezone.utc)
     # A process-wide limit is defined below; each account is also serialized in PG.

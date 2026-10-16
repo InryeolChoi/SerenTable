@@ -6,6 +6,7 @@ import {
   bootstrapCsrf,
   clearCsrf,
   emptyProfile,
+  profileStatus,
   type User,
   type Profile,
   type ProfileState,
@@ -658,7 +659,10 @@ function AdminPage() {
                   <strong>{person.display_name || "표시명 미입력"}</strong>
                   <p className="small muted">
                     {person.login_id} ·{" "}
-                    {person.profile_complete ? "입력 완료" : "미완성"}
+                    {profileStatus(
+                      person.profile_complete,
+                      person.profile_unreadable,
+                    )}
                   </p>
                   <button
                     aria-label={`상세 보기: ${person.login_id}`}
@@ -754,7 +758,10 @@ function AdminDetail({
           <dd>{foodText(p?.allergies)}</dd>
         </div>
       </dl>
-      <p>프로필: {value.profile_complete ? "입력 완료" : "미완성"}</p>
+      <p>
+        프로필:{" "}
+        {profileStatus(value.profile_complete, value.profile_unreadable)}
+      </p>
       <p>필수 동의: {value.consents_complete ? "완료" : "미완료"}</p>
       {value.consents.map((c) => (
         <p className="small" key={c.purpose}>

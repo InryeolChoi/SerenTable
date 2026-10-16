@@ -241,3 +241,36 @@ test("운영자는 합성 참가자 상세를 확인하고 모바일·데스크�
   expect(Object.keys(session)).toEqual(["user"]);
   expect(Object.keys(session.user).sort()).toEqual(["id", "login_id", "role"]);
 });
+
+test("만료된 CSRF 토큰은 새로 받아 한 번 재시도하고 입력을 저장한다", async ({
+  page,
+}) => {
+  await login(page);
+  await page.getByRole("link", { name: "프로필", exact: true }).click();
+  const form = page.getByRole("form", { name: "본인 프로필" });
+  await expect(form).toBeVisible();
+  await form.getByLabel("직업").fill("토큰 갱신 후 저장");
+  let rejected = 0;
+  let csrfFetches = 0;
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/auth/csrf")) csrfFetches += 1;
+  });
+  // Simulate the server rejecting a token that expired after its one-hour lifetime.
+  await page.route("**/api/me/profile", async (route) => {
+    if (route.request().method() === "PUT" && rejected === 0) {
+      rejected += 1;
+      await route.fulfill({
+        status: 403,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "csrf_rejected" }),
+      });
+    } else await route.continue();
+  });
+  await page.getByRole("button", { name: "프로필 저장", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("저장했습니다");
+  expect(rejected).toBe(1);
+  expect(csrfFetches).toBe(1);
+  await page.unroute("**/api/me/profile");
+  await page.reload();
+  await expect(form.getByLabel("직업")).toHaveValue("토큰 갱신 후 저장");
+});
