@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-labelledby="title desc">
+<title id="title">우연한 식탁 재현 심볼</title><desc id="desc">원형 식탁과 여섯 좌석. 제공된 화면 예시를 참고한 재현물이며 공식 로고 원본이 아닙니다.</desc>
+<rect width="120" height="120" rx="30" fill="#fff9ed"/>
+<g fill="#8b4e27"><circle cx="60" cy="60" r="29"/>
+<rect x="50" y="10" width="20" height="15" rx="7.5"/>
+<rect x="50" y="95" width="20" height="15" rx="7.5"/>
+<rect x="50" y="10" width="20" height="15" rx="7.5" transform="rotate(60 60 60)"/>
+<rect x="50" y="10" width="20" height="15" rx="7.5" transform="rotate(120 60 60)"/>
+<rect x="50" y="10" width="20" height="15" rx="7.5" transform="rotate(240 60 60)"/>
+<rect x="50" y="10" width="20" height="15" rx="7.5" transform="rotate(300 60 60)"/></g></svg>
