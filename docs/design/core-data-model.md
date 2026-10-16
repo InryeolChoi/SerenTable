@@ -8,7 +8,7 @@
 
 ## 범위와 결정 상태
 
-[구현 명세서](./mvp-implementation-spec.md), [요구 대조](./requirements-source-comparison.md), [데이터 감사](./data-assets-review.md), [승인 범위](./design-readiness-plan.md), [용어집](../../GLOSSARY.md)을 기준으로 한다. PRD 상태와 필수조건은 유지한다. 아래 보조 엔티티·관계·구현 장치는 **후속 구현을 위한 기술 설계 제안**이며 전체 물리 스키마 동결이나 미결정 사업 정책의 승인을 뜻하지 않는다.
+[구현 명세서](./mvp-implementation-spec.md), [공식 FAQ Q4/Q5](./official-faq-2026-10-16.md), [요구 대조](./requirements-source-comparison.md), [데이터 감사](./data-assets-review.md), [승인 범위](./design-readiness-plan.md), [용어집](../../GLOSSARY.md)을 기준으로 한다. PRD 상태와 필수조건은 유지한다. 아래 보조 엔티티·관계·구현 장치는 **후속 구현을 위한 기술 설계 제안**이며 전체 물리 스키마 동결이나 미결정 사업 정책의 승인을 뜻하지 않는다.
 
 현재 적용된 제품 스키마는 없고 마이그레이션은 `worker_heartbeat`만 생성한다. 이 Task는 DB 적재·마이그레이션·제품 API를 만들지 않는다. 제안한 제약이나 잠금이 운영 DB에서 보장된다고 해석하지 않는다. 사용자 승인에 따라 배포 검증과 설계 Task를 병행하되 부모 Work의 배포·원격 검증, 기능별 정책 선행 조건은 유지한다.
 
@@ -34,7 +34,8 @@
 | User·Profile | 인증 대응/계정 상태, 이름·연락처·출생연도·성별·직업·Instagram, MBTI·관심사·본인/희망 성향, 식사 가격대·못 먹는 음식·알레르기 |
 | ConsentRecord | 목적·문서 버전·동의 주체/시각과 신청의 근거 참조. 철회/재동의 영향은 U16 |
 | EventSlot | 날짜·시작/종료·지역·정원·신청 마감·매칭 예정 |
-| Payment·Entitlement | 모의 거래/상품 참조, 금액/상태·원거래·요청/결과 식별, 권리 소유/사용 연결. 기간·한도는 U03 |
+| Payment·Entitlement | 상품·결제 시점 가격/통화·기간 스냅샷, 모의 거래 상태·원거래·요청/결과 식별, 권리 소유/사용 연결. 멤버십은 유효 기간 내 무제한이며 실패 연장 세부 계산은 U03 |
+| MembershipExtension | 멤버십·실패 근거 참여·논리 실패 키, 적용 정책 버전·처리 상태·전후 만료 시각. 같은 실패의 중복 연장 방지 |
 | MatchRun·배치 이력 | 입력/규칙/알고리즘 버전, 구성·점수/평가 근거, 분리/병합/재배치/확정·실패 이유 |
 | Venue·배정 | 식당명·주소·지도·예약명·가격, 지역/시간/수용·재고, 배정 결과. 음식 적합성은 U10 |
 | 방·알림 | 테이블 자격·영속 메시지/시스템 글, 예정 시각·수신자·전달 결과/시도 |
@@ -47,7 +48,7 @@
 
 ## 핵심 ERD
 
-바로 보는 자료: [확대·스크롤 뷰어](./erd/index.html), [신청·결제 SVG](./erd/application-payment.svg), [매칭·모임 SVG](./erd/matching-gathering.svg), [피드백·운영 SVG](./erd/feedback-operations.svg). 같은 이름의 PNG도 제공하므로 Blaybus 중간 산출물에 올릴 수 있다. SVG는 확대해도 선명한 그림 파일이다. 그림은 아래 Mermaid 원문에서 생성하며 실제 DB에 적용된 스키마를 나타내지 않는다.
+바로 보는 자료: [확대·스크롤 뷰어](./erd/erd.html), [신청·결제 SVG](./erd/application-payment.svg), [매칭·모임 SVG](./erd/matching-gathering.svg), [피드백·운영 SVG](./erd/feedback-operations.svg). 같은 이름의 PNG도 제공하므로 Blaybus 중간 산출물에 올릴 수 있다. SVG는 확대해도 선명한 그림 파일이다. 그림은 아래 Mermaid 원문에서 생성하며 실제 DB에 적용된 스키마를 나타내지 않는다.
 
 재생성: Mermaid CLI를 준비한 환경에서 `python3 scripts/render_erd.py`를 실행한다. 별도 Chromium을 쓰면 `--puppeteer-config /path/to/config.json`, CLI가 PATH에 없으면 `--renderer /path/to/mmdc`를 지정한다. 원문 3개가 SVG·PNG 3개씩으로 출력된다.
 
@@ -68,6 +69,8 @@ erDiagram
     Payment ||--o{ Entitlement : may_grant
     Entitlement ||--o{ EntitlementUse : reserves_or_uses
     Application ||--o{ EntitlementUse : binds
+    Entitlement ||--o{ MembershipExtension : extends_with
+    MatchParticipation ||--o{ MembershipExtension : failure_source
     Application ||--o{ MatchResolution : resolves
     MatchParticipation ||--o{ MatchResolution : source_of
     Application {
@@ -100,10 +103,44 @@ erDiagram
         key application_id FK
         enum payment_state
         string request_key
+        int amount_krw
+        string product_version
+    }
+    Entitlement {
+        key id PK
+        key user_id FK
+        enum entitlement_kind
+        datetime starts_at
+        datetime expires_at
+    }
+    MembershipExtension {
+        key id PK
+        key entitlement_id FK
+        key source_participation_id FK
+        string failure_key
+        string policy_version
+        enum processing_state
+        datetime previous_expires_at
+        datetime resulting_expires_at
     }
 ```
 
-Payment는 모의 거래의 식별과 상태다. 신청에 재시도/추가 거래 이력을 남길 여지는 두되 어떤 거래가 해당 참여를 유효하게 결제했는지 명시한다. PAID 여러 행이 중복 참가 권리를 뜻하지 않는다. 구독 기간·횟수·권리 발생/소비와 결제·권리의 세부 관계는 U03이다. EntitlementUse는 이중 사용 방지용 연결 개념이며 별도 원장 서비스는 요구하지 않는다.
+Payment는 모의 거래의 식별과 상태다. 신청에 재시도/추가 거래 이력을 남길 여지는 두되 어떤 거래가 해당 참여를 유효하게 결제했는지 명시한다. PAID 여러 행이 중복 참가 권리를 뜻하지 않는다. 상품 기간·기간 내 무제한 참여·실패 연장 원칙은 공식 FAQ로 확정됐다. 권리 발생/소비 시점과 결제·권리의 세부 관계는 U03이다. EntitlementUse는 참가와 사용 근거를 연결하는 개념이며, 1회권 이중 사용을 막되 멤버십의 정상적인 다음 회차 참여를 1회 사용 후 차단하는 장치가 아니다. 별도 원장 서비스는 요구하지 않는다.
+
+### 상품·멤버십과 실패 연장
+
+| 상품 | 공식 가격 | 기간·참여 원칙 |
+|---|---|---|
+| 1회권 | 9,900원 | 한 번의 참가 권리. 실제 차감 시점·보관/재사용은 U03 |
+| 멤버십 1개월 | 35,000원 | 유효 기간 내 횟수 무제한 |
+| 멤버십 3개월 | 75,000원 | 유효 기간 내 횟수 무제한 |
+| 멤버십 6개월 | 120,000원 | 유효 기간 내 횟수 무제한 |
+
+가격·상품 버전·구매 시점의 기간 조건을 거래에 보존해 이후 상품 수정이 과거 결제 금액을 바꾸지 않게 한다. 달력상 월 계산·가입 기산점·갱신·만료 경계·환불 금액은 U03이며, 1개월을 임의로 30일로 환산하지 않는다. 무제한은 참여 횟수 제한이 없다는 뜻이며 동일 회차 중복 신청·동시 배치 충돌을 허용한다는 뜻은 아니다(U07).
+
+멤버십 매칭 실패 횟수만큼 이용 기한을 연장한다. MembershipExtension은 이를 위한 **기술 설계 제안**이다. 실패 근거인 참여·멤버십 소유자와 논리 실패 키를 보존하고 `(entitlement_id, failure_key)`를 일의화한다. 동일 실패를 처리하는 MatchRun 재시도·재배치·worker 재시작마다 새 실패 키를 발급하지 않는다. 서로 다른 회차의 새 실패는 기존 연장 기록을 덮어쓰지 않는다. 어떤 종료 결과·해결 주기를 독립 실패 1회로 셀지, 대체 일정 이동 전후의 실패를 어떻게 셀지는 U03에서 정한 정책 버전과 근거로 식별한다.
+
+실패 1회당 연장 단위·기산점이 미정인 지금은 자동으로 날짜를 계산하지 않는다. 내부 처리 상태는 정책 대기/적용 완료를 구별하는 보조 기록으로 제안하며 PRD 신청·결제·매칭 상태에 새 값을 추가하지 않는다. 정책이 정해진 뒤 적용할 때 멤버십을 잠그고 중복 키 확인·전후 만료 시각 변경·적용 완료 기록을 한 트랜잭션으로 처리한다. 같은 실패 재요청은 이전 결과를 반환하고 서로 다른 실패의 동시 적용도 한 연장을 잃지 않게 직렬화한다. 실패 연장은 이동·보관·환불 중 하나를 임의 선택한 것으로 처리하지 않는다. 환불/만료와의 경합·취소/정정 시 역처리는 U03/U04 선행 결정 후 완성한다.
 
 ### 후보와 이동
 
@@ -201,6 +238,7 @@ erDiagram
 | 조합 재탐색 | MATCHING → REALLOCATING | 부적합 조합 해제·이유 보존. 미동의 회차 자동 이동 금지 |
 | 최종 검증 | MATCHING/REALLOCATING → CONFIRMED | 같은 트랜잭션에서 필수조건·적용 최소점수·소유권 검사. 안내는 별도 결과 |
 | 미배치 판정 | MATCHING/REALLOCATING → ALTERNATIVE_OFFERED / NO_MATCH | 이유·대안 보존. 두 값의 구분과 선택 기한 U03/U07 및 A3-W2. 임의 환불/이동 금지 |
+| 멤버십 실패 연장 | 실패 근거 확정 → 정책 대기 / 적용 완료 기록 | PRD 상태와 분리. U03의 실패 식별·연장 계산 정책 확정 후 한 실패당 한 번 적용. 적용 실패는 만료 시각을 부분 변경하지 않음 |
 | 참가자 대체 선택 | 이전 ALTERNATIVE_OFFERED → TRANSFERRED, 새 참여 WAITING | 회차·마감·정원·동의 재검증, 원결제 유지. 반복으로 참여 기록 증가 금지 |
 | 참가자 보관/환불 선택 | MatchResolution에 선택과 결과 기록 | 보관 상태를 PRD 매칭 축에 추가하지 않음. NO_MATCH 대응·보관 조건 U03/U04 |
 | 자동 복구 불가 | 해당 비종결 매칭 상태 → EXCEPTION | 원인·대상·시도 보존. 운영자도 전제 검사 없이 CONFIRMED로 수정 금지 |
@@ -223,6 +261,7 @@ REFUND_AVAILABLE 이후 참가자가 이동을 선택할 때의 결제 표시도
 | 테이블 내 중복 참가 금지 | 유효 (table_id, user_id) UNIQUE | 실제 소유자 비교, 해제 이력 구별 |
 | 4~6인·연령 차이 8 이내·제외 없음 | 단일 행 CHECK로 다른 행 집계 보장 불가 | 변경 경쟁을 막은 트랜잭션에서 최종 집합 검증. 연령 U02·신고 U09·점수 U05/U14 |
 | 미결제/환불 완료자 확정 금지 | 상태 타입/CHECK·거래 키 UNIQUE | 결제/권리를 잠그고 재조회. 늦은 결제 결과로 환불을 PAID로 되돌리지 않음 |
+| 멤버십 무제한 참여·실패 연장 | 연장 (entitlement_id, failure_key) UNIQUE·근거 참여 FK·가격 비음수 | 기간 유효성/소유 검사, 참여 횟수로 차단하지 않음. 중복/동시 연장과 환불 경합 검사. 계산 정책 U03 |
 | 이동·보관·환불 중 한 선택 | 해결 주기당 채택 선택 하나·요청 키 UNIQUE | 해결·참여·권리·결제 함께 검증/변경. 같은 키의 다른 선택 거절 |
 | 식당 재고 초과 소비 금지 | 수량 비음수 CHECK·배정 일의성 | 시간대 재고 잠금/조건부 갱신. 수용·가격·식사 조건 확인, U10 안전 추정 금지 |
 | 방·시스템 안내 중복 방지 | 방의 table_id UNIQUE·업무 효과 키 UNIQUE | 확정 버전/안내 종류가 같으면 같은 결과. 구성 변경 재안내 U13 |
@@ -251,6 +290,7 @@ ScheduledJob은 시각·대상·논리 효과 키·처리 결과·다음 시도 
 | 테이블 확정 | 실행 + 구성 식별/버전 | 같은 구성의 테이블/배치를 늘리지 않음 |
 | 이동·보관·환불 선택 | 본인 + 해결 주기 + 요청 키 | 같은 내용은 기존 결과, 다른 선택은 충돌 |
 | 모의 환불 | 원거래 + 채택 해결 주기 | 권리/금액 이중 해제 금지 |
+| 멤버십 실패 연장 | 멤버십 + 정책에 따른 논리 실패 키 | 같은 실패는 같은 결과. 새 실패는 별도 기록, 동시 적용 시 만료 연장 유실 금지 |
 | 방·리마인드·콘텐츠 | 테이블 버전 + 효과 종류 + 대상 시각/수신자 | 같은 내부 글/알림 재생성 금지 |
 
 실행기는 기한 있는 소유권과 완료 저장 시 토큰/세대 검사를 쓰는 안이다. 기한 뒤 돌아온 예전 실행기가 새 결과를 덮어쓰지 않는다. 메모리 타이머만으로 예약하지 않고 재시작 때 미처리 예약을 읽는다. 소유 기한·조회 간격·시도 한도·예외 기준은 U12다. heartbeat 최신 여부는 업무 완료 증거가 아니다.
@@ -261,6 +301,8 @@ ScheduledJob은 시각·대상·논리 효과 키·처리 결과·다음 시도 
 
 2026-10-16 Mermaid CLI(`@mermaid-js/mermaid-cli` 11.17.0)의 `/private/tmp/serentable-mermaid/node_modules/.bin/mmdc`로 이 문서의 Mermaid 세 블록을 실제 SVG로 렌더링했고 모두 성공했다. 결과는 로컬 검증 경로 `/private/tmp/serentable-mermaid/core-data-model-1.svg`, `core-data-model-2.svg`, `core-data-model-3.svg`에 남겼다. 임시 산출물은 저장소에 포함하지 않으며, 이 검사는 다이어그램 구문·렌더링 확인이다. DB 제약의 구현이나 런타임 동작을 증명하지 않는다.
 
+후속 FAQ 반영 검증: `python3 scripts/render_erd.py --renderer /private/tmp/serentable-mermaid/node_modules/.bin/mmdc --puppeteer-config /private/tmp/serentable-mermaid/puppeteer.json`으로 원문 세 블록의 SVG·PNG를 모두 다시 생성했다. 신청·결제 그림의 MembershipExtension과 두 근거 관계, 필드·라벨이 잘리지 않는지 PNG로 확인했다. 변경 없는 그림의 비결정적 SVG 식별자 차이는 제외했다. 공식 가격 네 상품·기간 내 무제한·실패 연장 원칙을 FAQ Q4/Q5와 대조했고 연장 일수·실패 산정 정책은 미정으로 유지했다. 문서 링크·SVG XML·PNG 파일 형식과 `git diff --check`를 확인했다.
+
 실행 코드가 없어 런타임 테스트를 추가하지 않는다. 후속 구현·독립 검증은 승인된 실제 PostgreSQL + 공개 API + 별도 실행기 경계에서 수행한다. 내부 메서드나 DB 직접 조회만으로 합격시키지 않는다. 상태/이력 조회는 각 기능 API에 포함하되 무권한 시험용 상태 변경 API는 공개하지 않는다.
 
 | 반례 | 공개 동작의 기대 결과 | 인계 |
@@ -269,6 +311,9 @@ ScheduledJob은 시각·대상·논리 효과 키·처리 결과·다음 시도 
 | 두 실행기가 같은 사람 동시 확정 | 허용 범위에서 배치 하나, 다른 실행은 경합/재탐색 | U07, A3-W2 |
 | 3명·연령 차이 9·제외·미결제 | 각각 확정 거절. 다른 조건이 맞는 4명/차이 8은 대조 검사 | A3-W1/W2 |
 | 이동/환불 동시 요청 | 하나만 채택. 이동이면 결제 유지·새 WAITING, 환불이면 새 배치 없음 | A2-W2, A3-W2 |
+| 멤버십으로 정상 회차 재참여 | 유효 기간 내 이전 참여 횟수만으로 거절하지 않음. 같은 회차 중복은 별도 U07 적용 | A2-W2 |
+| 같은 실패의 worker 재시도·중복 연장 | 같은 연장 결과 하나. 정책 미확정이면 날짜 계산 없이 대기 근거 보존 | U03, A2-W2, A3-W2 |
+| 별도 실패 두 건 동시 연장 | 승인된 정책 기준 두 실패 효과를 모두 보존하고 갱신 유실 없음. 구체 일수는 U03 확정 후 기대값 설정 | U03, A2-W2, A3-W2 |
 | 환불/확정 재요청·재시작 | 같은 논리 결과, 이중 환불·테이블·방 없음 | A3-W2, A4-W1 |
 | 계산 뒤 취소/제외 갱신 | 옛 입력 확정 금지, 재검증/예외 이유 보존 | A3-W2, A5-W1 |
 | 재고 한 단위 동시 배정 | 한 건만 소비, 나머지 대체/소진 예외 | A4-W1 |
@@ -293,7 +338,7 @@ ScheduledJob은 시각·대상·논리 효과 키·처리 결과·다음 시도 
 | 후속 Work | 선행 결정 | 구현 경계 |
 |---|---|---|
 | A2-W1 로그인·프로필·동의 | U01/U02/U16 인증·필수 입력/연령·동의/공개/보관 | 계정/프로필 물리 스키마·API 전 |
-| A2-W2 일정 신청·이용권·모의 결제 | U03/U04/U07 권리/소비·기한·후보/복수 신청 | 결제/권리/신청·참여 제약·전이 전 |
+| A2-W2 일정 신청·이용권·모의 결제 | U03/U04/U07 권리/소비·연장 계산/실패 식별·기한·후보/복수 신청 | 결제/권리/신청·참여 제약·전이 전 |
 | A3-W1 규칙·데이터·정답 기준 | U02/U05/U06/U14/U17/U19 연령/점수/목적함수·원본 대응·100명 기준 | 변환·시드·독립 정답 전 |
 | A3-W2 예약 매칭·재배치·실패 해결 | U07/U09/U12/U13 소유 범위·신고 제외·잠금/시도·확정 후 취소 | 자동 확정·경합 시험 전 |
 | A4-W1 식당·채팅·알림 | U10/U11/U12/U16 식당 조건·멤버십·전달/표시 필드 | 배정·채팅·실제 푸시 전 |
