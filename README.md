@@ -48,6 +48,8 @@ Blaybus Work 하나를 GitHub Issue 하나에 연결한다. PR과 Task는 강제
 
 기본 진행 순서는 등록한 Agenda → Work → Task이다. Work·Task 추가가 필요하면 이유·소속·완료 기준·일정 영향을 먼저 안내한다.
 
+- [PostgreSQL 백업·격리 복원](docs/operations/postgres-recovery.md)
+
 ## 로컬 실행과 검증
 
 `docker compose up --build -d`로 로컬 앱·DB·작업 실행기를 시작한다. [첫 배포 실행 지침](docs/operations/foundation-runbook.md)에서 런타임·자동 검사·Railway 설정·비용·백업/복원·모바일 원격 작업의 미완료 전제를 확인한다. 현재 공개 화면은 준비 상태이며 로그인·어드민 권한·제품 기능을 제공하지 않는다.

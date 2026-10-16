@@ -23,3 +23,8 @@ frontend/playwright-report/
 # 도구별 개인 설정은 공유 작업 규칙과 분리한다.
 .claude/settings.local.json
 CLAUDE.local.md
+
+# Logical database backups stay local and outside public assets.
+/.local-backups/
+*.dump
+*.backup

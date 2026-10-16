@@ -36,7 +36,7 @@
 
 | Work → Task | Issue / PR | 확인한 결과·남은 일 |
 |---|---|---|
-| 첫 배포·CI·DB 연결 → 배포 안전장치·원격 작업 검증 | #16 / PR #20 | 사용자 머지 완료, 단 `codex/sync-foundation-tasks`에 머지됨. 원격·CI·readiness 검증 완료. Compute 한도·Railway 데이터 백업 경로 미완료로 Task 진행 중 |
+| 첫 배포·CI·DB 연결 → 배포 안전장치·원격 작업 검증 | #16 / PR #20 | 사용자 머지 완료, 단 `codex/sync-foundation-tasks`에 머지됨. 원격·CI·readiness 검증 완료. Compute $10/$20 한도 설정 완료. 실제 Railway 데이터 백업·복원 미완료로 Task 진행 중 |
 | 핵심 데이터·화면·보안 설계 → 핵심 ERD·상태·무결성 제약 설계 | #17 / PR #23 | 열린 PR. 문서·SVG/PNG 각3장·확대 뷰어와 생성 스크립트 제공. 최신 그림은 설계안이며 실제 DB 적용 아님 |
 | 같은 Work → 공통 UI·핵심 화면 흐름 설계 | #18 / PR #22 | 열린 PR. 흐름/합성 스케치 검토 완료. 로고 직접 미반영 확인, CTO 표지의 갈색·크림색/원형 6인 식탁과 현재 버건디/사각 식탁의 차이를 ui-brand-review.md에 기록. 브랜드 보완 필요 |
 | 같은 Work → 개인정보·권한·보안 검증 기준 정리 | #19 / PR #21 | 사용자 머지 완료, 위 공통 브랜치에 포함. 검증 기준 설계 완료이며 실제 제품 보안 시험과 구분 |
@@ -63,10 +63,20 @@ PR #13(`codex/sync-foundation-tasks` → main)은 아직 열려 있다. PR #20/#
 - 문서 PR #13 최신 조회 CI [38857500407](https://github.com/InryeolChoi/SerenTable/actions/runs/38857500407) verify PASS.
 - 이 재개 점검은 Task 완료가 아니다. Blaybus에서는 기존 Task #16 타이머를 재사용하고, 비용 한도·실제 백업/복원 미완료를 유지한다.
 
+## Task #16 후속 진행: 비용·백업 경로
+
+- 작업 브랜치 `codex/task16-backup-restore`, 기반 `codex/sync-foundation-tasks`. 기존 Task #16의 후속 PR로 진행하며 새 Work/Task는 만들지 않았다.
+- 사용자 승인으로 Compute $10 알림·$20 중단 한도를 CLI로 실제 설정·재조회했다. 약 $0.05227 사용량, 한도 미도달. Agent $5 한도 유지.
+- Railway 실제 DB 이미지가 PostgreSQL 18임을 확인했다. 백업·복원은 18 도구로 검증하며 기존 로컬/CI 17을 같은 환경으로 표시하지 않는다.
+- `scripts/postgres_recovery.py`, `scripts/verify_postgres_recovery.py`, 운영 지침과 CI 검증 추가. 실제 로컬 PostgreSQL 18의 독립 원본→백업→새 DB 복원→HTTP readiness·worker 검증 통과. 기존 파일·원본 보존, 손상/공개 경로 거부도 통과.
+- CLI 사용자 브라우저 로그인·전용 공개키 등록 완료. 실제 SSH 접속의 첫 서버 지문 신뢰 등록은 자동 승인 검토가 독립 지문 검증 부재를 사유로 거절했다. 사용자 선택(웹 Console·Files 또는 지문 신뢰 승인 또는 보류)을 기다린다. 이를 우회하지 않는다.
+- **실제 Railway 데이터 백업·복원은 미완료, Task #16/Work #2는 진행 중.** 자동 백업/별도 저장소·업무 데이터 복원은 구현하지 않았다. 다음 행동은 사용자 선택에 맞는 인증 경로에서 실제 백업 파일을 받고 같은 격리 복원을 실행하는 것이다.
+- 사용자 ERD 파일명 변경은 보존했다. 루트의 직전 재개 점검용 HANDOFF 변경은 이 기록에도 포함했다.
+
 ## 다음 작업 순서
 
 1. 미커밋 ERD 파일명 변경과 현재 PR/브랜치 확인. 인계 준비 자체를 제품 진척으로 세지 않는다.
-2. Work #2의 Compute 예산 제어·실제 데이터 백업/복원 경로를 마무리한다. 명령 실행에 필요한 인증과 정책을 확인하고 기존 운영 DB 덮어쓰기로 시험하지 않는다.
+2. Work #2의 비용 한도 설정은 완료했다. 사용자 선택에 맞춰 실제 데이터 백업/복원을 마무리한다. 명령 실행에 필요한 인증과 정책을 확인하고 기존 운영 DB 덮어쓰기로 시험하지 않는다.
 3. Work #15의 ERD 시각화 검토와 UI 브랜드 보완을 마친다. 원본 자료를 임의 공개하지 않고 로고 재현을 공식 원본으로 표시하지 않는다.
 4. 선행 조건을 확인한 뒤 Work #3 로그인·프로필·동의로 진행한다. U01 인증/계정, U02 필드/연령, U16 공개/보관 정책을 필요한 범위에서 결정한다.
 
@@ -81,7 +91,7 @@ PR #13(`codex/sync-foundation-tasks` → main)은 아직 열려 있다. PR #20/#
 | Claude 설정 | 공유 .claude/settings.json, 개인 .claude/settings.local.json | 둘 다 현재 프로젝트에 없음. 이 요청에서 권한/모델 설정을 새로 부여하지 않음 |
 | Claude MCP | 프로젝트 .mcp.json, 사용자 범위 설정·OAuth는 해당 도구에서 관리 | 프로젝트 .mcp.json 없음. Codex의 Railway/앱 연결이 Claude로 이식됐다고 가정하지 않음 |
 | GitHub | 같은 호스트의 gh CLI 또는 각 도구의 GitHub 연결 | Codex에서 gh 조회 성공. 다른 호스트에서는 gh auth status로 접근 여부 확인 |
-| Railway | Codex 연결 도구, Claude에서는 별도 MCP/CLI 연결 필요 여부 확인 | 로컬 railway CLI 없음, Claude 접근 미검증. 설정값·비밀값을 인계 문서에 저장하지 않음 |
+| Railway | Codex 연결 도구, Claude에서는 별도 MCP/CLI 연결 필요 여부 확인 | npm exec 기반 Railway CLI 5.69.0 로그인·비용 한도 조회 확인, Claude 접근 미검증. 설정값·비밀값을 인계 문서에 저장하지 않음 |
 | 스킬 | ~/.agents/skills/의 실제 SKILL.md와 도구별 skills 디렉터리 | 공통/Claude 디렉터리 존재. 동일 slash 명령 등록·모든 도구 실행 가능 여부는 미검증 |
 | 모바일 원격 | 연결된 Codex 호스트·기기 구성 | 기존 Codex 경로만 사용자 지시로 검증. Claude 모바일 연동을 구성한 것은 아님 |
 
