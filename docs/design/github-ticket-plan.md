@@ -4,9 +4,11 @@
 
 ## 발행 및 실행 원칙
 
-- 기존 Work 10개를 그대로 사용한다. 새 Agenda·Work·Task를 이번 계획에서 몰래 추가하지 않는다.
+2026-10-16 예외: 사용자가 지정한 배포 검증·공통 설계 네 Task에 한해 병렬 실행하고 Task별 Issue #16~#19와 별도 PR #20~#23을 생성했다. 부모 Work #2/#15는 유지한다. [Task 결과와 검토 순서](./parallel-task-results.md)를 우선하며 다른 Work의 기본 순서·정책 선행 조건은 유지한다.
+
+- 초기 Work 10개에 2026-10-16 사용자가 등록한 공통 설계 Work 1개를 추가하여 총 11개를 추적한다. Agenda 5개와 기존 완료 Task를 유지한다. 승인되지 않은 Work·Task를 추가하지 않는다.
 - 아래 식별자는 발행 전 순서 표기이며 실제 GitHub Issue 번호가 아니다.
-- 기본 실행 순서는 1~10이다. ‘선행’은 실제 완료가 필요한 직접 의존성으로, 단순한 일정 순서와 구별한다. 선행이 적어도 임의로 다음 Agenda로 건너뛰지 않는다.
+- 기본 실행 순서는 1 → 2 → 공통 설계(A1-W3) → 3~10이다. ‘선행’은 실제 완료가 필요한 직접 의존성으로, 단순한 일정 순서와 구별한다. 선행이 적어도 임의로 다음 Agenda로 건너뛰지 않는다.
 - Issue 본문에는 Blaybus 계층·목표·Task 체크리스트·인수 기준·정책 결정 전제·관련 명세·직접 선행 Issue를 기록한다.
 - 선행 Issue 번호가 결정되면 GitHub의 지원되는 네이티브 차단 관계로 연결한다. 모든 Issue에 같은 내용을 반복한 상위 Issue를 별도로 만들지 않는다.
 - `ready-for-agent`는 스킬에서 지정한 라벨이다. 선행/정책 전제가 남은 Issue는 해당 전제가 충족되기 전 착수하지 않는다. 라벨만으로 모든 제품 정책이 확정됐다고 해석하지 않는다.
@@ -35,17 +37,35 @@
 
 **산출물:** 모바일 브라우저에서 Railway의 React 화면과 FastAPI를 확인하고 서버가 실제 PostgreSQL에 연결되며, CI 실패 변경의 배포가 차단된다.
 
-- [ ] 최소 React·FastAPI 앱 구성.
-- [ ] DB 연결과 CI 구성.
-- [ ] Railway 배포 및 모바일 검증.
+- [x] 첫 화면 모바일 검증.
+- [x] Railway 배포.
+- [x] DB 연결과 CI 구성.
+- [x] 최소 React·FastAPI 앱 구성.
+- [ ] 배포 안전장치·원격 작업 검증.
+
+2026-10-15 사용자 Blaybus 수정 및 추가 완료 보고를 반영했다. 기존 배포/모바일 통합 Task를 분리했다. 네 완료 Task의 구현 근거는 PR #12이며, 다섯 번째 Task는 기존 Work 인수 기준의 남은 검증을 담당한다. Work는 진행 중이다.
 
 **인수 기준:** 화면 빌드·경로 새로고침·API 응답·DB 연결·배포 버전·로그를 확인한다. 별도 실행기의 시작/DB 연결도 확인한다. 비밀값은 Git에 포함하지 않는다. 사용량·예산 제어와 백업·복원 준비를 확인한다. 미정 U18·U20을 필요한 범위에서 확정하고 모바일 Codex 원격 작업 경로를 실제 점검한다. 앱 골격을 로그인/어드민 권한 구현 완료로 표시하지 않는다.
+
+## 2-a. 핵심 데이터·화면·보안 설계
+
+**위치:** 개발·배포 기반 확보 → 핵심 데이터·화면·보안 설계
+
+**Issue:** [핵심 데이터·화면·보안 설계](https://github.com/InryeolChoi/SerenTable/issues/15)
+
+**선행:** 2. 사용자 승인·등록 완료(2026-10-16), 진행 전.
+
+- [ ] 핵심 ERD·상태·무결성 제약 설계.
+- [ ] 공통 UI·핵심 화면 흐름 설계.
+- [ ] 개인정보·권한·보안 검증 기준 정리.
+
+**인수 기준:** 핵심 관계·식별자·상태·DB 무결성 제약표, 참가자/운영자 화면 흐름·간단한 스케치·공통 UI 기준, 역할별 공개/수정 권한과 접근 거절 테스트 기준을 검토한다. 전체 물리 스키마·모든 화면을 동결하지 않는다. 미결정 정책은 해당 기능의 선행 조건으로 남기며, 설계 검토와 실제 보안 검증 완료를 구분한다. 초안/검토 1~2시간을 목표로 하고 실제 시간은 별도 기록한다. 상세는 [승인한 설계 배치](./design-readiness-plan.md)다.
 
 ## 3. 로그인·프로필·동의
 
 **위치:** 참가 신청·이용권·결제 → 로그인·프로필·동의
 
-**선행:** 2.
+**선행:** 2와 공통 설계(A1-W3).
 
 **산출물:** 테스트 참가자가 로그인해 필수 프로필·매칭/식사 선호·동의를 저장하고 본인 정보만 조회/수정하며 운영자는 허용된 권한으로 접근한다.
 
@@ -71,15 +91,16 @@
 
 **위치:** 자동 매칭·실패 해결 → 규칙·데이터·정답 기준
 
-**선행:** 1. 입력 정리·규칙·독립 정답 데이터는 배포나 결제 구현 없이 검토할 수 있다. 기본 일정에서는 4 이후 수행한다.
+**선행:** 1과 4. 입력 정책 검토 자체는 먼저 가능하지만, 실제 DB 시드는 공통 설계와 신청·결제 업무 스키마가 필요하므로 Work 완료에는 4가 선행한다. 기본 일정도 4 이후다.
 
 **산출물:** 문서화된 필수조건·점수·목적함수와 정규화된 테스트 입력에 대해 독립 검증자가 같은 정답 기준을 사용할 수 있다. 엔진 구현의 기대값을 복사하지 않는다.
 
 - [ ] 입력 정규화·누락값·식별 정책 결정.
+- [ ] 가상데이터 변환·DB 시드 구축.
 - [ ] 100명 실행 사례와 작은 정답 사례 준비.
 - [ ] 매칭 점수·제외 조건 기준 확정.
 
-**인수 기준:** U05~U09·U14·U17·U19의 관련 정책을 명시한다. 원본 응답/고유 사용자/과거 이력을 구분하고 보완 데이터의 생성 근거를 기록한다. 날짜·연령·지역·제외·인원 경계와 유효 4+4 사례를 포함한다. 작은 후보군의 독립 정답 산출 기준과 100명 수용 기준을 확정한다. 준비 Work이므로 별도 UI를 억지로 추가하지 않는다.
+**인수 기준:** 승인된 정규화 정책과 준비된 업무 스키마를 사용해 데모 DB 시드를 재실행해도 중복되지 않게 적재하고 원본/생성 값을 구별하며 결과를 검증한다. 대상 환경·시드 권한·데모 계정 로그인 범위를 정한다. 원본 적재와 매칭 정답 검증을 같은 완료로 취급하지 않는다. U05~U09·U14·U17·U19의 관련 정책을 명시한다. 원본 응답/고유 사용자/과거 이력을 구분하고 보완 데이터의 생성 근거를 기록한다. 날짜·연령·지역·제외·인원 경계와 유효 4+4 사례를 포함한다. 작은 후보군의 독립 정답 산출 기준과 100명 수용 기준을 확정한다. 준비 Work이므로 별도 UI를 억지로 추가하지 않는다.
 
 ## 6. 예약 매칭·재배치·실패 해결
 
@@ -158,15 +179,16 @@ Work 10개의 분할/의존성은 기준안으로 승인되었고 제품 외부 
 
 ## 발행 결과
 
-Work 10개를 순서대로 발행하고 GitHub 네이티브 차단 관계 10개를 설정했다. 모든 Issue는 열린 상태이며 `ready-for-agent` 라벨을 적용했다. 선행이 남은 Work는 해당 조건 충족 후 착수한다.
+최초에는 Work 10개와 네이티브 차단 관계 10개를 발행했다. 2026-10-16 승인된 공통 설계 Work를 추가하여 현재 Work는 11개다. 자료 정리 Work는 완료이며 나머지는 각 상태와 선행 조건을 따른다. `ready-for-agent` 라벨만으로 착수 가능하다고 해석하지 않는다.
 
 | 순서 | Work Issue | 직접 선행 Issue |
 |---|---|---|
 | 1 | [#1 [A1-W1] 요구사항·설계·자료 정리](https://github.com/InryeolChoi/SerenTable/issues/1) | 없음 |
 | 2 | [#2 [A1-W2] 첫 배포·CI·DB 연결](https://github.com/InryeolChoi/SerenTable/issues/2) | [#1](https://github.com/InryeolChoi/SerenTable/issues/1) |
-| 3 | [#3 [A2-W1] 로그인·프로필·동의](https://github.com/InryeolChoi/SerenTable/issues/3) | [#2](https://github.com/InryeolChoi/SerenTable/issues/2) |
+| A1-W3 | [핵심 데이터·화면·보안 설계](https://github.com/InryeolChoi/SerenTable/issues/15) | [첫 배포·CI·DB 연결](https://github.com/InryeolChoi/SerenTable/issues/2) |
+| 3 | [#3 [A2-W1] 로그인·프로필·동의](https://github.com/InryeolChoi/SerenTable/issues/3) | [#2](https://github.com/InryeolChoi/SerenTable/issues/2), [공통 설계](https://github.com/InryeolChoi/SerenTable/issues/15) |
 | 4 | [#4 [A2-W2] 일정 신청·이용권·모의 결제](https://github.com/InryeolChoi/SerenTable/issues/4) | [#3](https://github.com/InryeolChoi/SerenTable/issues/3) |
-| 5 | [#5 [A3-W1] 규칙·데이터·정답 기준](https://github.com/InryeolChoi/SerenTable/issues/5) | [#1](https://github.com/InryeolChoi/SerenTable/issues/1) |
+| 5 | [#5 [A3-W1] 규칙·데이터·정답 기준](https://github.com/InryeolChoi/SerenTable/issues/5) | [#1](https://github.com/InryeolChoi/SerenTable/issues/1), [신청·결제](https://github.com/InryeolChoi/SerenTable/issues/4) |
 | 6 | [#6 [A3-W2] 예약 매칭·재배치·실패 해결](https://github.com/InryeolChoi/SerenTable/issues/6) | [#4](https://github.com/InryeolChoi/SerenTable/issues/4), [#5](https://github.com/InryeolChoi/SerenTable/issues/5) |
 | 7 | [#7 [A4-W1] 식당·채팅·알림](https://github.com/InryeolChoi/SerenTable/issues/7) | [#6](https://github.com/InryeolChoi/SerenTable/issues/6) |
 | 8 | [#8 [A4-W2] 참석·피드백·다음 추천](https://github.com/InryeolChoi/SerenTable/issues/8) | [#7](https://github.com/InryeolChoi/SerenTable/issues/7) |

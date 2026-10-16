@@ -1,6 +1,6 @@
 # 첫 배포·CI·DB 연결 실행 지침
 
-대상: 개발·배포 기반 확보 → 첫 배포·CI·DB 연결, Issue #2. 기반 구현은 인증·매칭·업무 처리를 완성하지 않는다. 참가자/어드민 경로는 공개 준비 화면이며 관리 데이터가 없다. 실제 Railway 자원과 모바일 기기 검증은 별도 완료 증거가 필요하다.
+대상: 개발·배포 기반 확보 → 첫 배포·CI·DB 연결, Issue #2. 기반 구현은 인증·매칭·업무 처리를 완성하지 않는다. 참가자/어드민 경로는 공개 준비 화면이며 관리 데이터가 없다. 현재 공개 URL은 https://chanceplate.up.railway.app 이다. 실제 배포·모바일 확인 결과와 남은 운영 검증은 [실행 기록](../design/implementation-progress.md)에 구분한다.
 
 ## 런타임과 의존성
 
@@ -95,7 +95,7 @@ CI는 모든 PR과 `main`, `integration/mvp` push에서 실행한다. 별도 Pos
 |---|---|---|
 | 소스·루트 | GitHub SerenTable, 루트 `/` | 동일 |
 | 빌드 | 루트 Dockerfile | 동일 |
-| 배포 브랜치 | 초기 `integration/mvp`, 최종 승인 후 `main` | 동일 |
+| 배포 브랜치 | `main` (PR #12 병합 후 적용) | 동일 |
 | Wait for CI | 켜기 | 켜기 |
 | 시작 명령 | `python -m serentable.server` | `python -m serentable.worker` |
 | pre-deploy 명령 | `alembic upgrade head` | 없음 |
@@ -120,7 +120,9 @@ Wait for CI는 실제 서비스별 설정이다. YAML 파일만으로 활성화�
 
 ## 비용과 백업·복원
 
-월 3~5만원 상한은 목표이며 아직 견적이나 지출 승인이 아니다. 실제 플랜 기본 비용과 세 서비스 RAM/CPU·볼륨·네트워크 합계를 확인하고 Railway의 사용량 알림(soft)과 중단 한도(hard)를 구분해 설정한다. hard limit 도달 시 서비스가 중단될 수 있다. 심사 기간과 결과 안내 기간의 가용성을 고려한다. 예약 실행용 worker는 절전시키지 않는다. 첫 24시간 사용량을 측정하고 예상 비용을 기록한다.
+2026-10-16 실제 화면 확인: 현재 Hobby 계정의 Postgres Backups는 신규·예약 백업/PITR 생성에 Pro 업그레이드를 요구하며 백업이 없다. 아래 volume 예약 백업 설명은 이용 가능한 플랜에서의 경로다. 현 계정에서 활성화됐다고 간주하지 않는다. Hobby 유지·논리 백업 경로는 [실행·격리 복원 지침](postgres-recovery.md)으로 준비했다. 실제 Railway 데이터 검증 상태는 최신 Task 기록에서 확인한다. [최신 Task 검증 기록](./deployment-safety-verification.md)에 플랜·사용량·미완료 조건을 기록한다.
+
+월 3~5만원은 예산 목표다. 2026-10-16 사용자가 승인한 Compute 월 $10 알림·$20 중단 한도를 설정하고 재조회로 확인했다. 원화 예산과 정확히 같은 금액이라고 보장하지 않는다. 실제 플랜 기본 비용과 세 서비스 RAM/CPU·볼륨·네트워크 합계를 확인하고 Railway의 사용량 알림(soft)과 중단 한도(hard)를 구분해 설정한다. hard limit 도달 시 서비스가 중단될 수 있다. 심사 기간과 결과 안내 기간의 가용성을 고려한다. 예약 실행용 worker는 절전시키지 않는다. 첫 24시간 사용량을 측정하고 예상 비용을 기록한다.
 
 PostgreSQL volume 백업의 주기·보존·권한을 대시보드에서 설정·확인한다. 설정만 확인한 것은 복원 검증 완료가 아니다. 별도 빈 테스트 DB에 논리 백업을 복원해 확인한다. 아래는 로컬 Compose DB용 예시다. 백업 파일은 Git에 올리지 않고 접근 제한한 저장소에 둔다.
 
@@ -135,7 +137,7 @@ docker compose exec -T postgres pg_restore -U serentable -d serentable_restore -
 
 ## 모바일 원격 작업
 
-모바일 Codex의 실제 실행 환경은 미확인이다. GitHub 저장소 권한, 실행 환경의 checkout/브랜치, 비밀값 전달 경로, PR/CI 확인 가능 여부를 사용자 기기에서 실제 확인한다. 이 지침이 실행 환경 연결을 대신하지 않는다. 이후 작은 문서 변경 지시 → 해당 브랜치 commit → PR → CI 결과 확인까지 실제 수행한 링크를 기록한다. 임의의 main 직접 push나 DB 비밀값 전달로 대체하지 않는다. 상세 제품 정책은 미결정 목록을 우선한다.
+2026-10-16 사용자 휴대폰 원격 접속 가능 보고와 `REMOTE-20261016` 지시를 받아 문서 commit → PR #20 → 실제 CI 성공을 확인했다([증거](./deployment-safety-verification.md)). 기기 모델·OS를 직접 확인한 것은 아니다. GitHub 저장소 권한, checkout/브랜치와 호스트의 비밀값 전달 경로를 유지하고 원격 지시를 main 직접 push나 대화의 DB 비밀값 전달로 대체하지 않는다. 호스트의 절전·네트워크·앱 종료는 원격 가용성에 영향을 준다. 상세 제품 정책은 미결정 목록을 우선한다.
 
 ## 공식 근거
 
@@ -145,3 +147,12 @@ docker compose exec -T postgres pg_restore -U serentable -d serentable_restore -
 - [비용 제어](https://docs.railway.com/pricing/cost-control)
 - [볼륨 백업](https://docs.railway.com/volumes/backups)
 - [uv GitHub Actions](https://docs.astral.sh/uv/guides/integration/github/)
+
+
+## 현재 검증과 다음 Task
+
+2026-10-15 사용자 Blaybus 상태: 첫 화면 모바일 검증 / Railway 배포 / DB 연결과 CI 구성 / 최소 React·FastAPI 앱 구성 완료. 새 Task `배포 안전장치·원격 작업 검증`은 진행 중이며 기존 인수 기준을 이어받는다.
+
+초기 조회에서 꺼져 있던 API·worker의 `source.checkSuites`를 true로 활성화했다. 임시 검증 브랜치의 실패 CI는 두 배포 모두 SKIPPED, 정상 복구 CI는 두 배포 모두 SUCCESS였다. 두 서비스의 main 복구와 공개 상태 응답을 확인했다([실제 기록](./ci-gate-verification.md)). 후속 검증에서 모바일 지시→PR→CI 성공, API readiness 배포 healthcheck 보완, Hobby 플랜 백업 제약을 확인했다. Compute 비용 한도는 후속 검증에서 설정했다. 실제 Railway 데이터 백업·복원 상태는 최신 기록을 따른다([최신 Task 기록](./deployment-safety-verification.md)).
+
+worker Pre-deploy에 상시 실행 명령을 넣으면 종료를 기다리며 배포가 멈춘다. worker의 Pre-deploy는 비워 두고 Start Command에 `python -m serentable.worker`를 넣는다. 해당 위치 오류를 수정한 뒤 배포 `8cc2fc2a-b9a7-4026-9c66-11a1c33381c4`의 SUCCESS, 실행 replica 1개와 heartbeat를 확인했다. heartbeat 응답만으로 배포 성공을 판단하지 않는다.

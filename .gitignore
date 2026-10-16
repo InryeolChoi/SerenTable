@@ -13,8 +13,18 @@ dist/
 coverage/
 tmp/
 # 제공받은 원본 자료는 로컬에서 참조한다.
+/data/
 docs/*.pdf
 
 frontend/test-results/
 frontend/playwright-report/
 .ruff_cache/
+
+# 도구별 개인 설정은 공유 작업 규칙과 분리한다.
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Logical database backups stay local and outside public assets.
+/.local-backups/
+*.dump
+*.backup
