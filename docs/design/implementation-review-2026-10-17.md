@@ -25,6 +25,9 @@ Claude Code·DeepSeek 세션 이후 `a385ac6..d28f66f`의 회차·신청·모의
 
 - `73acf66`: PostgreSQL17 pytest121 PASS, 별도 PostgreSQL18·Node22 브라우저10/10 PASS. 같은 DB에서 겹친 한 차례 실행은 제외하고 분리 DB에서 재검증했다.
 - 후속 FK 교착 수정: PostgreSQL18 교착·취소 중 결제 회귀2건 PASS. 최종 head 전체 CI는 PR #31 Checks에서 확인한다.
+- 코드 `7b90d31`의 [CI 38935930868](https://github.com/InryeolChoi/SerenTable/actions/runs/38935930868) SUCCESS: PostgreSQL17 pytest122, Node22 브라우저10/10, Ruff·마이그레이션·런타임 이미지·PostgreSQL18 복구 검증 통과. 계약 병합 `fb45188`은 이 코드와 파일 트리가 동일하다. 이후 기록 커밋의 CI는 별도로 표시한다.
+- 고정 합성 입력30개를 별도 전수 탐색 오라클과 인원/필수조건 대조하고, 정원6의 제출 우선순위도 독립 조합 열거30개와 비교해 모두 통과했다.
+- 공개 운영 상태 재조회: 버전 `6d707cb`, readiness connected·worker alive. 이는 기존 main의 상태이며 이번 PR 배포 완료가 아니다.
 - 독립 작은 정답 비교를 유지했고 DP의 비교차 분할·제출 우선 mask 지배 조건을 specialist가 검토했다. 빈 제외 집합의 연령·크기·정원 제약에서만 정확하다. 제외 쌍·점수 도입에는 새 검증이 필요하다.
 - 합성100명 planner 단일 함수3샘플: 같은 연령0.008초, 혼합0.112초, 연령 체인0.051초, 각각100명 배치. 운영 성능 보장·100명 DB/E2E 검증은 아니다.
 - 소개 응답은 표시명만 명시적으로 선택한다. 타 참가자 ID·이름 원문·연락처·Instagram·프로필 JSON은 포함하지 않는다.
@@ -40,7 +43,7 @@ Claude Code·DeepSeek 세션 이후 `a385ac6..d28f66f`의 회차·신청·모의
 
 ```text
 수행: 자동 매칭 구현을 검토해 최대 인원·마감·취소/결제·실패 기록·외래키 교착을 실패 재현 후 수정하고 확정 테이블의 표시명 소개를 연결했습니다. 결제 E2E 파일 순서 의존성도 제거했습니다.
-검증: 실제 PostgreSQL API·별도 실행기·작은 정답 비교·브라우저 E2E와 고위험 독립 검토. 최종 수치/CI는 PR Checks와 검토 기록 참조.
+검증: CI 38935930868에서 실제 PostgreSQL API·오라클122개, 브라우저10개, 이미지·복구 검증 통과. 고위험 독립 검토와 추가 정답/제출순 비교60건 통과.
 남음: 연장/보관/환불 정책, 후속 점수·제외 정책, 운영 배포·실기기 검증. Work 전체 진행 중 유지.
 PR: https://github.com/InryeolChoi/SerenTable/pull/31
 ```
