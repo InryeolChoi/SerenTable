@@ -17,6 +17,7 @@ from serentable.auth import (
 )
 from serentable.database import database_engine
 from serentable.events import SLOT_COLUMNS, field_error, slot_json
+from serentable.payments import payment_details
 from serentable.profile import consent_state, profile_state, read_profile
 
 router = APIRouter()
@@ -56,6 +57,7 @@ def applications_json(connection, rows, now, with_participant=False):
             {"ids": ids},
         ).mappings():
             candidates.setdefault(slot["application_id"], []).append(slot_json(slot, now))
+    payments = payment_details(connection, rows, now)
     return [
         {
             "id": str(row["id"]),
@@ -64,6 +66,7 @@ def applications_json(connection, rows, now, with_participant=False):
             "canceled_at": iso(row["canceled_at"]),
             "candidates": candidates.get(row["id"], []),
         }
+        | payments[row["id"]]
         | (
             {"participant": {"id": str(row["user_id"]), "login_id": row["login_id"]}}
             if with_participant

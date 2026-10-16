@@ -70,12 +70,56 @@ export type EventSlot = {
   capacity: number;
   recruiting: boolean;
 };
+export type ProductCode =
+  "single" | "membership_1m" | "membership_3m" | "membership_6m";
+export type Product = {
+  code: ProductCode;
+  name: string;
+  kind: "SINGLE" | "MEMBERSHIP";
+  price_krw: number;
+  period_months: number | null;
+};
+export type Catalog = {
+  mock: true;
+  product_version: string;
+  policy_version: string;
+  products: Product[];
+};
+export type Payment = {
+  id: string;
+  application_id: string;
+  state: "PENDING" | "PAID" | "FAILED";
+  mock: true;
+  amount_krw: number;
+  product: Product & { version: string };
+  policy_version: string;
+  simulated_failure: boolean;
+  requested_at: string;
+  completed_at: string | null;
+};
+export type Entitlement = {
+  id: string;
+  kind: "SINGLE" | "MEMBERSHIP";
+  product_code: ProductCode;
+  payment_id: string;
+  application_id: string | null;
+  starts_at: string;
+  expires_at: string | null;
+  state: "HELD" | "ACTIVE" | "EXPIRED";
+  policy_version: string;
+};
 export type Application = {
   id: string;
   state: "DRAFT" | "SUBMITTED" | "CANCELED";
   submitted_at: string | null;
   canceled_at: string | null;
   candidates: EventSlot[];
+  payments: Payment[];
+  coverage: {
+    source: "payment" | "membership";
+    entitlement: Entitlement;
+  } | null;
+  payment_required: boolean;
   participant?: { id: string; login_id: string };
 };
 let csrfToken: string | null = null;
@@ -109,6 +153,7 @@ const fieldNames: Record<string, string> = {
   matches_at: "매칭 예정",
   capacity: "정원",
   event_slot_ids: "후보 회차",
+  product_code: "이용권",
 };
 function validationMessage(status: number, detail: unknown) {
   if (status === 422 && Array.isArray(detail)) {

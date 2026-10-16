@@ -1,11 +1,23 @@
 import { useEffect, useState } from "react";
-import { ApiError, type Application, type EventSlot } from "./api";
+import {
+  ApiError,
+  type Application,
+  type EventSlot,
+  type ProductCode,
+} from "./api";
 import { SlotSummary } from "./events";
+import {
+  PaymentPanel,
+  paymentSummary,
+  ProductChoice,
+  RefundNotice,
+  useCatalog,
+} from "./payments";
 import { message, Notice, useScopedApi } from "./ui";
 
 const stateLabels: Record<Application["state"], string> = {
   DRAFT: "작성 중",
-  SUBMITTED: "신청 완료 · 결제 전",
+  SUBMITTED: "신청 완료",
   CANCELED: "신청 취소됨",
 };
 const conflictMessages: Record<string, string> = {
@@ -51,6 +63,8 @@ export function ApplyPage({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState<Application | null>(null);
+  const [product, setProduct] = useState<ProductCode | null>(null);
+  const { catalog } = useCatalog();
   async function load() {
     setLoading(true);
     try {
@@ -117,11 +131,14 @@ export function ApplyPage({
             <Notice>
               신청을 제출했습니다. 후보 {done.candidates.length}개 회차 · 상태{" "}
               {stateLabels[done.state]}
+              {done.payment_required
+                ? " · 이용권 결제가 필요합니다."
+                : " · 보유한 멤버십으로 결제 없이 신청이 완료되었습니다."}
             </Notice>
-            <button
-              className="primary"
-              onClick={() => navigate("/participant")}
-            >
+            {done.payment_required && (
+              <PaymentPanel application={done} initialProduct={product} />
+            )}
+            <button onClick={() => navigate("/participant")}>
               내 신청 보기
             </button>
           </>
@@ -136,11 +153,21 @@ export function ApplyPage({
                 </li>
               ))}
             </ul>
+            {catalog && (
+              <ProductChoice
+                products={catalog.products}
+                value={product}
+                disabled={pending}
+                onChange={setProduct}
+              />
+            )}
             <p className="notice">
-              제출은 결제가 아닙니다. 이용권 선택·모의 결제는 다음 단계에서
-              진행합니다. 여러 후보를 골라도 모든 회차에 각각 참가하는 것은
+              제출은 결제가 아닙니다. 제출 후 모의 결제 단계에서 선택한 이용권을
+              결제합니다. 유효한 멤버십 기간이 후보 회차를 모두 포함하면 결제
+              없이 처리됩니다. 여러 후보를 골라도 모든 회차에 각각 참가하는 것은
               아니며, 후보 간 배정 규칙은 아직 확정되지 않았습니다.
             </p>
+            <RefundNotice />
             <div className="actions">
               <button
                 className="primary"
@@ -225,6 +252,7 @@ function ApplicationItem({
         <strong>{stateLabels[application.state]}</strong>
         {application.participant && ` · ${application.participant.login_id}`}
       </p>
+      <p className="small">결제: {paymentSummary(application)}</p>
       <ul className="candidates">
         {application.candidates.map((slot) => (
           <li key={slot.id}>
@@ -291,15 +319,27 @@ export function MyApplications({
               key={application.id}
               application={application}
               action={
-                application.state === "SUBMITTED" &&
-                application.candidates.every((slot) => slot.recruiting) && (
-                  <button
-                    disabled={pending === application.id}
-                    onClick={() => void cancel(application.id)}
-                  >
-                    {pending === application.id ? "취소 중…" : "신청 취소"}
-                  </button>
-                )
+                <div className="actions">
+                  {application.payment_required && (
+                    <button
+                      className="primary"
+                      onClick={() =>
+                        navigate(`/participant/payment/${application.id}`)
+                      }
+                    >
+                      결제하기
+                    </button>
+                  )}
+                  {application.state === "SUBMITTED" &&
+                    application.candidates.every((slot) => slot.recruiting) && (
+                      <button
+                        disabled={pending === application.id}
+                        onClick={() => void cancel(application.id)}
+                      >
+                        {pending === application.id ? "취소 중…" : "신청 취소"}
+                      </button>
+                    )}
+                </div>
               }
             />
           ))}
@@ -308,8 +348,8 @@ export function MyApplications({
         <p>아직 제출한 신청이 없습니다.</p>
       )}
       <p className="small muted">
-        신청 취소는 후보 회차 중 가장 이른 신청 마감 전까지 가능합니다. 환불
-        규정은 결제 단계에서 별도로 안내합니다.
+        신청 취소는 후보 회차 중 가장 이른 신청 마감 전까지 가능하며 자동 환불이
+        아닙니다. 현행 기준 화요일 24:00 이후 환불 불가, 세부 환불 정책 미정.
       </p>
       <button onClick={() => navigate("/participant/apply")}>일정 신청</button>
     </>
@@ -341,7 +381,7 @@ export function AdminApplicationsPage() {
     <section>
       <h1>신청 현황</h1>
       <p className="lead">
-        참가자 신청과 후보 회차를 조회합니다. 읽기 전용입니다.
+        참가자 신청·후보 회차·모의 결제 상태를 조회합니다. 읽기 전용입니다.
       </p>
       {error && <Notice error>{error}</Notice>}
       {!applications ? (

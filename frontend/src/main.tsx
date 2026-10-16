@@ -24,6 +24,7 @@ import {
   ApplyPage,
   MyApplications,
 } from "./applications";
+import { MyEntitlements, PaymentPage } from "./payments";
 import symbol from "./chance-table-symbol.svg";
 import { message, Notice, useScopedApi } from "./ui";
 import "./style.css";
@@ -569,9 +570,10 @@ function ParticipantHome({ navigate }: { navigate: (path: string) => void }) {
         </button>
       </div>
       <MyApplications navigate={navigate} />
+      <MyEntitlements />
       <p className="notice">
-        이용권·결제는 다음 개발 단계에서 제공합니다. 신청 제출은 참가 확정이
-        아닙니다.
+        신청 제출과 모의 결제 완료는 참가 확정이 아닙니다. 매칭 결과는 별도로
+        안내합니다.
       </p>
     </section>
   );
@@ -977,6 +979,11 @@ function App() {
           ) : path === "/participant/apply" ||
             path === "/participant/apply/review" ? (
             <ApplyPage path={path} navigate={navigate} />
+          ) : path.startsWith("/participant/payment/") ? (
+            <PaymentPage
+              applicationId={path.slice("/participant/payment/".length)}
+              navigate={navigate}
+            />
           ) : path === "/participant/events" ? (
             <ParticipantEventsPage />
           ) : path === "/participant/profile" ? (
