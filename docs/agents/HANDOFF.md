@@ -9,8 +9,9 @@
 - Work #2 후속 PR #24의 공통 브랜치 머지를 확인했다(merge `3869396`, 2026-10-16T10:44:14Z). 비용·백업·원격 검증 인수 완료. 공통 PR #13은 아직 main에 미머지다.
 - Work #15 ERD·UI 브랜드 보완은 통합 `9e3a1b1`에 반영했다. 고정 범위 `750bbb0...9e3a1b1` 독립 Standards/Spec 지적 각각 0건. PR #22/#23 개별 head에 결과를 동기화했고 CI 38889918153/38889907017 PASS. 제품 기능 시험과 구분한다.
 - 현재 실행: **참가 신청·이용권·결제 → 로그인·프로필·동의(Work #3)**. 사용자는 사전 발급 합성 계정만 제공, Instagram 필수 수집·타 참가자 비공개를 승인했다. [ADR-0008](../adr/0008-demo-accounts-and-private-profile.md)과 [API 계약](../design/account-profile-contract.md)을 따른다. 공개 가입·실제 개인정보 모집·미확정 보관 날짜는 추가하지 않는다.
-- 별도 작업 트리에서 인증 서버·화면·프로필/동의 서버를 병렬 구현 중이다. 인증의 첫 실제 PostgreSQL HTTP 2개 검증 slice `5826964`만 통합 `c016a00`에 반영했다. 전체 인증/보안/브라우저 E2E 완료가 아니다.
-- 구현 트리: `core-security/SerenTable`의 `codex/work3-auth-server`, `core-ui/SerenTable`의 `codex/work3-account-ui`, `foundation-safety/SerenTable`의 `codex/work3-profile-consent`. 공통 부모 경로는 `/Users/inchoi/.codex/worktrees/`다. 서로 checkout을 수정하지 않는다. 진행 중인 에이전트 결과·미커밋 변경을 보존한다.
+- **Work #3 세 구현 브랜치를 통합 브랜치에 모두 병합했다(2026-10-16, Claude Code 인수).** 인증 서버 `1061a09`, 프로필/동의 서버 `d97fb43`, 계정 화면 `codex/work3-account-ui`(Codex 미커밋 E2E를 검토·커밋한 `2e5bc2d` 포함). 화면 커밋에서 운영자 상세 버튼의 접근 가능한 이름이 Chromium에서 `상세 보기 : id`로 계산되던 문제를 명시적 `aria-label`로 고쳤다. 미저장 입력은 React 메모리 상태로만 유지하며 브라우저 저장소를 쓰지 않는다.
+- 통합 결과 로컬 검증(실제 PostgreSQL 18 테스트 전용 컨테이너 `serentable-work3-integration-pg18`, 포트 55437): `uv run pytest -q` 30 passed, ruff check/format PASS, 프런트 빌드 PASS, Playwright 4/4 PASS(모바일 Chromium 에뮬레이션: 로그인·권한 거절·로그아웃, 미완성/완성 프로필·목적별 동의 저장·새로고침 유지, 연결 실패·입력 오류·세션 철회 후 같은 계정 미저장 입력 유지와 타 계정 격리, 운영자 상세 360/390/1440px 잘림 없음). 실제 모바일 기기·배포 환경 검증, 독립 Standards/Spec 검토, CI는 아직 아니다. 통합 브랜치 push 여부는 GitHub에서 확인한다.
+- 구현 트리: `core-security/SerenTable`의 `codex/work3-auth-server`, `core-ui/SerenTable`의 `codex/work3-account-ui`, `foundation-safety/SerenTable`의 `codex/work3-profile-consent`. 공통 부모 경로는 `/Users/inchoi/.codex/worktrees/`다. 세 브랜치 모두 통합에 반영되어 미커밋 변경이 없다.
 
 ## 최신 주최 측 안내: 2026-10-16
 
@@ -79,7 +80,7 @@ PR #13(`codex/sync-foundation-tasks` → main)은 아직 열려 있다. PR #20/#
 ## 다음 작업 순서
 
 1. 현재 Git/PR과 활성 구현 작업 트리를 확인한다. 위 최신 상태가 아래 과거 진행 기록보다 우선한다.
-2. 인증 보강·프로필/동의·화면 결과를 병합 전담 에이전트로 통합한다. 실제 PostgreSQL HTTP·브라우저 E2E와 독립 검토를 마친 뒤 Work #3 인수 상태를 갱신한다.
+2. Work #3 통합과 로컬 실제 PostgreSQL HTTP·브라우저 E2E는 완료했다. 통합 브랜치를 push해 PR #25 CI를 확인하고, 고정 범위 독립 Standards/Spec 검토를 마친 뒤 Work #3 인수 상태를 갱신한다.
 3. 인증 런타임 비밀과 합성 계정 seed를 배포 전에 구성·검증한다. 비밀번호/세션 값을 Git·로그에 넣지 않는다. 코드 통합만으로 배포 완료 처리하지 않는다.
 4. 이후 Work #4는 U03/U04 등 해당 사업 정책 선행을 확인한다. 합성 계정 승인으로 결제·환불·매칭 정책을 확정하지 않는다.
 
