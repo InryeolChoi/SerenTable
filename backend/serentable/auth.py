@@ -29,6 +29,15 @@ class Settings:
     ttl: int
 
 
+def served_over_https(request: Request) -> bool:
+    """Railway terminates TLS at its edge, which always sets X-Forwarded-Proto: https.
+
+    Railway publishes no stable proxy CIDR, so uvicorn's proxy allowlist cannot name it.
+    Only this scheme header is read; client-address headers remain untrusted.
+    """
+    return request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+
+
 def settings(request: Request) -> Settings:
     origin = os.getenv("APP_ORIGIN", "")
     key = os.getenv("AUTH_SIGNING_KEY", "")
@@ -52,7 +61,7 @@ def settings(request: Request) -> Settings:
     )
     if not valid_origin or len(key) < 32:
         raise HTTPException(503, "auth_configuration_unavailable")
-    if production and (parsed.scheme != "https" or request.url.scheme != "https"):
+    if production and (parsed.scheme != "https" or not served_over_https(request)):
         raise HTTPException(503, "auth_configuration_unavailable")
     try:
         ttl = int(os.getenv("AUTH_SESSION_TTL_SECONDS", "43200"))
