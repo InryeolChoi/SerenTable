@@ -661,11 +661,11 @@ function AdminPage() {
                     {person.profile_complete ? "입력 완료" : "미완성"}
                   </p>
                   <button
+                    aria-label={`상세 보기: ${person.login_id}`}
                     aria-pressed={selected === person.id}
                     onClick={() => void show(person)}
                   >
                     상세 보기
-                    <span className="sr-only">: {person.login_id}</span>
                   </button>
                 </li>
               ))}
