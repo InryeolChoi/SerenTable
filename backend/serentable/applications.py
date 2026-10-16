@@ -103,7 +103,6 @@ def latest_consent_ids(connection, user_id):
 def submit_application(
     payload: ApplicationInput, user: Principal = Depends(require_csrf_participant)
 ):
-    now = datetime.now(timezone.utc)
     application_id = uuid.uuid4()
     try:
         with database_engine().begin() as connection:
@@ -112,6 +111,8 @@ def submit_application(
             connection.execute(
                 text("SELECT id FROM app_user WHERE id = :id FOR UPDATE"), {"id": user.id}
             )
+            # Judge deadlines after the lock wait, by the database clock.
+            now = locked_now(connection)
             prior = connection.execute(
                 text("""SELECT id FROM application
                 WHERE user_id = :user_id AND request_key = :key"""),
@@ -135,12 +136,13 @@ def submit_application(
                 raise HTTPException(409, "profile_incomplete")
             if not consent_state(connection, user.id)["complete"]:
                 raise HTTPException(409, "consent_incomplete")
+            # FOR SHARE lets a later close/match step that locks the slot order itself after us.
             open_slots = connection.execute(
-                text("""SELECT count(*) FROM event_slot
-                WHERE id = ANY(:ids) AND closes_at > :now"""),
+                text("""SELECT id FROM event_slot
+                WHERE id = ANY(:ids) AND closes_at > :now FOR SHARE"""),
                 {"ids": payload.event_slot_ids, "now": now},
-            ).scalar()
-            if open_slots != len(payload.event_slot_ids):
+            ).all()
+            if len(open_slots) != len(payload.event_slot_ids):
                 raise field_error("event_slot_ids", "slot_not_recruiting")
             if connection.execute(
                 text("""SELECT 1 FROM application_candidate
@@ -186,11 +188,15 @@ def submit_application(
     return response
 
 
+def locked_now(connection):
+    """The database clock at this point; unlike now(), it advances within a transaction."""
+    return connection.execute(text("SELECT clock_timestamp()")).scalar()
+
+
 @router.post("/api/me/applications/{application_id}/cancel")
 def cancel_application(
     application_id: uuid.UUID, user: Principal = Depends(require_csrf_participant)
 ):
-    now = datetime.now(timezone.utc)
     try:
         with database_engine().begin() as connection:
             # Another participant's id is indistinguishable from a missing one.
@@ -201,13 +207,16 @@ def cancel_application(
             ).scalar()
             if state is None:
                 raise HTTPException(404, "application_not_found")
+            now = locked_now(connection)
             if state == "SUBMITTED":
-                earliest_close = connection.execute(
-                    text("""SELECT min(s.closes_at) FROM application_candidate c
-                    JOIN event_slot s ON s.id = c.event_slot_id
-                    WHERE c.application_id = :id"""),
-                    {"id": application_id},
-                ).scalar()
+                earliest_close = min(
+                    connection.execute(
+                        text("""SELECT s.closes_at FROM application_candidate c
+                        JOIN event_slot s ON s.id = c.event_slot_id
+                        WHERE c.application_id = :id FOR SHARE OF s"""),
+                        {"id": application_id},
+                    ).scalars()
+                )
                 if earliest_close <= now:
                     raise HTTPException(409, "application_cancel_closed")
                 connection.execute(

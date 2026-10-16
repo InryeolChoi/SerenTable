@@ -282,3 +282,74 @@ def test_operator_reads_all_applications_and_roles_are_enforced():
         assert no_csrf.status_code == 403
         cancel_path = f"/api/me/applications/{rows[0]['id']}/cancel"
         assert one.post(cancel_path).status_code == 403
+
+
+def hold_lock(sql, params):
+    """Hold a row lock from another session, as a concurrent request would."""
+    from serentable.database import database_engine
+    from sqlalchemy import text
+
+    connection = database_engine().connect()
+    transaction = connection.begin()
+    connection.execute(text(sql), params)
+    return connection, transaction
+
+
+def test_deadline_passing_while_waiting_for_the_participant_lock_rejects_submit():
+    with TestClient(app) as operator, TestClient(app) as one:
+        login(operator, "operator")
+        soon = create_slot(operator, days=8, close_in=timedelta(seconds=2))
+        login(one, "participant-01")
+        make_ready(one)
+        user_id = one.get("/api/auth/me").json()["user"]["id"]
+        connection, transaction = hold_lock(
+            "SELECT id FROM app_user WHERE id = :id FOR UPDATE", {"id": user_id}
+        )
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            pending = pool.submit(apply, one, [soon])
+            time.sleep(2.5)
+            transaction.rollback()
+            connection.close()
+            response = pending.result(timeout=10)
+        assert response.status_code == 422
+        assert one.get("/api/me/applications").json()["applications"] == []
+
+
+def test_deadline_passing_while_waiting_for_the_application_lock_rejects_cancel():
+    with TestClient(app) as operator, TestClient(app) as one:
+        login(operator, "operator")
+        soon = create_slot(operator, days=8, close_in=timedelta(seconds=2))
+        login(one, "participant-01")
+        make_ready(one)
+        application = apply(one, [soon]).json()["application"]
+        connection, transaction = hold_lock(
+            "SELECT id FROM application WHERE id = :id FOR UPDATE", {"id": application["id"]}
+        )
+        path = f"/api/me/applications/{application['id']}/cancel"
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            pending = pool.submit(send, one, "POST", path)
+            time.sleep(2.5)
+            transaction.rollback()
+            connection.close()
+            response = pending.result(timeout=10)
+        assert (response.status_code, response.json()) == (
+            409,
+            {"detail": "application_cancel_closed"},
+        )
+
+
+def test_profile_save_waits_for_an_in_flight_submission_of_the_same_participant():
+    with TestClient(app) as one:
+        login(one, "participant-01")
+        make_ready(one)
+        user_id = one.get("/api/auth/me").json()["user"]["id"]
+        connection, transaction = hold_lock(
+            "SELECT id FROM app_user WHERE id = :id FOR UPDATE", {"id": user_id}
+        )
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            pending = pool.submit(send, one, "PUT", "/api/me/profile", {"display_name": "x"})
+            time.sleep(0.5)
+            assert not pending.done()
+            transaction.rollback()
+            connection.close()
+            assert pending.result(timeout=10).status_code == 200
