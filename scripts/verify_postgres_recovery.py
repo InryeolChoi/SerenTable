@@ -112,7 +112,14 @@ def main():
         collision = [*command, "backup", "--local-source", source, "--output", str(partial_dump)]
         assert subprocess.run(collision, cwd=ROOT, capture_output=True).returncode != 0
         assert partial.read_bytes() == b"preserve an existing unfinished backup"
-        result = run([*command, "restore", "--dump", str(dump), "--app-image", IMAGE])
+        result = subprocess.run(
+            [*command, "restore", "--dump", str(dump), "--app-image", IMAGE],
+            capture_output=True,
+        )
+        if result.returncode:
+            # The recovery CLI emits only its own fixed stage/error labels.
+            sys.stderr.write(result.stderr.decode())
+            raise RuntimeError("Isolated restore CLI failed")
         report = json.loads(result.stdout)
         assert report["restore"] == "passed"
         assert report["sha256"] == digest

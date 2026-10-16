@@ -19,7 +19,9 @@ IMAGE = "postgres:18-alpine"
 RAILWAY = ["npm", "exec", "--yes", "--package=@railway/cli@5.69.0", "--", "railway"]
 
 
-def run(command, *, stdin=None, stdout=subprocess.PIPE, env=None, timeout=120):
+def run(
+    command, *, stdin=None, stdout=subprocess.PIPE, env=None, timeout=120, stage="external command"
+):
     try:
         return subprocess.run(
             command,
@@ -32,7 +34,7 @@ def run(command, *, stdin=None, stdout=subprocess.PIPE, env=None, timeout=120):
         ).stdout
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
         # Provider/driver diagnostics can contain credentials or record contents.
-        raise RuntimeError(f"{command[0]} command failed; raw diagnostics withheld") from None
+        raise RuntimeError(f"{stage} failed; raw diagnostics withheld") from None
 
 
 def validate_dump(path):
@@ -127,6 +129,7 @@ def restore(args):
                 IMAGE,
             ],
             env=environment,
+            stage="restore database creation",
         )
         started.append(database)
         for _ in range(30):
@@ -153,6 +156,7 @@ def restore(args):
                     "--single-transaction",
                 ],
                 stdin=stream,
+                stage="archive restore",
             )
         count = (
             run(
@@ -195,6 +199,7 @@ def restore(args):
                 "serentable.server",
             ],
             env=app_environment,
+            stage="restored application launch",
         )
         started.append(application)
         # Refresh the restored heartbeat, since the saved one may be old.
@@ -209,6 +214,7 @@ def restore(args):
                 "--once",
             ],
             env=app_environment,
+            stage="restored worker execution",
         )
         probe = (
             "import json,urllib.request; "
@@ -268,7 +274,7 @@ def main():
     except (RuntimeError, OSError, ValueError) as error:
         parser.exit(
             1,
-            f"Recovery check failed: {type(error).__name__}; "
+            f"Recovery check failed: {str(error) if isinstance(error, RuntimeError) else type(error).__name__}; "
             "verify Docker, CLI login, source and archive. No raw secrets logged.\n",
         )
 
