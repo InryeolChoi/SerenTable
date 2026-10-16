@@ -4,6 +4,8 @@
 
 ## 먼저 확인할 현재 상태
 
+- **2026-10-17 취침 중 구현 요청 진행:** 통합 브랜치 `codex/overnight-matching-progress`, 시작 `39dd3d0`(main `93195f6`, PR #32 OPEN). 기존 Work #5/#6 안에서 확정 시 1회권 사용 상태·대체 일정 읽기 전용 API/화면·100명 DB/worker·복구 검증을 진행한다. [범위·검증 기록](../design/overnight-implementation-2026-10-17.md)을 기준으로 재개한다. 첫 API RED→GREEN, 대체 일정 API 3개 및 최신 번들 모바일 Chromium 1개 PASS. 전체 회귀·100명은 진행 중이며 완료로 표시하지 않는다. 실패 연장/이동/보관/환불 정책과 원본 시드 규칙은 미정이다. 사용자 AGENTS.md·미추적 설정/스크립트를 보존한다.
+
 - **2026-10-17 PR #31 배포·신청/모의 결제 인수 완료:** main `93195f6`, CI38937665767 SUCCESS. API/worker 배포 SUCCESS·replica 각1, 공개 버전 일치·readiness/worker 정상. 컨테이너 환경의 비밀번호를 내보내지 않고 공개 HTTPS로 운영자/참가자 로그인·회차·신청·실패/성공 모의 결제·멱등 재전송·조회·취소 검증23 PASS. [배포 검증 기록](../operations/application-deployment-verification.md) 참조. 현재 모의 MVP 범위에서 Work #4/신청·이용권·결제 Agenda 완료 가능. 실제 Blaybus 변경은 사용자 수동이며 반영 확인 전이다. 임시 정책의 CEO 승인·Work #6 완료로 확대하지 않는다. 배포 브라우저 전체 흐름/실기기는 최종 통합 검증에 남긴다. 검증용 회차1·취소된 합성 신청1·실패/성공 모의 결제·보유1회권1이 남으며 실제 청구는 없다. 사용자 AGENTS.md/설정 변경을 보존한다.
 
 - **최종 코드 검증:** `7b90d31` CI [38935930868](https://github.com/InryeolChoi/SerenTable/actions/runs/38935930868) SUCCESS(API·오라클122, 브라우저10, 이미지·PG18 복구 포함). 계약 선행 브랜치를 병합한 `fb45188`은 동일 파일 트리다. 후속 기록 커밋 CI와 구분한다. 운영 공개 버전은 `6d707cb`, readiness·worker 정상으로 재확인했다. 다음은 PR #30/#31 사용자 검토·머지와 실제 배포 검증, 이후 미매칭 해결 정책 확정이다. Work #6은 진행 중을 유지한다.

@@ -107,7 +107,8 @@ export type Entitlement = {
   application_state: "DRAFT" | "SUBMITTED" | "CANCELED" | null;
   starts_at: string;
   expires_at: string | null;
-  state: "HELD" | "ACTIVE" | "EXPIRED";
+  used_at: string | null;
+  state: "HELD" | "USED" | "ACTIVE" | "EXPIRED";
   policy_version: string;
 };
 export type MatchingState =

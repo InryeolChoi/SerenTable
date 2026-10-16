@@ -73,7 +73,9 @@ p.product_kind, p.product_version, p.amount_krw, p.period_months, p.policy_versi
 p.simulated_failure, p.requested_at, p.completed_at"""
 ENTITLEMENT_COLUMNS = """e.id, e.user_id, e.payment_id, e.kind, e.application_id, e.starts_at,
 e.expires_at, e.policy_version, p.product_code,
-(SELECT a.state FROM application a WHERE a.id = e.application_id) AS application_state"""
+(SELECT a.state FROM application a WHERE a.id = e.application_id) AS application_state,
+(SELECT min(ta.created_at) FROM table_assignment ta
+ WHERE ta.application_id = e.application_id) AS used_at"""
 
 
 def payment_json(row):
@@ -100,7 +102,10 @@ def payment_json(row):
 
 def entitlement_json(row, now):
     if row["kind"] == "SINGLE":
-        state = "HELD"
+        # Assignments and confirmation commit together; rolled-back runs never consume
+        # a pass. Historical assignments remain even if a future reallocation ends them:
+        # ending an assignment must not silently restore a previously used right (U03).
+        state = "USED" if row["used_at"] is not None else "HELD"
     else:
         state = "ACTIVE" if now < row["expires_at"] else "EXPIRED"
     return {
@@ -114,6 +119,7 @@ def entitlement_json(row, now):
         "application_state": row["application_state"],
         "starts_at": iso(row["starts_at"]),
         "expires_at": iso(row["expires_at"]),
+        "used_at": iso(row["used_at"]),
         "state": state,
         "policy_version": row["policy_version"],
     }

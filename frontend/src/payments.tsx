@@ -275,6 +275,7 @@ export function paymentSummary(application: Application) {
 
 const entitlementStates: Record<Entitlement["state"], string> = {
   HELD: "보유 중",
+  USED: "사용 완료",
   ACTIVE: "이용 중",
   EXPIRED: "만료됨",
 };
@@ -302,7 +303,7 @@ export function MyEntitlements() {
               <p>
                 <strong>
                   {productNames[item.product_code]} ·{" "}
-                  {item.application_state === "CANCELED"
+                  {item.application_state === "CANCELED" && item.state === "HELD"
                     ? "취소된 신청에 묶여 보유"
                     : entitlementStates[item.state]}
                 </strong>
@@ -310,6 +311,8 @@ export function MyEntitlements() {
               <p className="small muted">
                 {item.kind === "MEMBERSHIP"
                   ? `시작 ${day.format(new Date(item.starts_at))} · 만료 ${day.format(new Date(item.expires_at!))} · 기간 내 참여 횟수 무제한`
+                  : item.state === "USED"
+                    ? `테이블 확정으로 사용 완료 · ${day.format(new Date(item.used_at!))}`
                   : item.application_state === "CANCELED"
                     ? "결제한 신청이 취소됨 · 자동 환불 아님 · 보관·재사용 규칙 미정"
                     : "결제한 신청에 보유 · 테이블 확정 시 사용 처리 예정 · 취소 시 보관·재사용 규칙 미정"}

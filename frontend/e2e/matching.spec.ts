@@ -105,6 +105,7 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
 
   const full = await createSlot(operator, 45 + Math.random(), "hongdae", closeInSeconds);
   const partial = await createSlot(operator, 52 + Math.random(), "gangnam", closeInSeconds);
+  const alternative = await createSlot(operator, 60 + Math.random(), "euljiro", 3600);
   for (const participant of participants) await submitAndPay(participant, full.id);
   // Only three applications here: fewer people than a table needs.
   for (const participant of participants.slice(0, 3))
@@ -119,6 +120,8 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
   const confirmed = mine.filter({ hasText: full.name });
   await expect(confirmed).toContainText("매칭: 매칭 확정 (CONFIRMED)");
   await expect(confirmed).toContainText("같은 테이블 4명");
+  const passes = participants[0].getByRole("list", { name: "내 이용권" });
+  await expect(passes.getByText("1회권 · 사용 완료", { exact: true })).toBeVisible();
   await expect(confirmed).toContainText("같은 식탁 소개:");
   for (const suffix of ["01", "02", "03", "04"])
     await expect(confirmed).toContainText(`매칭 식탁 ${suffix}`);
@@ -126,6 +129,11 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
   await expect(mine.filter({ hasText: partial.name })).toContainText(
     "매칭: 매칭 실패 (NO_MATCH) · 함께 앉을 인원이 부족합니다",
   );
+  const unseated = mine.filter({ hasText: partial.name });
+  await unseated.getByRole("button", { name: "다른 일정 확인" }).click();
+  const suggestions = unseated.getByRole("region", { name: "대체 일정" });
+  await expect(suggestions).toContainText(alternative.name);
+  await expect(suggestions).toContainText("조회만으로 일정이나 결제가 변경되지 않습니다");
   // Every seated participant sees the same confirmation.
   for (const participant of participants.slice(1)) {
     const rows = await openMyApplications(participant);
