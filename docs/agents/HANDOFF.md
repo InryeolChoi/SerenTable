@@ -41,7 +41,7 @@
 |---|---|---|
 | 첫 배포·CI·DB 연결 → 배포 안전장치·원격 작업 검증 | #16 / PR #20 | 사용자 머지 완료, 단 `codex/sync-foundation-tasks`에 머지됨. 원격·CI·readiness 검증 완료. Compute $10/$20 한도 설정 완료. 실제 Railway 백업·격리 복원 완료. 후속 PR #24 검토·머지 대기 |
 | 핵심 데이터·화면·보안 설계 → 핵심 ERD·상태·무결성 제약 설계 | #17 / PR #23 | 열린 PR. 문서·SVG/PNG 각3장·확대 뷰어와 생성 스크립트 제공. 최신 그림은 설계안이며 실제 DB 적용 아님 |
-| 같은 Work → 공통 UI·핵심 화면 흐름 설계 | #18 / PR #22 | 열린 PR. 흐름/합성 스케치 검토 완료. 로고 직접 미반영 확인, CTO 표지의 갈색·크림색/원형 6인 식탁과 현재 버건디/사각 식탁의 차이를 ui-brand-review.md에 기록. 브랜드 보완 필요 |
+| 같은 Work → 공통 UI·핵심 화면 흐름 설계 | #18 / PR #22 | **완료.** 사용자 머지 `eae10de`(2026-10-16T11:40:06Z, base `codex/sync-foundation-tasks`), Issue #18 수동 종료. 브랜드 보완(갈색·크림색·원형 식탁) 반영, CI 38889918153 PASS, 독립 Standards/Spec 0건. 최종 시각 승인·실제 기기 시험은 후속 기능 Work |
 | 같은 Work → 개인정보·권한·보안 검증 기준 정리 | #19 / PR #21 | 사용자 머지 완료, 위 공통 브랜치에 포함. 검증 기준 설계 완료이며 실제 제품 보안 시험과 구분 |
 
 PR #13(`codex/sync-foundation-tasks` → main)은 아직 열려 있다. PR #20/#21 머지를 main 배포로 해석하지 않는다. 부모 Work #2/#15나 Agenda 전체를 완료 처리하지 않았다. [상세 결과·Blaybus 복사 문구](../design/parallel-task-results.md)를 확인한다.
