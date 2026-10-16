@@ -42,9 +42,13 @@ test("운영자가 만든 회차를 참가자가 서울 시각으로 확인한�
     .getByLabel("매칭 예정", { exact: true })
     .fill(seoulLocal(days, 16, minute));
   await form.getByRole("button", { name: "회차 만들기" }).click();
-  await expect(operator.getByRole("status")).toContainText(
-    "을지로 회차를 만들었습니다",
-  );
+  // The list reload that follows shows its own role=status loading notice, so a
+  // page-wide status locator can resolve to two elements. Scope it to the confirmation.
+  await expect(
+    operator
+      .getByRole("status")
+      .filter({ hasText: "을지로 회차를 만들었습니다" }),
+  ).toBeVisible();
   const time = `19:${String(minute).padStart(2, "0")}`;
   const created = operator
     .getByRole("list", { name: "회차 목록" })
