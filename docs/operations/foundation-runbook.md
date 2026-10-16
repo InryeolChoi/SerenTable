@@ -156,3 +156,15 @@ docker compose exec -T postgres pg_restore -U serentable -d serentable_restore -
 초기 조회에서 꺼져 있던 API·worker의 `source.checkSuites`를 true로 활성화했다. 임시 검증 브랜치의 실패 CI는 두 배포 모두 SKIPPED, 정상 복구 CI는 두 배포 모두 SUCCESS였다. 두 서비스의 main 복구와 공개 상태 응답을 확인했다([실제 기록](./ci-gate-verification.md)). 후속 검증에서 모바일 지시→PR→CI 성공, API readiness 배포 healthcheck 보완, Hobby 플랜 백업 제약을 확인했다. Compute 비용 한도는 후속 검증에서 설정했다. 실제 Railway 데이터 백업·복원 상태는 최신 기록을 따른다([최신 Task 기록](./deployment-safety-verification.md)).
 
 worker Pre-deploy에 상시 실행 명령을 넣으면 종료를 기다리며 배포가 멈춘다. worker의 Pre-deploy는 비워 두고 Start Command에 `python -m serentable.worker`를 넣는다. 해당 위치 오류를 수정한 뒤 배포 `8cc2fc2a-b9a7-4026-9c66-11a1c33381c4`의 SUCCESS, 실행 replica 1개와 heartbeat를 확인했다. heartbeat 응답만으로 배포 성공을 판단하지 않는다.
+
+## 합성 계정 인증의 추가 실행 전제
+
+Work #3 구현 계약은 [계정·프로필 계약](../design/account-profile-contract.md)을 따른다. 현재 통합 브랜치의 구현·로컬 검증을 main 배포 완료로 해석하지 않는다.
+
+- 기존 PostgreSQL 연결과 `alembic upgrade head` 외에 `APP_ORIGIN`(정확한 공개 HTTPS origin), `AUTH_SIGNING_KEY`(별도 생성한 32자 이상 런타임 비밀)가 필요하다. production/Railway production에서는 설정 누락·HTTP를 인증 경계의 503으로 거절한다. heartbeat-only 복원과 liveness는 이 설정 없이도 시작 가능해야 한다.
+- 합성 계정은 `python -m serentable.seed_demo_accounts`를 승인된 DB에서 명시적으로 실행해 발급한다. `DEMO_PARTICIPANT_PASSWORD`, `DEMO_OPERATOR_PASSWORD`를 비밀 환경 변수로 전달하며 12~128자를 사용한다. 인수/URL/저장소/출력에 비밀번호를 넣지 않는다. 계정 ID는 participant-01~04와 operator다. 재실행은 기존 계정의 비밀번호를 바꾸지 않는다. 공개 가입·암호 복구 기능은 없다.
+- 테스트 코드의 합성 비밀번호·서명 키는 개발/CI 전용이다. 공개 배포의 기본 인증정보로 사용하지 않는다. 심사용 계정 전달과 런타임 비밀 설정은 별도다.
+- Railway의 HTTPS는 앞단 프록시에서 처리된다. [Railway 네트워크 명세](https://docs.railway.com/networking/public-networking/specs-and-limits)는 X-Forwarded-Proto 헤더를 설명하며, [FastAPI 지침](https://fastapi.tiangolo.com/advanced/behind-a-proxy/)과 [Uvicorn 설정](https://uvicorn.dev/settings/)에 따라 신뢰하는 프록시에서만 전달 헤더를 받아야 한다. `FORWARDED_ALLOW_IPS=*`를 근거 없이 설정하지 않는다. 실제 연결의 신뢰 경계·HTTPS 인식·Secure/HttpOnly/__Host- 쿠키와 공개 HTTP의 동작을 배포 환경에서 확인하기 전에는 배포 인증 검증 완료로 기록하지 않는다.
+- 2026-10-16 사용자 결정(방안 A): Railway는 프록시 CIDR을 공개하지 않으므로 uvicorn 신뢰 목록(`FORWARDED_ALLOW_IPS`)은 기본값을 유지한다. 대신 production 인증 경계는 `request.url.scheme` 또는 Railway 엣지가 항상 설정하는 `X-Forwarded-Proto: https` 하나만 HTTPS 근거로 인정한다(`serentable.auth.served_over_https`). `X-Forwarded-For` 등 접속 주소 헤더는 계속 신뢰하지 않으며 로그인 제한은 계정 단위다. 실제 진입점 `python -m serentable.server`를 신뢰 목록 밖 프록시 조건으로 띄운 회귀 시험이 있다.
+- 배포 후 공개 URL 검증: `DEPLOY_ORIGIN=https://<공개 도메인>`과 `DEMO_PARTICIPANT_PASSWORD`를 셸 환경에만 두고 `uv run python scripts/verify_deployed_auth.py`를 실행한다. HTTP→HTTPS 전환, `__Host-` Secure/HttpOnly/SameSite=Lax 쿠키, 외부 출처 거절, 로그인·세션·권한 거절·로그아웃, no-store를 PASS/FAIL로만 출력하고 비밀번호는 출력하지 않는다.
+- 현재 코드 검증은 로컬의 합성 계정과 분리 DB에서 수행한다. 실제 개인정보 모집·장기 보관/폐기 운영을 승인하거나 구현한 결과가 아니다.

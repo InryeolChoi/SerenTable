@@ -1,5 +1,19 @@
 # 핵심 ERD·상태·무결성 제약 설계
 
+## Work #3의 물리 스키마 적용 범위
+
+전체 ERD는 후속 기능까지 포함하는 설계도다. 통합 브랜치의 migration `0002_auth`·`0003_profile`이 적용하는 범위만 아래에 구분한다. main/운영 DB에 적용했다고 주장하지 않는다.
+
+| 물리 테이블 | 책임·관계·제약 |
+|---|---|
+| app_user | UUID PK, 고유 login_id, 비밀번호 해시, participant/operator 역할 CHECK, active |
+| auth_session | 세션 digest PK, app_user FK, 생성/만료/철회 시각 |
+| auth_login_limit | 로그인 식별 digest PK, 실패 횟수·제한 시간 창. 프로세스 재시작에도 유지 |
+| participant_profile | app_user FK이자 PK로 사용자당 초안 하나, 검증한 필드의 JSONB, updated_at |
+| consent_record | app_user FK, 목적 CHECK, 문서 버전·수락/철회·서버 기록 시각. 사용자 행 잠금으로 동시 재전송 직렬화, 같은 현재 상태의 중복 이력 방지 |
+
+필수 완성도·문자열·선택지 검증은 API가 책임진다. 초안 저장은 신청 자격을 부여하지 않는다. 타 참가자 공개 API는 현재 없으며 본인/운영자 권한으로만 조회한다. 승인 범위는 [ADR-0008](../adr/0008-demo-accounts-and-private-profile.md), 상세 계약은 [계정·프로필 계약](account-profile-contract.md)을 따른다. 아래 설계 Task의 검증·미구현 설명은 해당 설계 시점의 결과다.
+
 **Task:** 개발·배포 기반 확보 → 핵심 데이터·화면·보안 설계 → 핵심 ERD·상태·무결성 제약 설계
 
 **추적:** [Task #17](https://github.com/InryeolChoi/SerenTable/issues/17), [부모 Work #15](https://github.com/InryeolChoi/SerenTable/issues/15)

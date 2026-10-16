@@ -4,11 +4,15 @@
 
 ## 먼저 확인할 현재 상태
 
-- 저장소: https://github.com/InryeolChoi/SerenTable
-- 현재 주 작업 디렉터리: `/Users/inchoi/SerenTable`, 통합 브랜치 `codex/core-design-integration`. 공통 인계 문서 최초 커밋은 `a53ccc6`이고 루트 반영 커밋은 `d549f5f`이다. 이후 공통 기록 갱신 규칙을 보강했으며 문서 PR #13으로 전달한다. 실제 HEAD는 `git log`에서 확인한다.
-- 이 통합 브랜치에는 아직 main에 없는 설계 산출물이 있다. 새 clone에서 main만 열고 해당 산출물이 없다고 판단하지 않는다. 이 문서가 포함된 통합 브랜치나 요청받은 Task PR 브랜치를 사용한다.
-- **사용자 변경 보존:** 인계 작성 직전 루트 checkout에서 `docs/design/erd/index.html` 삭제와 `docs/design/erd/erd.html` 미추적 파일을 관찰했다. 파일명 변경으로 보이나 작성 의도는 확인하지 않았다. 이 변경을 복원·삭제·강제 stage하지 않았고 인계 문서 커밋에도 포함하지 않는다. ERD 링크를 수정할 Task에서 현재 파일과 사용자 의도를 확인한다.
-- 2026-10-16 사용자가 작업 재개를 요청했다. Git·GitHub·현재 배포 상태를 대조했다. 다음 대상은 기존 Work #2의 Task #16 미완료 항목이며 비용 한도 설정·업무 정책은 아직 결정하지 않았다. 사용자 ERD 파일명 변경을 보존한다.
+- **2026-10-16 11:42Z 사용자 머지:** PR #13(`c5c3f4e`)·#23(`0dbd563`)이 `main`에 머지됐다(PR #22는 `eae10de`로 공통 브랜치 경유). 아래 표·기록의 "PR #13/#23 열림" 서술은 이 시점 이전 상태다. Issue #17·Work #15 종료 여부는 GitHub에서 확인한다. 통합 브랜치에 `main`을 병합(내용 변경 없음)해 PR #25 충돌 표시를 해소했고 CI 38896894745 SUCCESS.
+- 저장소: https://github.com/InryeolChoi/SerenTable . 루트 통합 브랜치 `codex/core-design-integration`, 최신 HEAD는 실제 Git에서 확인한다. Draft PR [#25](https://github.com/InryeolChoi/SerenTable/pull/25)에 통합 결과를 전달한다. main 배포와 통합 브랜치를 구분한다.
+- 사용자 승인으로 ERD 뷰어를 `docs/design/erd/erd.html`로 정식 변경했다. 승인된 이름 변경 커밋 `9ef90d0`이며 미확인 사용자 변경으로 남아 있지 않다.
+- Work #2 후속 PR #24의 공통 브랜치 머지를 확인했다(merge `3869396`, 2026-10-16T10:44:14Z). 비용·백업·원격 검증 인수 완료. 공통 PR #13은 아직 main에 미머지다.
+- Work #15 ERD·UI 브랜드 보완은 통합 `9e3a1b1`에 반영했다. 고정 범위 `750bbb0...9e3a1b1` 독립 Standards/Spec 지적 각각 0건. PR #22/#23 개별 head에 결과를 동기화했고 CI 38889918153/38889907017 PASS. 제품 기능 시험과 구분한다.
+- 현재 실행: **참가 신청·이용권·결제 → 로그인·프로필·동의(Work #3)**. 사용자는 사전 발급 합성 계정만 제공, Instagram 필수 수집·타 참가자 비공개를 승인했다. [ADR-0008](../adr/0008-demo-accounts-and-private-profile.md)과 [API 계약](../design/account-profile-contract.md)을 따른다. 공개 가입·실제 개인정보 모집·미확정 보관 날짜는 추가하지 않는다.
+- **Work #3 세 구현 브랜치를 통합 브랜치에 모두 병합했다(2026-10-16, Claude Code 인수).** 인증 서버 `1061a09`, 프로필/동의 서버 `d97fb43`, 계정 화면 `codex/work3-account-ui`(Codex 미커밋 E2E를 검토·커밋한 `2e5bc2d` 포함). 화면 커밋에서 운영자 상세 버튼의 접근 가능한 이름이 Chromium에서 `상세 보기 : id`로 계산되던 문제를 명시적 `aria-label`로 고쳤다. 미저장 입력은 React 메모리 상태로만 유지하며 브라우저 저장소를 쓰지 않는다.
+- 통합 결과 로컬 검증(실제 PostgreSQL 18 테스트 전용 컨테이너 `serentable-work3-integration-pg18`, 포트 55437): `uv run pytest -q` 30 passed, ruff check/format PASS, 프런트 빌드 PASS, Playwright 4/4 PASS(모바일 Chromium 에뮬레이션: 로그인·권한 거절·로그아웃, 미완성/완성 프로필·목적별 동의 저장·새로고침 유지, 연결 실패·입력 오류·세션 철회 후 같은 계정 미저장 입력 유지와 타 계정 격리, 운영자 상세 360/390/1440px 잘림 없음). 실제 모바일 기기·배포 환경 검증, 독립 Standards/Spec 검토, CI는 아직 아니다. 통합 브랜치 push 여부는 GitHub에서 확인한다.
+- 구현 트리: `core-security/SerenTable`의 `codex/work3-auth-server`, `core-ui/SerenTable`의 `codex/work3-account-ui`, `foundation-safety/SerenTable`의 `codex/work3-profile-consent`. 공통 부모 경로는 `/Users/inchoi/.codex/worktrees/`다. 세 브랜치 모두 통합에 반영되어 미커밋 변경이 없다.
 
 ## 최신 주최 측 안내: 2026-10-16
 
@@ -38,7 +42,7 @@
 |---|---|---|
 | 첫 배포·CI·DB 연결 → 배포 안전장치·원격 작업 검증 | #16 / PR #20 | 사용자 머지 완료, 단 `codex/sync-foundation-tasks`에 머지됨. 원격·CI·readiness 검증 완료. Compute $10/$20 한도 설정 완료. 실제 Railway 백업·격리 복원 완료. 후속 PR #24 검토·머지 대기 |
 | 핵심 데이터·화면·보안 설계 → 핵심 ERD·상태·무결성 제약 설계 | #17 / PR #23 | 열린 PR. 문서·SVG/PNG 각3장·확대 뷰어와 생성 스크립트 제공. 최신 그림은 설계안이며 실제 DB 적용 아님 |
-| 같은 Work → 공통 UI·핵심 화면 흐름 설계 | #18 / PR #22 | 열린 PR. 흐름/합성 스케치 검토 완료. 로고 직접 미반영 확인, CTO 표지의 갈색·크림색/원형 6인 식탁과 현재 버건디/사각 식탁의 차이를 ui-brand-review.md에 기록. 브랜드 보완 필요 |
+| 같은 Work → 공통 UI·핵심 화면 흐름 설계 | #18 / PR #22 | **완료.** 사용자 머지 `eae10de`(2026-10-16T11:40:06Z, base `codex/sync-foundation-tasks`), Issue #18 수동 종료. 브랜드 보완(갈색·크림색·원형 식탁) 반영, CI 38889918153 PASS, 독립 Standards/Spec 0건. 최종 시각 승인·실제 기기 시험은 후속 기능 Work |
 | 같은 Work → 개인정보·권한·보안 검증 기준 정리 | #19 / PR #21 | 사용자 머지 완료, 위 공통 브랜치에 포함. 검증 기준 설계 완료이며 실제 제품 보안 시험과 구분 |
 
 PR #13(`codex/sync-foundation-tasks` → main)은 아직 열려 있다. PR #20/#21 머지를 main 배포로 해석하지 않는다. 부모 Work #2/#15나 Agenda 전체를 완료 처리하지 않았다. [상세 결과·Blaybus 복사 문구](../design/parallel-task-results.md)를 확인한다.
@@ -76,10 +80,12 @@ PR #13(`codex/sync-foundation-tasks` → main)은 아직 열려 있다. PR #20/#
 
 ## 다음 작업 순서
 
-1. 미커밋 ERD 파일명 변경과 현재 PR/브랜치 확인. 인계 준비 자체를 제품 진척으로 세지 않는다.
-2. Work #2의 비용 한도·실제 백업/복원 검증은 완료했다. PR #24 검토·머지 후 Task #16/Work #2 완료 상태와 Blaybus를 맞춘다. 명령 실행에 필요한 인증과 정책을 확인하고 기존 운영 DB 덮어쓰기로 시험하지 않는다.
-3. Work #15의 ERD 시각화 검토와 UI 브랜드 보완을 마친다. 원본 자료를 임의 공개하지 않고 로고 재현을 공식 원본으로 표시하지 않는다.
-4. 선행 조건을 확인한 뒤 Work #3 로그인·프로필·동의로 진행한다. U01 인증/계정, U02 필드/연령, U16 공개/보관 정책을 필요한 범위에서 결정한다.
+1. 현재 Git/PR과 활성 구현 작업 트리를 확인한다. 위 최신 상태가 아래 과거 진행 기록보다 우선한다.
+2. Work #3 통합·CI(38895117676 PASS)와 고정 범위 `9e3a1b1...8519f12` 독립 검토를 완료했다. Standards 확정 위반 0건(판단 사항: 테스트의 DB 직접 상태 준비, auth.py import 순서, 503 처리 중복, main.tsx 단일 파일 등은 마감 후 리팩터링 후보). Spec 지적 중 기능 결함 4건을 `codex/work3-review-fixes`(`73308e9`)에서 수정했다: CSRF 만료 시 새 토큰으로 1회 재시도, 인증·CSRF를 본문 검증 전에 판정(로그인 포함), 이전 스키마 프로필 행을 행 단위 `unreadable`로 보고, `KeyError`의 503 변환 제거(`DATABASE_URL` 누락은 전용 SQLAlchemy 예외). 각 수정의 회귀 시험이 수정 전 코드에서 실패함을 확인했다. pytest 32, Playwright 5/5 PASS.
+   - **사용자 결정 3건 반영(2026-10-16, ADR-0008 추가 결정):** 동의 이력은 서버 보존으로 충족(열람 API 없음), 해시 동시 처리 한도 초과는 503 `login_busy`+`Retry-After: 1`로 계정 잠금 429와 구분, `/api/me/profile`·`/api/me/consents`는 참가자 전용(운영자 403 `participant_required`). 브랜치 `codex/work3-policy-decisions`, 회귀 시험이 수정 전 코드에서 실패함을 확인. pytest 34, Playwright 6/6 PASS.
+   - Blaybus 위치 정정: Work #3은 Agenda **참가 신청·이용권·결제** 소속이다(개발·배포 기반 확보 아님). Task는 ① 수집 필드·권한·화면 구현, ② 필수값·접근 권한 검증. 검토·수정은 ②, 정책 결정 반영은 ①에 기록한다.
+3. (2026-10-16 Claude Code, Work #3 Task ② 진행 중 중단) 배포 인증 차단 요인: 운영 코드는 production에서 `request.url.scheme=="https"`를 요구하는데 `serentable.server`의 uvicorn은 기본 `FORWARDED_ALLOW_IPS=127.0.0.1`이라 Railway 프록시 뒤에서 scheme이 http로 보여 인증 경계가 전부 503이 된다. Railway는 프록시 CIDR을 공개하지 않는다(staff 답변). `X-Forwarded-Proto`를 직접 확인하는 방안과 `FORWARDED_ALLOW_IPS=*` 방안 중 사용자 결정 대기. Claude Code 세션의 Railway 운영 환경 읽기는 자동 승인 정책에서 거절되어 Railway 변수·서비스를 조회하지 않았다. Issue #4 Task ①을 ①-a 회차·지역 설정/①-b 일정 신청/①-c 이용권·모의 결제(U03·U04 선행)로 분할했다(사용자 승인). 인증 런타임 비밀과 합성 계정 seed를 배포 전에 구성·검증한다. 비밀번호/세션 값을 Git·로그에 넣지 않는다. 코드 통합만으로 배포 완료 처리하지 않는다.
+4. 이후 Work #4는 U03/U04 등 해당 사업 정책 선행을 확인한다. 합성 계정 승인으로 결제·환불·매칭 정책을 확정하지 않는다.
 
 ## 설정·접근은 어디에 두는가
 

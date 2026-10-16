@@ -3,6 +3,11 @@ from functools import lru_cache
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import SQLAlchemyError
+
+
+class DatabaseNotConfigured(SQLAlchemyError):
+    """DATABASE_URL is absent; handled like any other storage failure."""
 
 
 @lru_cache(maxsize=4)
@@ -15,4 +20,7 @@ def engine_for(url: str):
 
 
 def database_engine():
-    return engine_for(os.environ["DATABASE_URL"])
+    url = os.getenv("DATABASE_URL")
+    if not url:
+        raise DatabaseNotConfigured("DATABASE_URL is not set")
+    return engine_for(url)
