@@ -1,5 +1,12 @@
 import { expect, type Page } from "@playwright/test";
 
+// A screen can hold more than one live-region notice at the same time: a result
+// notice and the loading notice of the list reloading after it are both
+// role="status", and a panel below a page keeps its own error alongside the
+// page's. Playwright fails fast when a locator resolves to two elements, so
+// notice assertions narrow the locator by text (
+// getByRole("status").filter({ hasText: "..." })) or to the one region that holds
+// them, instead of asserting on the whole page.
 export const origin = "http://127.0.0.1:8000";
 export const participantPassword = "synthetic-participant-password";
 export const operatorPassword = "synthetic-operator-password";

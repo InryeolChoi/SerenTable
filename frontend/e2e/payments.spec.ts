@@ -100,20 +100,26 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
   await expect(mock).toContainText("결제 금액 9,900원");
   await mock.getByRole("checkbox", { name: /실패 시뮬레이션/ }).check();
   await mock.getByRole("button", { name: "모의 결제하기" }).click();
-  await expect(mock.getByRole("alert")).toContainText("결제 실패");
+  await expect(
+    mock.getByRole("alert").filter({ hasText: "결제 실패" }),
+  ).toBeVisible();
   await mock.getByRole("checkbox", { name: /실패 시뮬레이션/ }).uncheck();
   await mock.getByRole("radio", { name: /^멤버십 1개월/ }).check();
   await expect(mock).toContainText("결제 금액 35,000원");
   await mock.getByRole("button", { name: "모의 결제하기" }).click();
-  await expect(mock.getByRole("status")).toContainText("결제 완료");
+  await expect(
+    mock.getByRole("status").filter({ hasText: "결제 완료" }),
+  ).toBeVisible();
 
   // A second application inside the membership period needs no payment.
   await participant.getByRole("button", { name: "내 신청 보기" }).click();
   await applyFor(participant, second.name);
   await participant.getByRole("button", { name: "신청 제출" }).click();
-  await expect(participant.getByRole("status").first()).toContainText(
-    "보유한 멤버십으로 결제 없이",
-  );
+  await expect(
+    participant
+      .getByRole("status")
+      .filter({ hasText: "보유한 멤버십으로 결제 없이" }),
+  ).toBeVisible();
 
   await participant
     .getByRole("link", { name: "입력 상태", exact: true })
@@ -154,9 +160,11 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
   const later = await createSlot(operator, days + 45);
   await applyFor(participant, later.name);
   await participant.getByRole("button", { name: "신청 제출" }).click();
-  await expect(participant.getByRole("status").first()).toContainText(
-    "이용권 결제가 필요합니다",
-  );
+  await expect(
+    participant
+      .getByRole("status")
+      .filter({ hasText: "이용권 결제가 필요합니다" }),
+  ).toBeVisible();
   await participant
     .getByRole("link", { name: "입력 상태", exact: true })
     .click();
@@ -169,14 +177,18 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
   const payLater = participant.getByRole("region", { name: "모의 결제" });
   await payLater.getByRole("radio", { name: /^멤버십 1개월/ }).check();
   await payLater.getByRole("button", { name: "모의 결제하기" }).click();
-  await expect(payLater.getByRole("alert")).toContainText(
-    "후보 회차가 시작되기 전에 끝납니다",
-  );
+  await expect(
+    payLater
+      .getByRole("alert")
+      .filter({ hasText: "후보 회차가 시작되기 전에 끝납니다" }),
+  ).toBeVisible();
   // A single pass paid for an application that is then canceled stays held, tied to
   // the canceled application.
   await payLater.getByRole("radio", { name: /^1회권/ }).check();
   await payLater.getByRole("button", { name: "모의 결제하기" }).click();
-  await expect(payLater.getByRole("status")).toContainText("결제 완료");
+  await expect(
+    payLater.getByRole("status").filter({ hasText: "결제 완료" }),
+  ).toBeVisible();
   await participant.getByRole("button", { name: "내 신청 보기" }).click();
   await pending.getByRole("button", { name: "신청 취소" }).click();
   await expect(pending).toContainText("신청: 신청 취소됨");
