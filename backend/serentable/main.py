@@ -10,9 +10,11 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from serentable.auth import router as auth_router
 from serentable.database import database_engine
+from serentable.profile import router as profile_router
 
 app = FastAPI(title="SerenTable", docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(auth_router)
+app.include_router(profile_router)
 
 
 @app.exception_handler(RequestValidationError)
