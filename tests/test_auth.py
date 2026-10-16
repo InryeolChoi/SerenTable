@@ -468,3 +468,63 @@ def test_login_busy_is_distinct_from_account_limit(client):
     assert busy.headers["cache-control"] == "no-store"
     assert client.get("/api/auth/me").status_code == 401
     assert sign_in(client).status_code == 200
+
+
+def test_production_entrypoint_accepts_edge_https_without_trusting_proxy_ip(seeded_accounts):
+    import socket
+    import time
+
+    import httpx
+
+    with socket.socket() as reserved:
+        reserved.bind(("127.0.0.1", 0))
+        port = reserved.getsockname()[1]
+    base = f"http://127.0.0.1:{port}"
+    environment = {
+        **os.environ,
+        "PORT": str(port),
+        "APP_ENV": "production",
+        "APP_ORIGIN": "https://edge.example",
+        # Emulate Railway: the proxy peer is not in uvicorn's trusted list.
+        "FORWARDED_ALLOW_IPS": "192.0.2.1",
+    }
+    process = subprocess.Popen(
+        [sys.executable, "-m", "serentable.server"],
+        env=environment,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        deadline = time.monotonic() + 10
+        while True:
+            try:
+                if httpx.get(base + "/api/health").status_code == 200:
+                    break
+            except httpx.TransportError:
+                pass
+            if process.poll() is not None or time.monotonic() > deadline:
+                pytest.fail("production_entrypoint_not_ready")
+            time.sleep(0.05)
+        assert httpx.get(base + "/api/auth/csrf").status_code == 503
+        edge = {"X-Forwarded-Proto": "https"}
+        bootstrap = httpx.get(base + "/api/auth/csrf", headers=edge)
+        assert bootstrap.status_code == 200
+        nonce = bootstrap.cookies["__Host-serentable_csrf"]
+        assert "Secure" in bootstrap.headers["set-cookie"]
+        login = httpx.post(
+            base + "/api/auth/login",
+            headers={
+                **edge,
+                "Origin": "https://edge.example",
+                "X-CSRF-Token": bootstrap.json()["csrf_token"],
+                "Cookie": f"__Host-serentable_csrf={nonce}",
+            },
+            json={"login_id": "participant-01", "password": PARTICIPANT_PASSWORD},
+        )
+        assert login.status_code == 200
+        assert login.json()["user"]["login_id"] == "participant-01"
+        spoofed = {"X-Forwarded-Proto": "http", "X-Forwarded-For": "203.0.113.9"}
+        assert httpx.get(base + "/api/auth/csrf", headers=spoofed).status_code == 503
+    finally:
+        process.terminate()
+        process.wait(timeout=5)
