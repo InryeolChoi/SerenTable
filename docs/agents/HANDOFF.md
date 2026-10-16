@@ -4,6 +4,8 @@
 
 ## 먼저 확인할 현재 상태
 
+- **2026-10-17 PR #31 배포·신청/모의 결제 인수 완료:** main `93195f6`, CI38937665767 SUCCESS. API/worker 배포 SUCCESS·replica 각1, 공개 버전 일치·readiness/worker 정상. 컨테이너 환경의 비밀번호를 내보내지 않고 공개 HTTPS로 운영자/참가자 로그인·회차·신청·실패/성공 모의 결제·멱등 재전송·조회·취소 검증23 PASS. [배포 검증 기록](../operations/application-deployment-verification.md) 참조. 현재 모의 MVP 범위에서 Work #4/신청·이용권·결제 Agenda 완료 가능. 실제 Blaybus 변경은 사용자 수동이며 반영 확인 전이다. 임시 정책의 CEO 승인·Work #6 완료로 확대하지 않는다. 배포 브라우저 전체 흐름/실기기는 최종 통합 검증에 남긴다. 검증용 회차1·취소된 합성 신청1·실패/성공 모의 결제·보유1회권1이 남으며 실제 청구는 없다. 사용자 AGENTS.md/설정 변경을 보존한다.
+
 - **최종 코드 검증:** `7b90d31` CI [38935930868](https://github.com/InryeolChoi/SerenTable/actions/runs/38935930868) SUCCESS(API·오라클122, 브라우저10, 이미지·PG18 복구 포함). 계약 선행 브랜치를 병합한 `fb45188`은 동일 파일 트리다. 후속 기록 커밋 CI와 구분한다. 운영 공개 버전은 `6d707cb`, readiness·worker 정상으로 재확인했다. 다음은 PR #30/#31 사용자 검토·머지와 실제 배포 검증, 이후 미매칭 해결 정책 확정이다. Work #6은 진행 중을 유지한다.
 
 - **2026-10-17 Codex 재개·구현 검토:** `codex/work6-matching-runner`에서 기존 PR #31을 보완한다. 사용자 AGENTS.md/미추적 설정·스크립트를 보존했다. [검토·수정·검증·Blaybus 기록](../design/implementation-review-2026-10-17.md)을 우선 확인한다. 아래 그리디 제한·파일명 순서 우회·소개 미구현 설명은 후속 수정으로 대체된다. `73acf66` pytest121/브라우저10 통과, 후속 FK 교착 회귀2건도 수정 후 통과. 최종 head CI는 PR #31에서 확인한다. Work #6은 미완료이며 CEO의 U03/U04 답변은 아직 없다는 사용자 확인을 받았다. 새 운영 배포·실기기·100명 DB 검증은 수행하지 않았다.
