@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from serentable.applications import router as applications_router
 from serentable.auth import router as auth_router
 from serentable.database import database_engine
 from serentable.events import router as events_router
@@ -17,6 +18,7 @@ app = FastAPI(title="SerenTable", docs_url=None, redoc_url=None, openapi_url=Non
 app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(events_router)
+app.include_router(applications_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -98,6 +100,9 @@ if (WEB_ROOT / "assets").is_dir():
 @app.get("/admin", include_in_schema=False)
 @app.get("/admin/events", include_in_schema=False)
 @app.get("/participant/events", include_in_schema=False)
+@app.get("/participant/apply", include_in_schema=False)
+@app.get("/participant/apply/review", include_in_schema=False)
+@app.get("/admin/applications", include_in_schema=False)
 def web_shell():
     if not (WEB_ROOT / "index.html").is_file():
         raise HTTPException(status_code=503, detail="web_build_unavailable")

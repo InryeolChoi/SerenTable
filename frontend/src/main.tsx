@@ -19,6 +19,11 @@ import {
   type ParticipantDetail,
 } from "./api";
 import { AdminEventsPage, ParticipantEventsPage } from "./events";
+import {
+  AdminApplicationsPage,
+  ApplyPage,
+  MyApplications,
+} from "./applications";
 import symbol from "./chance-table-symbol.svg";
 import { message, Notice, useScopedApi } from "./ui";
 import "./style.css";
@@ -563,8 +568,9 @@ function ParticipantHome({ navigate }: { navigate: (path: string) => void }) {
           동의 내용 확인
         </button>
       </div>
+      <MyApplications navigate={navigate} />
       <p className="notice">
-        참가 신청·결제는 다음 개발 단계에서 제공합니다. 입력 완료는 참가 확정이
+        이용권·결제는 다음 개발 단계에서 제공합니다. 신청 제출은 참가 확정이
         아닙니다.
       </p>
     </section>
@@ -888,6 +894,17 @@ function App() {
                 회차 관리
               </a>
             )}
+            {user.role === "operator" && (
+              <a
+                href="/admin/applications"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate("/admin/applications");
+                }}
+              >
+                신청 현황
+              </a>
+            )}
             {user.role === "participant" && (
               <>
                 <a
@@ -898,6 +915,15 @@ function App() {
                   }}
                 >
                   모집 회차
+                </a>
+                <a
+                  href="/participant/apply"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate("/participant/apply");
+                  }}
+                >
+                  일정 신청
                 </a>
                 <a
                   href="/participant/profile"
@@ -943,9 +969,14 @@ function App() {
           ) : user.role === "operator" ? (
             path === "/admin/events" ? (
               <AdminEventsPage />
+            ) : path === "/admin/applications" ? (
+              <AdminApplicationsPage />
             ) : (
               <AdminPage />
             )
+          ) : path === "/participant/apply" ||
+            path === "/participant/apply/review" ? (
+            <ApplyPage path={path} navigate={navigate} />
           ) : path === "/participant/events" ? (
             <ParticipantEventsPage />
           ) : path === "/participant/profile" ? (

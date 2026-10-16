@@ -70,6 +70,14 @@ export type EventSlot = {
   capacity: number;
   recruiting: boolean;
 };
+export type Application = {
+  id: string;
+  state: "DRAFT" | "SUBMITTED" | "CANCELED";
+  submitted_at: string | null;
+  canceled_at: string | null;
+  candidates: EventSlot[];
+  participant?: { id: string; login_id: string };
+};
 let csrfToken: string | null = null;
 export class ApiError extends Error {
   constructor(
@@ -100,6 +108,7 @@ const fieldNames: Record<string, string> = {
   closes_at: "신청 마감",
   matches_at: "매칭 예정",
   capacity: "정원",
+  event_slot_ids: "후보 회차",
 };
 function validationMessage(status: number, detail: unknown) {
   if (status === 422 && Array.isArray(detail)) {

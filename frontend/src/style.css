@@ -267,6 +267,16 @@ dd {
 .participants p {
   margin: 6px 0 12px;
 }
+.participants .candidates {
+  list-style: none;
+  padding: 0 0 0 12px;
+  margin: 0 0 12px;
+  border-left: 2px solid #d7c6af;
+}
+.participants .candidates li {
+  border: 0;
+  padding: 6px 0;
+}
 .detail-list > div {
   margin: 14px 0;
   padding-bottom: 10px;
