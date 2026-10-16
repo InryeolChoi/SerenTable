@@ -4,11 +4,13 @@
 
 ## 먼저 확인할 현재 상태
 
-- 저장소: https://github.com/InryeolChoi/SerenTable
-- 현재 주 작업 디렉터리: `/Users/inchoi/SerenTable`, 통합 브랜치 `codex/core-design-integration`. 공통 인계 문서 최초 커밋은 `a53ccc6`이고 루트 반영 커밋은 `d549f5f`이다. 이후 공통 기록 갱신 규칙을 보강했으며 문서 PR #13으로 전달한다. 실제 HEAD는 `git log`에서 확인한다.
-- 이 통합 브랜치에는 아직 main에 없는 설계 산출물이 있다. 새 clone에서 main만 열고 해당 산출물이 없다고 판단하지 않는다. 이 문서가 포함된 통합 브랜치나 요청받은 Task PR 브랜치를 사용한다.
-- **사용자 변경 보존:** 인계 작성 직전 루트 checkout에서 `docs/design/erd/index.html` 삭제와 `docs/design/erd/erd.html` 미추적 파일을 관찰했다. 파일명 변경으로 보이나 작성 의도는 확인하지 않았다. 이 변경을 복원·삭제·강제 stage하지 않았고 인계 문서 커밋에도 포함하지 않는다. ERD 링크를 수정할 Task에서 현재 파일과 사용자 의도를 확인한다.
-- 2026-10-16 사용자가 작업 재개를 요청했다. Git·GitHub·현재 배포 상태를 대조했다. 다음 대상은 기존 Work #2의 Task #16 미완료 항목이며 비용 한도 설정·업무 정책은 아직 결정하지 않았다. 사용자 ERD 파일명 변경을 보존한다.
+- 저장소: https://github.com/InryeolChoi/SerenTable . 루트 통합 브랜치 `codex/core-design-integration`, 최신 HEAD는 실제 Git에서 확인한다. Draft PR [#25](https://github.com/InryeolChoi/SerenTable/pull/25)에 통합 결과를 전달한다. main 배포와 통합 브랜치를 구분한다.
+- 사용자 승인으로 ERD 뷰어를 `docs/design/erd/erd.html`로 정식 변경했다. 승인된 이름 변경 커밋 `9ef90d0`이며 미확인 사용자 변경으로 남아 있지 않다.
+- Work #2 후속 PR #24의 공통 브랜치 머지를 확인했다(merge `3869396`, 2026-10-16T10:44:14Z). 비용·백업·원격 검증 인수 완료. 공통 PR #13은 아직 main에 미머지다.
+- Work #15 ERD·UI 브랜드 보완은 통합 `9e3a1b1`에 반영했다. 고정 범위 `750bbb0...9e3a1b1` 독립 Standards/Spec 지적 각각 0건. PR #22/#23 개별 head에 결과를 동기화했고 CI 38889918153/38889907017 PASS. 제품 기능 시험과 구분한다.
+- 현재 실행: **참가 신청·이용권·결제 → 로그인·프로필·동의(Work #3)**. 사용자는 사전 발급 합성 계정만 제공, Instagram 필수 수집·타 참가자 비공개를 승인했다. [ADR-0008](../adr/0008-demo-accounts-and-private-profile.md)과 [API 계약](../design/account-profile-contract.md)을 따른다. 공개 가입·실제 개인정보 모집·미확정 보관 날짜는 추가하지 않는다.
+- 별도 작업 트리에서 인증 서버·화면·프로필/동의 서버를 병렬 구현 중이다. 인증의 첫 실제 PostgreSQL HTTP 2개 검증 slice `5826964`만 통합 `c016a00`에 반영했다. 전체 인증/보안/브라우저 E2E 완료가 아니다.
+- 구현 트리: `core-security/SerenTable`의 `codex/work3-auth-server`, `core-ui/SerenTable`의 `codex/work3-account-ui`, `foundation-safety/SerenTable`의 `codex/work3-profile-consent`. 공통 부모 경로는 `/Users/inchoi/.codex/worktrees/`다. 서로 checkout을 수정하지 않는다. 진행 중인 에이전트 결과·미커밋 변경을 보존한다.
 
 ## 최신 주최 측 안내: 2026-10-16
 
@@ -76,10 +78,10 @@ PR #13(`codex/sync-foundation-tasks` → main)은 아직 열려 있다. PR #20/#
 
 ## 다음 작업 순서
 
-1. 미커밋 ERD 파일명 변경과 현재 PR/브랜치 확인. 인계 준비 자체를 제품 진척으로 세지 않는다.
-2. Work #2의 비용 한도·실제 백업/복원 검증은 완료했다. PR #24 검토·머지 후 Task #16/Work #2 완료 상태와 Blaybus를 맞춘다. 명령 실행에 필요한 인증과 정책을 확인하고 기존 운영 DB 덮어쓰기로 시험하지 않는다.
-3. Work #15의 ERD 시각화 검토와 UI 브랜드 보완을 마친다. 원본 자료를 임의 공개하지 않고 로고 재현을 공식 원본으로 표시하지 않는다.
-4. 선행 조건을 확인한 뒤 Work #3 로그인·프로필·동의로 진행한다. U01 인증/계정, U02 필드/연령, U16 공개/보관 정책을 필요한 범위에서 결정한다.
+1. 현재 Git/PR과 활성 구현 작업 트리를 확인한다. 위 최신 상태가 아래 과거 진행 기록보다 우선한다.
+2. 인증 보강·프로필/동의·화면 결과를 병합 전담 에이전트로 통합한다. 실제 PostgreSQL HTTP·브라우저 E2E와 독립 검토를 마친 뒤 Work #3 인수 상태를 갱신한다.
+3. 인증 런타임 비밀과 합성 계정 seed를 배포 전에 구성·검증한다. 비밀번호/세션 값을 Git·로그에 넣지 않는다. 코드 통합만으로 배포 완료 처리하지 않는다.
+4. 이후 Work #4는 U03/U04 등 해당 사업 정책 선행을 확인한다. 합성 계정 승인으로 결제·환불·매칭 정책을 확정하지 않는다.
 
 ## 설정·접근은 어디에 두는가
 
