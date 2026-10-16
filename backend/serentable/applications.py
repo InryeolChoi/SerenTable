@@ -18,6 +18,7 @@ from serentable.clock import iso, locked_now
 from serentable.database import database_engine
 from serentable.eligibility import eligible_slot_ids
 from serentable.events import SLOT_COLUMNS, field_error, slot_json
+from serentable.matching import participation_details
 from serentable.payments import payment_details
 from serentable.profile import consent_state, profile_state, read_profile
 
@@ -56,6 +57,7 @@ def applications_json(connection, rows, now, with_participant=False):
             candidates.setdefault(slot["application_id"], []).append(slot_json(slot, now))
     payments = payment_details(connection, rows, now)
     eligible = eligible_slot_ids(connection, ids, now)
+    matching = participation_details(connection, ids)
     return [
         {
             "id": str(row["id"]),
@@ -64,6 +66,9 @@ def applications_json(connection, rows, now, with_participant=False):
             "canceled_at": iso(row["canceled_at"]),
             "candidates": candidates.get(row["id"], []),
             "matching_eligible_slot_ids": eligible[row["id"]],
+            # The stored matching axis, or null when no run has reached this application
+            # yet; the screen then derives "waiting" from eligibility as before.
+            "matching": matching[row["id"]],
         }
         | payments[row["id"]]
         | (
@@ -137,11 +142,14 @@ def submit_application(
                 raise HTTPException(409, "consent_incomplete")
             # FOR SHARE lets a later close/match step that locks the slot order itself after us.
             open_slots = connection.execute(
-                text("""SELECT id FROM event_slot
-                WHERE id = ANY(:ids) AND closes_at > :now FOR SHARE"""),
+                text("""SELECT id, closes_at FROM event_slot
+                WHERE id = ANY(:ids) FOR SHARE"""),
                 {"ids": payload.event_slot_ids, "now": now},
             ).all()
-            if len(open_slots) != len(payload.event_slot_ids):
+            now = locked_now(connection)
+            if len(open_slots) != len(payload.event_slot_ids) or any(
+                slot.closes_at <= now for slot in open_slots
+            ):
                 raise field_error("event_slot_ids", "slot_not_recruiting")
             if connection.execute(
                 text("""SELECT 1 FROM application_candidate
@@ -196,7 +204,7 @@ def cancel_application(
             # Another participant's id is indistinguishable from a missing one.
             state = connection.execute(
                 text("""SELECT state FROM application
-                WHERE id = :id AND user_id = :user_id FOR UPDATE"""),
+                WHERE id = :id AND user_id = :user_id FOR NO KEY UPDATE"""),
                 {"id": application_id, "user_id": user.id},
             ).scalar()
             if state is None:
@@ -211,6 +219,8 @@ def cancel_application(
                         {"id": application_id},
                     ).scalars()
                 )
+                # Matching may have held this slot until after the deadline.
+                now = locked_now(connection)
                 if earliest_close <= now:
                     raise HTTPException(409, "application_cancel_closed")
                 connection.execute(

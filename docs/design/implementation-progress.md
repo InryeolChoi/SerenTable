@@ -1,5 +1,7 @@
 # MVP 구현 분류 및 실행 기록
 
+**2026-10-17 후속 검토:** 기존 PR #31에서 인원 최대화·마감 판정·취소/결제·실패 기록·외래키 교착 및 E2E 순서 의존성을 재현·수정하고 확정 테이블 표시명 소개를 연결했다. [검토 기록](implementation-review-2026-10-17.md)에 기준 커밋·환경·결과·Blaybus 문구·미완료를 구분한다. 전체 Work #6 완료나 새 운영 배포로 해석하지 않는다.
+
 기준: 2026-10-15, Asia/Seoul. 사용자가 `implement-spec`으로 현재 구현 가능한 작업의 분류와 실행을 요청했다. 앞선 10/16 시작 계획보다 최신 구현 시작 요청을 우선한다. 기본 순서는 Agenda → Work → Task를 유지한다.
 
 ## 작업 위치와 브랜치
@@ -19,7 +21,7 @@
 | #3 로그인·프로필·동의 | 구현 중 | 합성 계정·Instagram 필수/비공개 승인. 인증·UI·프로필/동의 별도 트리 병렬 구현, 최종 E2E·보안·배포 미완료 |
 | #4 일정 신청·이용권·모의 결제 | 대기 | #3, 모의 구독·환불·취소 정책 U03/U04 필요 |
 | #5 규칙·데이터·정답 기준 | 정책 결정 필요 | 정책 검토는 먼저 가능하나 새 DB 시드 Task는 #4 업무 스키마가 필요. 기본 순서도 #4 다음. U05~U09/U14/U17/U19 확정 필요 |
-| #6 예약 매칭·재배치·실패 해결 | 대기 | #4/#5, 상태 경쟁·재시도·확정 후 취소 범위 필요 |
+| #6 예약 매칭·재배치·실패 해결 | 진행 중 | ①-a 계약 승인·①-b 자동 실행기 완료(아래 Work #6 절). ①-c 미매칭 대안·이동/보관/환불, U05 점수, 100명 규모(U19) 필요 |
 | #7 식당·채팅·알림 | 대기 | #6, 음식/가격 검증·채팅/푸시·재시도 기준과 실제 기기 확인 필요 |
 | #8 참석·피드백·다음 추천 | 대기 | #7, 피드백·신고·체크인·공개/보관 정책 필요 |
 | #9 운영자 예외·안전 종합 관리 | 대기 | #8. 기본 권한·운영 설정·예외 처리는 이전 기능 Work와 함께 구현 |
@@ -130,7 +132,7 @@ Work #4 `일정 신청·이용권·모의 결제`(Agenda `참가 신청·이용�
 - pytest **105 passed**, ruff check/format(CI 범위 `backend tests migrations`) PASS, 프런트 빌드 PASS.
 - Playwright 전체 스위트 **9/9 PASS**(3회 개별 실행). 브라우저는 모바일 Chromium 에뮬레이션이며 실제 기기·배포 환경 검증이 아니다.
 - CI: PR #27 head `f24ba46` [38915264719](https://github.com/InryeolChoi/SerenTable/actions/runs/38915264719), `c62a6ed` [38916165226](https://github.com/InryeolChoi/SerenTable/actions/runs/38916165226) SUCCESS.
-- **미완료:** 배포 환경 브라우저 E2E(데모 계정 자격 증명이 세션에 없음), U03/U04 정책 확정, 매칭 실행기 회차 `FOR UPDATE` 선행 조건.
+- **미완료:** 배포 환경 브라우저 E2E(데모 계정 자격 증명이 세션에 없음), U03/U04 정책 확정. 매칭 실행기의 회차 `FOR UPDATE` 선행 조건은 Work #6 ①-b에서 충족했다(아래 Work #6 절).
 
 ### Blaybus에 반영할 Task 기록
 
@@ -185,3 +187,48 @@ Work #4 `일정 신청·이용권·모의 결제`(Agenda `참가 신청·이용�
 ### Work #4 상태 판단
 
 Work #4의 하위 다섯 Task는 위 문구대로 모두 완료로 바꿀 수 있다. 다만 Work 자체는 완료로 바꾸지 않기를 요청한다. U03/U04 정책 확정(CEO 답변 대기)과 배포 환경 브라우저 확인이 남아 있고, 후보 간 배정 규칙·회차 수정·취소는 후속 Work의 선행 조건이기 때문이다. Issue [#4](https://github.com/InryeolChoi/SerenTable/issues/4)의 체크박스와 Blaybus 상태는 사용자가 갱신한다(이 기록 시점에 아직 반영하지 않았다).
+
+## Work #6 구현과 검증 결과
+
+Work #6 `예약 매칭·재배치·실패 해결`(Agenda `자동 매칭·실패 해결`, GitHub Issue [#6](https://github.com/InryeolChoi/SerenTable/issues/6))의 진행 결과다. 등록된 두 Task 중 `자동 실행·확정·대안·이동/환불 구현`의 **앞부분만** 끝났고 두 Task 모두 완료가 아니다.
+
+작업 분할은 사용자가 2026-10-17 승인한 계약([PR #30](https://github.com/InryeolChoi/SerenTable/pull/30), `docs/design/matching-contract.md`)을 따른다: ①-a 계약 → ①-b 자동 실행기 → ①-c 미매칭 대안·이동/보관/환불 → ② 신뢰성 검증. 계약이 승인한 결정은 **하드 제약만 사용**(테이블 4~6명·전원 결제·회차 동의·출생연도 차 ≤ 8·제외 쌍 없음·정원), **앉는 인원 최대화 후 제출 순서 tie-break**(U06 — 점수·성별 비율·MBTI는 U05 확정 전까지 쓰지 않음), **신청당 살아 있는 배치 하나·회차는 `matches_at` 오름차순·이미 다른 회차에서 확정된 신청 제외**(U07)다. 점수·재배치·환불은 이 범위에서 확정하지 않았다.
+
+검증 경계: 아래 수치는 로컬 실제 PostgreSQL 17 테스트 전용 컨테이너(`serentable-foundation-pg`, 127.0.0.1:55432)에서 확인한 값이며 CI(`.github/workflows/ci.yml` verify job)가 같은 명령을 수행한다. Playwright는 webServer가 실행 전 스키마를 재생성하고 `--repeat-each`는 쓰지 않는다(초기화가 실행당 1회라 상태 의존 스펙에서 거짓 실패가 난다).
+
+- ①-b 구현: `backend/serentable/matching.py`(하드 제약 플래너, 회차별 트랜잭션 실행기, 읽기 전용 운영자 이력), `migrations/versions/0007_matching.py`(`match_run`·`dining_table`·`table_assignment`·`match_run_member`·`match_participation`, `UNIQUE(event_slot_id, attempt)`·회차 `RUNNING` 부분 유니크·신청 살아 있는 배치 부분 유니크), `worker.py` 루프가 유일한 트리거(MAT-01: 공개 트리거·운영자 시작 없음), 참가자·운영자 화면에 저장된 매칭 축과 이력 표시.
+- 신뢰성 동작: 회차 행 `FOR UPDATE` 후 **잠금 뒤 DB 시계**로 판정, 중단된 RUNNING 세대는 `stale_generation`으로 ABANDONED 후 attempt 2로 재개, 동시 실행 2개는 정확히 1개만 실행, 확정은 ①-b에서 최종이며 뒤 실행이 덮어쓰지 않음(U13 미결정), 매칭 축은 `match_participation`에 저장하고 `application.state`는 바꾸지 않음.
+- pytest **115 passed**(신규 `tests/test_matching_runner.py` 10건 포함, 이전 105건 회귀 없음), ruff check/format(CI 범위 `backend tests migrations`) PASS, `npm run build` PASS, 마이그레이션 0007 up/down 왕복 확인.
+- 독립 정답 대조: 같은 입력에서 플래너의 `seated_count`가 `tests/oracle/hard_constraints.py`의 `max_seatable()`과 정확히 같고 `validate_assignment()` 위반 0건, 같은 입력은 항상 같은 테이블이다(실행기는 오라클을 import하지 않는다).
+- 실행기 실측(실제 PostgreSQL HTTP 경계): 결제 4명 → 테이블 1개·확정 4명, 미결제·3명 → `not_enough_eligible`, 1980년생 + 1994~96년생 → `age_gap`, 여러 회차 신청 → 가장 이른 회차 1곳에만 배치, 재실행 무시, 중단 세대 → attempt 2, 동시 실행 → 1건.
+- Playwright 전체 스위트 **10/10 PASS**(실행기 로그 `worker_matching_ok runs=2`). 브라우저는 모바일 Chromium 에뮬레이션이며 실제 기기·배포 환경 검증이 아니다.
+- CI: PR #31 head `d15cd78` [38929034129](https://github.com/InryeolChoi/SerenTable/actions/runs/38929034129) **SUCCESS**.
+- 전체 스위트 첫 실행의 `payments.spec.ts:147` 실패는 원인을 실측으로 확인했다(실행 로그 `resolved to 3 elements`): 같은 DB를 공유하는데 이 스펙이 participant-03의 1회권을 2장 사서 이용권이 1→3으로 늘었다. 제품·테스트 로직은 바꾸지 않고 스펙 파일명을 `frontend/e2e/reserved-matching.spec.ts`로 바꿔 participant-03의 개수를 절대값으로 단언하는 `payments.spec.ts` 뒤에 실행되게 하고 이유를 파일에 적었다.
+- **미완료:** Task ①-c(미매칭 대안·이동/보관/환불), U05 점수 도입, 실행 규모(U19·100명) 성능, 배포 환경 실행기 동작·브라우저 E2E(데모 자격 증명 없음), 계약 문서 76행 `UNIQUE(application_id)` → `WHERE ended_at IS NULL` 부분 유니크 문장 정정(PR #30 머지 후), ② 신뢰성 검증 Task.
+
+### Blaybus에 반영할 Task 기록
+
+Work #6의 두 Task 위치는 `자동 매칭·실패 해결 > 예약 매칭·재배치·실패 해결`이다. 아래 문구는 **부분 완료 보고**이며 Task를 완료로 바꾸지 않기를 요청한다. 실제 투입 시간은 사용자가 기록한다.
+
+**Task: 자동 실행·확정·대안·이동/환불 구현 — 진행 중(부분 완료)**
+
+```text
+수행 내용: 승인된 매칭 계약(PR #30)의 앞부분을 실행했습니다. 매칭을 시작하는 공개 API도 운영자 시작 버튼도 없이 별도 실행기 루프만이 마감된 회차를 확정하도록 했고(MAT-01), 하드 제약(테이블 4~6명·전원 결제 완료·회차 동의·출생연도 차 8 이하·제외 쌍 없음·정원)만으로 앉는 인원을 최대화한 뒤 제출 순서로 tie-break하게 했습니다. 한 신청의 살아 있는 테이블 배치는 하나로 제한하고(DB 부분 유니크 인덱스) 회차는 매칭 예정 시각 오름차순으로 처리해 여러 후보 회차를 낸 신청은 가장 이른 회차에서만 앉습니다. 회차별 한 트랜잭션, 회차 행 FOR UPDATE 후 잠금 뒤 DB 시계 판정, 중단된 실행 세대 정리 후 재개, 동시 실행 1건 보장을 구현했고, 참가자 "내 신청"과 운영자 "신청 현황"에 저장된 매칭 상태·이유·실행 이력을 읽기 전용으로 표시했습니다. 마이그레이션 0007_matching을 추가했습니다.
+검증 결과: 실제 PostgreSQL에서 pytest 115 passed(신규 매칭 10건 포함, 이전 105건 회귀 없음), ruff check/format PASS, 프런트 빌드 PASS, Playwright 전체 스위트 10/10 PASS, 마이그레이션 up/down 왕복 확인. 같은 작은 입력에서 배정 인원이 독립 정답 검증기 tests/oracle/hard_constraints.py와 정확히 일치하고 위반이 0건임을 시험으로 확인했습니다. 미배정 이유(인원 부족·출생연도 없음·나이 차·정원), 동시 실행기 경합, 중단 세대 재개를 실제 DB에서 확인했습니다.
+관련 PR: https://github.com/InryeolChoi/SerenTable/pull/31 (열림) / 계약: https://github.com/InryeolChoi/SerenTable/pull/30 (초안, 머지 대기)
+추가 증거: https://github.com/InryeolChoi/SerenTable/actions/runs/38929034129
+남은 작업: 미매칭 대안 제안·이동/보관/환불(①-c), 매칭 점수 도입(U05 확정 후), 배포 환경 실행기 동작 확인. 이 Task는 아직 완료가 아닙니다.
+```
+
+**Task: 필수조건·중복·중단 복구 검증 — 진행 중(착수 전)**
+
+```text
+수행 내용: 착수 전입니다. ①-b에서 필수조건·중복 배치·중단 복구의 실행기 동작과 오라클 대조는 확인했지만, 이 Task의 독립 검증 범위(재배치·확정 후 취소·대안·환불 상태 경합과 복구 전 과정)는 아직 시작하지 않았습니다.
+검증 결과: 해당 없음(위 ①-b 검증은 구현 단계 검증이며 이 Task의 독립 검증이 아닙니다).
+관련 PR: 해당 없음
+남은 작업: Task ①-c 구현 후, 매칭 실행 권한·복수 회차 경합·이동과 환불 동시 요청·실행기 재시작 복구를 독립 검증으로 확인합니다.
+```
+
+### Work #6 상태 판단
+
+Task `자동 실행·확정·대안·이동/환불 구현`은 **진행 중**으로 둔다. 자동 실행·확정은 구현·검증됐지만 ①-c(미매칭 대안·이동/보관/환불)와 U05 점수가 남아 있다. Task `필수조건·중복·중단 복구 검증`도 진행 중이며, ①-c 이후에 본격 착수한다. Work #6 자체도 부분 완료이므로 완료로 바꾸지 않기를 요청한다. Issue [#6](https://github.com/InryeolChoi/SerenTable/issues/6)의 체크박스와 Blaybus 상태는 사용자가 갱신한다(이 기록 시점에 아직 반영하지 않았다).

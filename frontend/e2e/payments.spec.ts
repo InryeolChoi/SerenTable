@@ -61,6 +61,9 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
   const participantContext = await browser.newContext();
   const participant = await participantContext.newPage();
   await login(participant, account, participantPassword);
+  const initialPasses = await participant.request.get("/api/me/entitlements");
+  expect(initialPasses.ok()).toBeTruthy();
+  const initialPassCount = (await initialPasses.json()).entitlements.length;
   await call(participant, "PUT", "/api/me/profile", {
     name: "합성 이름",
     display_name: "결제 식탁",
@@ -144,7 +147,7 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
   // The no-show policy is shown after submission too.
   await expect(participant.getByText(/노쇼·취소 정책 미정/)).toBeVisible();
   const passes = participant.getByRole("list", { name: "내 이용권" });
-  await expect(passes.getByRole("listitem")).toHaveCount(1);
+  await expect(passes.getByRole("listitem")).toHaveCount(initialPassCount + 1);
   await expect(passes).toContainText("멤버십 1개월 · 이용 중");
   await expect(passes).toContainText("만료");
   for (const width of [360, 1440]) {
@@ -193,7 +196,7 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
   await pending.getByRole("button", { name: "신청 취소" }).click();
   await expect(pending).toContainText("신청: 신청 취소됨");
   await participant.reload();
-  await expect(passes.getByRole("listitem")).toHaveCount(2);
+  await expect(passes.getByRole("listitem")).toHaveCount(initialPassCount + 2);
   await expect(passes).toContainText("1회권 · 취소된 신청에 묶여 보유");
 
   // After the earliest candidate closes an unpaid application cannot be paid any more.

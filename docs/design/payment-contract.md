@@ -1,5 +1,7 @@
 # 이용권·모의 결제 계약 (Work #4 Task ①-c)
 
+**2026-10-17 취소 경합 보완:** 결제는 참가자 잠금 뒤 신청의 `FOR NO KEY UPDATE`를 얻고 최신 SUBMITTED 상태를 확인한다. 취소가 먼저 끝나면 409 `application_not_payable`이며 결제·이용권을 추가하지 않는다. 매칭 배치 FK의 `FOR KEY SHARE`와 호환되는 잠금이다. CEO 확인 대기 U03/U04는 미정으로 유지한다.
+
 **기준:** 2026-10-16, Asia/Seoul. 위치: 참가 신청·이용권·결제 → 일정 신청·이용권·모의 결제 → ①-c 이용권·모의결제(Issue #4). [핵심 데이터 모델](./core-data-model.md)의 Payment·Entitlement·결제 상태, [구현 명세](./mvp-implementation-spec.md) APP-04·PAY-01/02·STA-01과 U03/U04 행, [공식 FAQ](./official-faq-2026-10-16.md) Q1·Q4·Q5, [ADR-0007](../adr/0007-prd-ticket-scope.md), [신청 계약](./application-contract.md)을 따른다.
 
 ## 범위와 결정

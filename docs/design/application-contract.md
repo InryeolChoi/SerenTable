@@ -1,5 +1,7 @@
 # 일정 신청 계약 (Work #4 Task ①-b)
 
+**2026-10-17 잠금 보완:** 제출·취소는 회차 `FOR SHARE`를 얻은 뒤 DB 시각을 다시 읽는다. 취소는 신청의 `FOR NO KEY UPDATE`를 사용한다. 결제도 같은 신청 잠금으로 직렬화하여 취소 상태를 확인하면서, 매칭 배치 FK의 `FOR KEY SHARE`와 충돌하지 않는다.
+
 **기준:** 2026-10-16, Asia/Seoul. 위치: 참가 신청·이용권·결제 → 일정 신청·이용권·모의 결제 → ①-b 일정 신청(Issue #4). [핵심 데이터 모델](./core-data-model.md)의 Application·ApplicationCandidate·신청 상태, [UI 흐름](./ui-flow-design.md)의 `/participant/apply`·`/participant/apply/review`, [구현 명세](./mvp-implementation-spec.md) APP-01~03, [회차 계약](./event-slot-contract.md)을 따른다.
 
 ## 범위와 결정
