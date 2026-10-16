@@ -96,6 +96,16 @@ def backup(args):
             temporary.unlink(missing_ok=True)
 
 
+def wait_for_database(container):
+    for _ in range(30):
+        try:
+            run(["docker", "exec", container, "pg_isready", "-h", "127.0.0.1", "-U", "serentable"])
+            return
+        except RuntimeError:
+            time.sleep(1)
+    raise RuntimeError("Restore database did not become ready")
+
+
 def restore(args):
     archive = args.dump.resolve()
     validate_dump(archive)
@@ -132,14 +142,7 @@ def restore(args):
             stage="restore database creation",
         )
         started.append(database)
-        for _ in range(30):
-            try:
-                run(["docker", "exec", database, "pg_isready", "-U", "serentable"])
-                break
-            except RuntimeError:
-                time.sleep(1)
-        else:
-            raise RuntimeError("Restore database did not become ready")
+        wait_for_database(database)
         with archive.open("rb") as stream:
             run(
                 [
