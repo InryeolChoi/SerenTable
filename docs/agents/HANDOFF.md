@@ -8,7 +8,7 @@
 - 현재 주 작업 디렉터리: `/Users/inchoi/SerenTable`, 통합 브랜치 `codex/core-design-integration`. 공통 인계 문서 최초 커밋은 `a53ccc6`이고 루트 반영 커밋은 `d549f5f`이다. 이후 공통 기록 갱신 규칙을 보강했으며 문서 PR #13으로 전달한다. 실제 HEAD는 `git log`에서 확인한다.
 - 이 통합 브랜치에는 아직 main에 없는 설계 산출물이 있다. 새 clone에서 main만 열고 해당 산출물이 없다고 판단하지 않는다. 이 문서가 포함된 통합 브랜치나 요청받은 Task PR 브랜치를 사용한다.
 - **사용자 변경 보존:** 인계 작성 직전 루트 checkout에서 `docs/design/erd/index.html` 삭제와 `docs/design/erd/erd.html` 미추적 파일을 관찰했다. 파일명 변경으로 보이나 작성 의도는 확인하지 않았다. 이 변경을 복원·삭제·강제 stage하지 않았고 인계 문서 커밋에도 포함하지 않는다. ERD 링크를 수정할 Task에서 현재 파일과 사용자 의도를 확인한다.
-- 사용자 마지막 방향은 오늘 제품 구현을 마무리하고 재개 때 이어가는 것이었다. 이번 요청은 도구 전환과 에이전트의 자율 기록 갱신 준비다. 다음 제품 Task를 자동 착수하거나 Claude 모델 세션을 대신 실행하지 않았다.
+- 2026-10-16 사용자가 작업 재개를 요청했다. Git·GitHub·현재 배포 상태를 대조했다. 다음 대상은 기존 Work #2의 Task #16 미완료 항목이며 비용 한도 설정·업무 정책은 아직 결정하지 않았다. 사용자 ERD 파일명 변경을 보존한다.
 
 ## 최신 주최 측 안내: 2026-10-16
 
@@ -54,6 +54,14 @@ PR #13(`codex/sync-foundation-tasks` → main)은 아직 열려 있다. PR #20/#
 - 공통 기록 갱신 보강: AGENTS.md에서 작업 결과·검증·중단·전환 때 기록 갱신을 의무화하고 Claude/Gemini/Copilot 진입 파일을 구성했다. 진입 파일 참조·문서 상대 링크·git diff --check를 확인했다. ERD 기준 문서는 아직 공통 PR 브랜치에 없으며 Task PR/통합 브랜치에서 존재를 확인했다. 각 도구의 실제 세션 자동 로딩과 외부 인증 공유는 검증하지 않았다.
 - 최근 변경 CI: PR #22 `38765386668`, PR #23 `38765765265` verify SUCCESS. 이후 커밋이 있으면 최신 head의 CI를 확인한다.
 - 초기 네 Task 고정 범위 `4f41619...6357379` 독립 Standards/Spec 각각 0건. 후속 시각화/브랜드 대조는 그 리뷰 범위와 구분한다.
+
+## 2026-10-16 재개 확인
+
+- 루트 HEAD `b6de489`, 통합 브랜치와 origin 일치. 기존 ERD index.html 삭제/erd.html 미추적 변경 유지.
+- GitHub 조회: PR #13/#22/#23은 열림. Task #16~#19와 부모 Work #2/#15도 열림. 보안 PR 머지와 Issue 완료 상태는 별개다.
+- 공개 `/api/readiness`는 ready/database connected, `/api/worker-health`는 alive를 재확인했다. 제품 업무 E2E나 전체 Railway 리소스 조회를 대신하지 않는다.
+- 문서 PR #13 최신 조회 CI [38857500407](https://github.com/InryeolChoi/SerenTable/actions/runs/38857500407) verify PASS.
+- 이 재개 점검은 Task 완료가 아니다. Blaybus에서는 기존 Task #16 타이머를 재사용하고, 비용 한도·실제 백업/복원 미완료를 유지한다.
 
 ## 다음 작업 순서
 
