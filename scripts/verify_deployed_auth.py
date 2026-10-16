@@ -1,6 +1,7 @@
 """Check the deployed authentication boundary over the public HTTPS URL.
 
-Usage: DEPLOY_ORIGIN=https://host DEMO_PARTICIPANT_PASSWORD=... python scripts/verify_deployed_auth.py
+Usage: set DEPLOY_ORIGIN=https://host and DEMO_PARTICIPANT_PASSWORD in the shell, then run
+`uv run python scripts/verify_deployed_auth.py`.
 Passwords are read from the environment only and never printed.
 """
 
@@ -72,9 +73,7 @@ def main():
         )
         check(results, "own_profile_200", browser.get("/api/me/profile").status_code == 200)
         token = browser.get("/api/auth/csrf").json().get("csrf_token", "")
-        logout = browser.post(
-            "/api/auth/logout", headers={"Origin": origin, "X-CSRF-Token": token}
-        )
+        logout = browser.post("/api/auth/logout", headers={"Origin": origin, "X-CSRF-Token": token})
         check(results, "logout_200", logout.status_code == 200)
         check(results, "after_logout_401", browser.get("/api/auth/me").status_code == 401)
 
