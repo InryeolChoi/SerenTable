@@ -203,8 +203,14 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
   const refundRows = await openMyApplications(participants[2]);
   const toRefund = refundRows.filter({ hasText: partial.name });
   await toRefund.getByRole("button", { name: "다른 일정 확인" }).click();
+  await expect(toRefund).toContainText("환불 가능 · 미사용 1회권 원금 전액");
   await toRefund.getByRole("button", { name: "1회권 전액 모의 환불" }).click();
   await expect(toRefund).toContainText("전액 모의 환불 완료");
+  await toRefund.getByText("실패 해결 이력", { exact: true }).click();
+  const refundHistory = toRefund.getByRole("list", { name: "모의 환불 처리 이력" });
+  await expect(refundHistory).toContainText("환불 요청");
+  await expect(refundHistory).toContainText("환불 처리 중");
+  await expect(refundHistory).toContainText("환불 완료");
   await expect(participants[2].getByRole("list", { name: "내 이용권" })).toContainText("모의 환불 완료");
   await expect(toRefund.getByRole("button", { name: "다른 일정 확인" })).toHaveCount(0);
   for (const width of [360, 1440]) {

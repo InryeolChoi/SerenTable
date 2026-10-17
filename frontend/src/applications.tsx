@@ -313,7 +313,7 @@ function ApplicationItem({
         <strong>신청: {stateLabels[application.state]}</strong>
         {application.participant && ` · ${application.participant.login_id}`}
       </p>
-      <p className="small">결제: {paymentSummary(application)}</p>
+      <p className="small">결제: {paymentSummary(application)}{application.refund_state === "REFUND_AVAILABLE" && " · 환불 가능 (모의)"}</p>
       <p className="small">매칭: {matchingSummary(application)}</p>
       {application.matching?.state === "CONFIRMED" && application.matching.table && (
         <p className="small">
@@ -334,6 +334,12 @@ function ApplicationItem({
         <ul>{application.resolutions.map(item => <li key={item.id}>
           {show(item.created_at)} · {item.action === "TRANSFER" ? "일정 이동 동의·처리 완료"
             : item.action === "HOLD" ? "이용권 보관·신청 종료" : "전액 모의 환불 완료"}
+          {!!item.refund_events?.length && <ol aria-label="모의 환불 처리 이력">
+            {item.refund_events.map(event => <li key={event.state}>
+              {event.state === "REFUND_REQUESTED" ? "환불 요청" : event.state === "REFUND_PROCESSING" ? "환불 처리 중" : "환불 완료"}
+              {` · ${event.amount_krw.toLocaleString("ko-KR")}원 · ${show(event.created_at)}`}
+            </li>)}
+          </ol>}
         </li>)}</ul>
       </details>}
       {action}
@@ -347,7 +353,7 @@ function AlternativeSlots({ application, onResolved }: {
 }) {
   const request = useScopedApi();
   const [result, setResult] = useState<{
-    alternatives: EventSlot[]; pending_candidates: EventSlot[]; failure_run_id: string | null;
+    alternatives: EventSlot[]; pending_candidates: EventSlot[]; failure_run_id: string | null; refund_state: "REFUND_AVAILABLE" | null;
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -402,6 +408,7 @@ function AlternativeSlots({ application, onResolved }: {
           <button disabled={loading} onClick={() => void choose("TRANSFER", slot.id)}>이 일정으로 이동</button>
         </li>)}
       </ul> : <p>현재 이용권으로 이동 가능한 모집 일정이 없습니다.</p>}
+      {result.refund_state && <p className="small">환불 가능 · 미사용 1회권 원금 전액 (모의)</p>}
       <div className="actions">
         <button disabled={loading} onClick={() => void choose("HOLD")}>
           {single ? "1회권 보관" : "이번 신청 종료·멤버십 유지"}</button>

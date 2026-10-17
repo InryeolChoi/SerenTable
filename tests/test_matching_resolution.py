@@ -120,9 +120,13 @@ def test_system_failure_refund_is_full_mock_and_repeat_safe():
         prepare(owner, "participant-01")
         application = failure(owner, operator)
         key = str(uuid.uuid4())
-        run_id = owner.get(f"/api/me/applications/{application}/alternatives").json()[
-            "failure_run_id"
-        ]
+        offer = owner.get(f"/api/me/applications/{application}/alternatives").json()
+        assert offer["refund_state"] == "REFUND_AVAILABLE"
+        (available,) = owner.get("/api/me/applications").json()["applications"]
+        assert available["refund_state"] == "REFUND_AVAILABLE"
+        (admin_available,) = operator.get("/api/admin/applications").json()["applications"]
+        assert admin_available["refund_state"] == "REFUND_AVAILABLE"
+        run_id = offer["failure_run_id"]
         refunded = choose(owner, application, "REFUND", key=key, run_id=run_id)
         assert refunded.status_code == 200, refunded.text
         assert (
@@ -131,7 +135,15 @@ def test_system_failure_refund_is_full_mock_and_repeat_safe():
         assert choose(owner, application, "HOLD", key=key, run_id=run_id).status_code == 409
         (mine,) = owner.get("/api/me/applications").json()["applications"]
         assert mine["payments"][0]["state"] == "REFUNDED"
+        assert [e["state"] for e in mine["resolutions"][0]["refund_events"]] == [
+            "REFUND_REQUESTED",
+            "REFUND_PROCESSING",
+            "REFUNDED",
+        ]
+        assert all(e["amount_krw"] == 9900 for e in mine["resolutions"][0]["refund_events"])
         assert mine["payments"][0]["amount_krw"] == 9900
+        (admin,) = operator.get("/api/admin/applications").json()["applications"]
+        assert admin["resolutions"] == mine["resolutions"]
         assert mine["coverage"] is None
         assert mine["payment_required"] is False
         assert mine["matching_eligible_slot_ids"] == []

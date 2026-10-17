@@ -65,16 +65,62 @@ def applications_json(connection, rows, now, with_participant=False):
                 }
             )
     history = {}
+    refund_events = {}
     if ids:
+        for event in connection.execute(
+            text("""SELECT f.* FROM mock_refund_event f
+                JOIN match_resolution r ON r.id=f.resolution_id
+                WHERE r.application_id=ANY(:ids)
+                ORDER BY f.created_at, CASE f.state WHEN 'REFUND_REQUESTED' THEN 1
+                    WHEN 'REFUND_PROCESSING' THEN 2 ELSE 3 END"""),
+            {"ids": ids},
+        ).mappings():
+            refund_events.setdefault(event["resolution_id"], []).append(
+                {
+                    "state": event["state"],
+                    "amount_krw": event["amount_krw"],
+                    "created_at": iso(event["created_at"]),
+                }
+            )
         for resolution in connection.execute(
             text("""SELECT * FROM match_resolution WHERE application_id=ANY(:ids)
                 ORDER BY created_at DESC, id"""),
             {"ids": ids},
         ).mappings():
-            history.setdefault(resolution["application_id"], []).append(resolution_json(resolution))
+            history.setdefault(resolution["application_id"], []).append(
+                resolution_json(resolution)
+                | {"refund_events": refund_events.get(resolution["id"], [])}
+            )
     payments = payment_details(connection, rows, now)
     eligible = eligible_slot_ids(connection, ids, now)
     matching = participation_details(connection, ids)
+    eligible_ids = {uuid.UUID(slot) for choices in eligible.values() for slot in choices}
+    completed_slots = (
+        set(
+            str(slot)
+            for slot in connection.execute(
+                text("""SELECT event_slot_id FROM match_run WHERE state='SUCCEEDED'
+            AND event_slot_id=ANY(:ids)"""),
+                {"ids": list(eligible_ids)},
+            ).scalars()
+        )
+        if eligible_ids
+        else set()
+    )
+    refund_states = {}
+    for row in rows:
+        participation = matching[row["id"]]
+        coverage = payments[row["id"]]["coverage"]
+        available = (
+            row["state"] == "SUBMITTED"
+            and participation is not None
+            and offers_alternatives(participation["state"], participation["reason_code"])
+            and coverage is not None
+            and coverage["entitlement"]["kind"] == "SINGLE"
+            and coverage["entitlement"]["state"] == "HELD"
+            and all(slot in completed_slots for slot in eligible[row["id"]])
+        )
+        refund_states[row["id"]] = "REFUND_AVAILABLE" if available else None
     return [
         {
             "id": str(row["id"]),
@@ -87,6 +133,7 @@ def applications_json(connection, rows, now, with_participant=False):
             # yet; the screen then derives "waiting" from eligibility as before.
             "matching": matching[row["id"]],
             "resolutions": history.get(row["id"], []),
+            "refund_state": refund_states[row["id"]],
         }
         | payments[row["id"]]
         | (
@@ -193,8 +240,8 @@ def list_application_alternatives(
                     .mappings()
                     .all()
                 )
+            has_single = not pending and single_right(connection, application_id) is not None
             if alternatives:
-                has_single = single_right(connection, application_id) is not None
                 alternatives = [
                     slot
                     for slot in alternatives
@@ -218,6 +265,7 @@ def list_application_alternatives(
                 ]
             return private_response(
                 {
+                    "refund_state": "REFUND_AVAILABLE" if has_single else None,
                     "failure_run_id": str(application["match_run_id"])
                     if application["match_run_id"]
                     else None,

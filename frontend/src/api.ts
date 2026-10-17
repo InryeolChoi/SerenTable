@@ -174,7 +174,8 @@ export type Application = {
   /** Candidate slots whose matching would include this application (paid by the close). */
   matching_eligible_slot_ids: string[];
   matching: MatchParticipation | null;
-  resolutions: { id: string; action: "TRANSFER" | "HOLD" | "REFUND"; state: string; created_at: string; event_slot_id: string | null }[];
+  refund_state: "REFUND_AVAILABLE" | null;
+  resolutions: { id: string; action: "TRANSFER" | "HOLD" | "REFUND"; state: string; created_at: string; event_slot_id: string | null; refund_events: { state: string; amount_krw: number; created_at: string }[] }[];
   participant?: { id: string; login_id: string };
 };
 let csrfToken: string | null = null;
