@@ -126,11 +126,11 @@ function RoomConversation({ room }: { room: Room }) {
   return <section className="panel" aria-label="단체방 대화">
     <h2>{room.region_name} · {room.member_count}인 확정</h2>
     <Notice>{connection}</Notice>
-    <ol aria-label="메시지 목록">
+    <ol className="message-list" aria-label="메시지 목록">
       {messages.map((item) => <li key={item.id}>
         <strong>{item.author?.display_name ?? "식탁 안내"}</strong>{" "}
         <time dateTime={item.created_at}>{show(item.created_at)}</time>
-        <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{item.body}</p>
+        <p className="message-body">{item.body}</p>
       </li>)}
     </ol>
     {sendError && <Notice error>{sendError}</Notice>}
