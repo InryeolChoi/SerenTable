@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import text
 
+from serentable.audit import record_audit
 from serentable.auth import (
     Principal,
     private_response,
@@ -74,6 +75,17 @@ def create_inventory(payload: InventoryInput, operator: Principal = Depends(requ
             )
             .mappings()
             .one()
+        )
+        record_audit(
+            connection,
+            operator.id,
+            "venue_inventory.create",
+            "venue_inventory",
+            row["id"],
+            after={
+                "event_slot_id": str(row["event_slot_id"]),
+                **{key: row[key] for key in ("name", "price_krw", "capacity")},
+            },
         )
         response = private_response({"inventory": inventory_json(row)})
         response.status_code = 201
@@ -169,18 +181,32 @@ def approve_food(
         digest, _, _ = food_state(members_for(connection, table["id"]))
         if digest != payload.food_snapshot:
             raise HTTPException(409, "food_conditions_changed")
-        connection.execute(
+        inserted = connection.execute(
             text("""INSERT INTO venue_food_approval
             (inventory_id,dining_table_id,food_snapshot,reviewed_by,created_at)
             VALUES (:inventory,:table,:snapshot,:operator,CURRENT_TIMESTAMP)
-            ON CONFLICT DO NOTHING"""),
+            ON CONFLICT DO NOTHING RETURNING 1"""),
             {
                 "inventory": inventory_id,
                 "table": table["id"],
                 "snapshot": digest,
                 "operator": operator.id,
             },
-        )
+        ).scalar()
+        if inserted:
+            # Only the snapshot digest is kept; members' food conditions stay out of the trail.
+            record_audit(
+                connection,
+                operator.id,
+                "venue_food.approve",
+                "dining_table",
+                table["id"],
+                after={
+                    "inventory_id": str(inventory_id),
+                    "food_snapshot": digest,
+                    "confirmed_suitable": True,
+                },
+            )
         return private_response({"approved": True})
 
 
