@@ -233,3 +233,27 @@ def test_unanswered_feedback_never_blocks_a_new_application(table):
     assert len(reminders(member)) == 1
     created = apply(member, [create_slot(table["operator"])])
     assert created.status_code == 201, created.text
+
+
+@pytest.mark.parametrize("choice", ["AVOID", "MEET_AGAIN", None])
+def test_preference_changes_wait_for_matching_before_updating_score_inputs(table, choice):
+    from test_safety import serialize_api_with_matching
+
+    end_slot(table["slot"])
+    member = table["members"][0]
+    target = table["ids"][1]
+    endpoint = path(table["id"], "preferences")
+    # A deletion must serialize too: it removes the mutual-MEET_AGAIN score exemption.
+    initial = send(
+        member, "PUT", endpoint, {"preferences": [{"target_id": target, "choice": "MEET_AGAIN"}]}
+    )
+    assert initial.status_code == 200
+    saved = serialize_api_with_matching(
+        lambda: send(
+            member, "PUT", endpoint, {"preferences": [{"target_id": target, "choice": choice}]}
+        ),
+        table["ids"][0],
+    )
+    assert saved.status_code == 200, saved.text
+    mate = next(m for m in saved.json()["tablemates"] if m["user_id"] == target)
+    assert mate["preference"] == choice

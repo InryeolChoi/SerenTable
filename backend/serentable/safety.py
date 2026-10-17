@@ -23,6 +23,7 @@ from serentable.auth import (
 )
 from serentable.clock import iso
 from serentable.database import database_engine
+from serentable.match_resolution import lock_matching
 
 router = APIRouter()
 
@@ -40,6 +41,9 @@ SEATED = """SELECT ta.user_id FROM table_assignment ta
 
 def record_exclusion(connection, a, b, source):
     """Record a symmetric matching exclusion (H5) inside the caller's transaction."""
+    # The caller must also acquire this before taking any participant/choice row lock.
+    # Reentrant within the transaction; this protects direct exclusion writers as well.
+    lock_matching(connection)
     low, high = sorted((str(a), str(b)))
     connection.execute(
         text("""INSERT INTO participant_exclusion(user_low, user_high, source)
@@ -89,6 +93,8 @@ class ReportInput(BaseModel):
 @router.post("/api/me/reports")
 def create_report(payload: ReportInput, user: Principal = Depends(require_csrf_participant)):
     with database_engine().begin() as connection:
+        # Global matching coordination always precedes participant row locks.
+        lock_matching(connection)
         # Serialize this reporter so a replay finds the committed report instead of a twin.
         connection.execute(text("SELECT id FROM app_user WHERE id=:id FOR UPDATE"), {"id": user.id})
         require_tablemates(connection, payload.dining_table_id, user.id, payload.reported_id)
@@ -144,6 +150,7 @@ class BlockInput(BaseModel):
 @router.post("/api/me/blocks")
 def create_block(payload: BlockInput, user: Principal = Depends(require_csrf_participant)):
     with database_engine().begin() as connection:
+        lock_matching(connection)
         require_tablemates(connection, payload.dining_table_id, user.id, payload.blocked_id)
         record_exclusion(connection, user.id, payload.blocked_id, "block")
     # Blocks leave no per-direction record, so nothing can show who blocked whom.

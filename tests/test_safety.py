@@ -291,3 +291,56 @@ def test_active_suspension_and_ban_block_new_applications_but_warnings_do_not(ta
         for row in operator.get("/api/admin/sanctions").json()["sanctions"]
     }
     assert states == {ids[0]: False, ids[1]: False, ids[2]: True}
+
+
+def serialize_api_with_matching(request, user_id):
+    """Hold the real worker coordination lock while a second connection serves HTTP.
+
+    A safety write must wait before taking the participant row lock; otherwise a worker
+    could calculate H5 before the exclusion commits and confirm the pair afterwards.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    from serentable.match_resolution import lock_matching
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with database_engine().begin() as connection:
+            lock_matching(connection)
+            pid = connection.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            pending = pool.submit(request)
+            deadline = time.monotonic() + 5
+            blocked = False
+            while time.monotonic() < deadline and not pending.done():
+                # PostgreSQL caches statistics within a transaction; refresh this
+                # observer so an API that starts after the first poll is visible.
+                connection.execute(text("SELECT pg_stat_clear_snapshot()"))
+                blocked = connection.execute(
+                    text("""SELECT EXISTS(SELECT 1 FROM pg_stat_activity
+                    WHERE datname=current_database() AND wait_event='advisory'
+                      AND :pid=ANY(pg_blocking_pids(pid)))"""),
+                    {"pid": pid},
+                ).scalar_one()
+                if blocked:
+                    break
+                time.sleep(0.01)
+            assert blocked, "safety/preference write bypassed the active matching transaction"
+            # Matching inserts reference app_user. Locking this row before the shared
+            # matching lock would cause a cycle; NOWAIT catches that lock-order bug.
+            connection.execute(
+                text("SELECT id FROM app_user WHERE id=:id FOR KEY SHARE NOWAIT"),
+                {"id": user_id},
+            )
+        return pending.result(timeout=5)
+
+
+@pytest.mark.parametrize("action", ["report", "block"])
+def test_safety_changes_wait_for_matching_before_locking_participants(table, action):
+    _, members, ids, table_id = table
+    request = (
+        (lambda: report(members[0], table_id, ids[1]))
+        if action == "report"
+        else (lambda: block(members[0], table_id, ids[1]))
+    )
+    saved = serialize_api_with_matching(request, ids[0])
+    assert saved.status_code in (200, 201), saved.text
+    assert pair(ids[0], ids[1], action) in exclusions()
