@@ -313,3 +313,21 @@ def test_a_partial_http_preparation_resumes_without_duplicate_mock_payments(scen
             } == payments
         finally:
             engine.dispose()
+
+
+def test_proxy_environment_cannot_redirect_credentials_away_from_the_local_app(scenario_server):
+    _, environment = scenario_server
+    result = scenario(
+        str(uuid.uuid4()),
+        {
+            **environment,
+            "http_proxy": "http://127.0.0.1:1",
+            "HTTP_PROXY": "http://127.0.0.1:1",
+            "https_proxy": "http://127.0.0.1:1",
+            "HTTPS_PROXY": "http://127.0.0.1:1",
+            "no_proxy": "",
+            "NO_PROXY": "",
+        },
+    )
+    assert result.returncode == 1
+    assert "scenario_dedicated_slot_required; completed=0" in result.stderr

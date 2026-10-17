@@ -10,6 +10,7 @@ import http.cookiejar
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -35,13 +36,17 @@ class Client:
     def __init__(self, origin):
         self.origin = origin
         self.opener = urllib.request.build_opener(
-            NoRedirect(), urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar())
+            urllib.request.ProxyHandler({}),
+            NoRedirect(),
+            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
         )
 
-    def request(self, path, method="GET", payload=None):
+    def request(self, path, method="GET", payload=None, *, deadline=None):
         headers = {"Origin": self.origin, "Accept": "application/json"}
         if method != "GET":
-            headers["X-CSRF-Token"] = self.request("/api/auth/csrf")["csrf_token"]
+            headers["X-CSRF-Token"] = self.request("/api/auth/csrf", deadline=deadline)[
+                "csrf_token"
+            ]
             headers["Content-Type"] = "application/json"
         request = urllib.request.Request(
             self.origin + path,
@@ -49,8 +54,11 @@ class Client:
             headers=headers,
             method=method,
         )
+        timeout = 15 if deadline is None else min(15, deadline - time.monotonic())
+        if timeout <= 0:
+            raise ScenarioError("scenario_cleanup_deadline")
         try:
-            with self.opener.open(request, timeout=15) as response:
+            with self.opener.open(request, timeout=timeout) as response:
                 body = response.read(8_000_001)
                 if len(body) > 8_000_000:
                     raise ScenarioError("scenario_response_too_large")
@@ -62,9 +70,9 @@ class Client:
     def login(self, account, password):
         return self.request("/api/auth/login", "POST", {"login_id": account, "password": password})
 
-    def logout(self):
+    def logout(self, deadline):
         try:
-            self.request("/api/auth/logout", "POST")
+            self.request("/api/auth/logout", "POST", deadline=deadline)
         except (ScenarioError, KeyError, TypeError):
             pass  # The ordinary revocable session will expire if the server is unavailable.
 
@@ -189,8 +197,11 @@ def prepare(origin, slot_id, participant_password, operator_password):
     except ScenarioError as error:
         raise ScenarioError(f"{error}; completed={completed}") from None
     finally:
+        deadline = time.monotonic() + 5
         for client in clients:
-            client.logout()
+            if time.monotonic() >= deadline:
+                break
+            client.logout(deadline)
     return {"synthetic": True, "slot_id": slot_id, "ready_participants": completed, "mock": True}
 
 

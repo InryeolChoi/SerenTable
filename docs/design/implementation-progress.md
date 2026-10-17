@@ -1,5 +1,7 @@
 # MVP 구현 분류 및 실행 기록
 
+**2026-10-17 합성 시연 B안:** [PR #37](https://github.com/InryeolChoi/SerenTable/pull/37)은 #36 계정 시드 이후 별도100명 동의·신청·모의 결제를 기존 HTTP API로 준비한다. [계약·검증·Blaybus 문구](./synthetic-demo-scenario-contract.md). 격리 DB에서100명 자동 확정/필수위반0·멱등 재실행·부분 결제 실패 재개·기존 계정/거절 보존을 확인했다. 환경 프록시 재현 문제를 차단했고 정리 예산을 추가했다. #36은 최종 CI164+브라우저10 통과·Ready, #37은 최종 CI/검토 확인 후 Ready. 운영 쓰기는 아직 하지 않았고 Task/Work #5는 진행 중이다.
+
 **시드 후속:** 사용자는 검증·머지 후 Railway 심사용 DB 적재 의도를 재확인했다. [계약](./synthetic-demo-seed-contract.md)의 명시 Railway 모드·대상 검사·백업/적재/공개 확인 순서를 추가했다. 실제 운영 쓰기는 아직 없으며 초기 로컬154 회귀 PASS, 보완된 집중22 PASS와 최종 CI를 구분한다.
 
 **2026-10-17 합성 앱 시드:** [PR #36](https://github.com/InryeolChoi/SerenTable/pull/36)은 사용자 A안 승인에 따라 원본 비연결100명 계정·완성 프로필 CLI를 제공한다. [정확한 수행/검증/남은 항목](./synthetic-demo-seed-contract.md), ADR-0010을 따른다. 로컬 전용 데모 DB에 실제100/100 적재·재실행0/0, 집중12 PASS·독립 두 축 수정필요0. 자동 동의/거래·Railway 적재·매칭 점수 구현은 아니며 Work #5는 진행 중이다. [PR #35](https://github.com/InryeolChoi/SerenTable/pull/35)는 실제 worker 강제 종료·복구 시험을 독립 제공하며 CI130/API·10브라우저 PASS, Work #6은 진행 중이다.

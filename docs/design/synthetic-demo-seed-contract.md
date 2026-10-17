@@ -1,5 +1,7 @@
 # 독립 합성 참가자100명 앱 시드
 
+**후속 B안:** 사용자가 별도 합성100명의 동의·신청·모의 결제 시연 준비를 추가 승인했다. 계정·프로필을 만드는 이 CLI의 범위는 유지하며 [별도 시나리오 CLI](./synthetic-demo-scenario-contract.md)·[PR #37](https://github.com/InryeolChoi/SerenTable/pull/37)에서 연결한다. 이 CLI 자체가 동의/거래를 만든다는 의미는 아니다.
+
 위치: **자동 매칭·실패 해결 → 규칙·데이터·정답 기준 → 가상데이터 변환·DB 시드 구축** (Work #5). 2026-10-17 사용자 A안 승인이 기준이다. [ADR-0010](../adr/0010-independent-demo-roster-and-interest-objective.md)과 원본 준비 [계약](./source-preparation-contract.md)은 서로 다른 경로다.
 
 ## 생성·식별 규칙
