@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 
+from serentable.audit import record_audit
 from serentable.auth import (
     Principal,
     private_response,
@@ -271,6 +272,16 @@ def review_report(
                 reviewed_at=clock_timestamp() WHERE id=:id"""),
                 {"id": report_id, "decision": payload.decision, "operator": operator.id},
             )
+            # States only: the report's detail text never enters the audit trail.
+            record_audit(
+                connection,
+                operator.id,
+                "report.review",
+                "safety_report",
+                report_id,
+                before={"state": "OPEN"},
+                after={"state": payload.decision},
+            )
             row = read_admin_report(connection, report_id)
         elif row["state"] != payload.decision:
             raise HTTPException(409, "report_already_reviewed")
@@ -367,6 +378,20 @@ def create_sanction(payload: SanctionInput, operator: Principal = Depends(requir
                 params | {"id": uuid.uuid4(), "operator": operator.id, "now": now},
             ).scalar_one()
         )
+        if not existing:
+            record_audit(
+                connection,
+                operator.id,
+                "sanction.create",
+                "participant",
+                payload.user_id,
+                after={
+                    "sanction_id": str(sanction_id),
+                    "kind": payload.kind,
+                    "report_id": str(payload.report_id) if payload.report_id else None,
+                    "ends_at": iso(payload.ends_at),
+                },
+            )
         row = (
             connection.execute(text(SANCTION_SELECT + "WHERE s.id=:id"), {"id": sanction_id})
             .mappings()

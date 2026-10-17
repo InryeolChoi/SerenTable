@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
 
+from serentable.audit import record_audit
 from serentable.auth import (
     Principal,
     private_response,
@@ -179,6 +180,14 @@ def review_no_show(
                 )
                 .mappings()
                 .one()
+            )
+            record_audit(
+                connection,
+                operator.id,
+                "no_show.review",
+                "participant",
+                user_id,
+                after={"dining_table_id": str(table_id), "decision": payload.decision},
             )
             created = True
         result = review_json(row)
