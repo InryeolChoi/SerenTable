@@ -54,8 +54,9 @@ test("참가 이력에서 체크인·평가하고 운영 현황에서 예외·�
     isolatedClock(slot.id,true);
     await members[0].reload();
     const evaluation = members[0].getByRole("region",{name:"모임 평가"});
+    await expect(evaluation).toBeVisible();
     for (const label of ["테이블 전체 만족도","대화 만족도","식당 만족도","재참여 의향","추천 의향"])
-      await evaluation.getByLabel(label,{exact:true}).selectOption("4");
+      await evaluation.getByLabel(label).selectOption("4");
     await evaluation.getByRole("button",{name:"평가 저장",exact:true}).click();
     await expect(evaluation.getByText(/평가를 저장했습니다/)).toBeVisible();
     await members[0].reload();
