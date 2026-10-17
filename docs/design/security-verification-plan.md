@@ -1,5 +1,7 @@
 # 개인정보·권한·보안 검증 기준
 
+**2026-10-17 추가 경계:** 대체 일정 조회는 로그인한 참가자의 본인 SUBMITTED·NO_MATCH 신청만 허용한다. 타인/없는 ID의 동일 404, 운영자 403·익명 401, no-store를 실제 PostgreSQL HTTP에서 확인했다. 응답은 공개 회차 메타데이터만 포함하며 다른 신청자·개별 점수·개인정보를 포함하지 않는다. 읽기 요청은 신청/후보/결제/권리/매칭 상태를 변경하지 않는다. 전체 보안 인수와 실제 기기 검증을 완료한 것은 아니다.
+
 **Task:** 개발·배포 기반 확보 → 핵심 데이터·화면·보안 설계 → 개인정보·권한·보안 검증 기준 정리
 
 **추적:** [Task Issue #19](https://github.com/InryeolChoi/SerenTable/issues/19), [Work Issue #15](https://github.com/InryeolChoi/SerenTable/issues/15)

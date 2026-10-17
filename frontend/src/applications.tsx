@@ -168,7 +168,8 @@ export function ApplyPage({
               제출은 결제가 아닙니다. 제출 후 모의 결제 단계에서 선택한 이용권을
               결제합니다. 유효한 멤버십 기간이 후보 회차를 모두 포함하면 결제
               없이 처리됩니다. 여러 후보를 골라도 모든 회차에 각각 참가하는 것은
-              아니며, 후보 간 배정 규칙은 아직 확정되지 않았습니다.
+              아니며, 매칭 시각이 이른 회차부터 처리해 한 신청은 한 테이블에만
+              확정됩니다.
             </p>
             <RefundNotice />
             <NoShowNotice />
@@ -326,6 +327,59 @@ function ApplicationItem({
   );
 }
 
+/** Read-only recruitment suggestions; an explicit transfer needs the later policy. */
+function AlternativeSlots({ applicationId }: { applicationId: string }) {
+  const request = useScopedApi();
+  const [result, setResult] = useState<{
+    alternatives: EventSlot[];
+    pending_candidates: EventSlot[];
+  } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  async function load() {
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      setResult(await request(`/api/me/applications/${applicationId}/alternatives`));
+    } catch (error) {
+      setError(error instanceof ApiError && error.status === 409
+        ? "신청 상태가 변경되었습니다. 신청 상태를 새로 확인해 주세요."
+        : message(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <section aria-label="대체 일정">
+      <button disabled={loading} onClick={() => void load()}>
+        {loading ? "다른 일정 확인 중…" : "다른 일정 확인"}
+      </button>
+      {error && <Notice error>{error}</Notice>}
+      {result && (result.pending_candidates.length ? (
+        <>
+          <p>선택한 후보 회차의 매칭이 아직 남아 있습니다. 기존 신청으로 계속 기다립니다.</p>
+          <ul className="candidates">
+            {result.pending_candidates.map((slot) => <li key={slot.id}><SlotSummary slot={slot} /></li>)}
+          </ul>
+        </>
+      ) : (
+        <>
+          <p className="small muted">
+            조회만으로 일정이나 결제가 변경되지 않습니다. 일정 이동·이용권 보관·환불은
+            아직 제공되지 않습니다.
+          </p>
+          {result.alternatives.length ? (
+            <ul className="candidates" aria-label="모집 중인 다른 일정">
+              {result.alternatives.map((slot) => <li key={slot.id}><SlotSummary slot={slot} /></li>)}
+            </ul>
+          ) : <p>현재 모집 중인 다른 일정이 없습니다. 나중에 다시 확인해 주세요.</p>}
+        </>
+      ))}
+    </section>
+  );
+}
+
 /** The participant's own applications with status; shown on the home page. */
 export function MyApplications({
   navigate,
@@ -337,6 +391,7 @@ export function MyApplications({
   const [pending, setPending] = useState("");
   const [error, setError] = useState("");
   async function load() {
+    setError("");
     try {
       setApplications(
         (await request<{ applications: Application[] }>("/api/me/applications"))
@@ -400,6 +455,9 @@ export function MyApplications({
                         {pending === application.id ? "취소 중…" : "신청 취소"}
                       </button>
                     )}
+                  {application.matching?.state === "NO_MATCH" && (
+                    <AlternativeSlots applicationId={application.id} />
+                  )}
                 </div>
               }
             />
@@ -415,6 +473,7 @@ export function MyApplications({
         제외됩니다.
       </p>
       <NoShowNotice />
+      <button onClick={() => void load()}>신청 상태 새로고침</button>
       <button onClick={() => navigate("/participant/apply")}>일정 신청</button>
     </>
   );

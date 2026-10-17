@@ -85,7 +85,7 @@ def test_single_pass_payment_snapshots_product_and_holds_pass_for_the_applicatio
         assert listed["payments"] == [payment]
         entitlement = listed["coverage"]["entitlement"]
         assert listed["coverage"]["source"] == "payment"
-        # Held for this application; consumed only at table confirmation (not built yet).
+        # Held for this application; consumed only at table confirmation.
         assert entitlement["kind"] == "SINGLE" and entitlement["state"] == "HELD"
         assert entitlement["expires_at"] is None
         assert entitlement["application_id"] == application["id"]

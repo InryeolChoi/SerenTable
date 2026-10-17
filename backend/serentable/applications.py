@@ -103,6 +103,72 @@ def latest_consent_ids(connection, user_id):
     return {row["purpose"]: row["id"] for row in rows}
 
 
+@router.get("/api/me/applications/{application_id}/alternatives")
+def list_application_alternatives(
+    application_id: uuid.UUID, user: Principal = Depends(require_participant)
+):
+    """STA-04: recruitment information only; never transfer a booking or its payment.
+
+    An earlier NO_MATCH is not final while a consented, paid candidate still awaits a
+    successful run. Existing live choices on any of this user's applications are omitted
+    from alternatives so the list does not suggest submitting a duplicate candidate.
+    """
+    try:
+        with database_engine().connect() as connection:
+            application = (
+                connection.execute(
+                    text("""SELECT a.state, mp.state AS matching_state FROM application a
+                LEFT JOIN match_participation mp ON mp.application_id = a.id
+                WHERE a.id = :id AND a.user_id = :user"""),
+                    {"id": application_id, "user": user.id},
+                )
+                .mappings()
+                .first()
+            )
+            if application is None:
+                raise HTTPException(404, "application_not_found")
+            if application["state"] != "SUBMITTED" or application["matching_state"] != "NO_MATCH":
+                raise HTTPException(409, "alternatives_not_available")
+            now = locked_now(connection)
+            eligible = eligible_slot_ids(connection, [application_id], now)[application_id]
+            pending = (
+                connection.execute(
+                    text(f"""SELECT {SLOT_COLUMNS} FROM event_slot s
+                JOIN region r ON r.code = s.region_code
+                WHERE s.id = ANY(:ids) AND NOT EXISTS (
+                    SELECT 1 FROM match_run m
+                    WHERE m.event_slot_id = s.id AND m.state = 'SUCCEEDED')
+                ORDER BY s.matches_at, s.id"""),
+                    {"ids": eligible},
+                )
+                .mappings()
+                .all()
+            )
+            alternatives = []
+            if not pending:
+                alternatives = (
+                    connection.execute(
+                        text(f"""SELECT {SLOT_COLUMNS} FROM event_slot s
+                    JOIN region r ON r.code = s.region_code
+                    WHERE s.closes_at > :now AND NOT EXISTS (
+                        SELECT 1 FROM application_candidate c
+                        WHERE c.event_slot_id = s.id AND c.user_id = :user AND c.live)
+                    ORDER BY s.starts_at, r.sort_order, s.id"""),
+                        {"user": user.id, "now": now},
+                    )
+                    .mappings()
+                    .all()
+                )
+            return private_response(
+                {
+                    "pending_candidates": [slot_json(slot, now) for slot in pending],
+                    "alternatives": [slot_json(slot, now) for slot in alternatives],
+                }
+            )
+    except SQLAlchemyError:
+        raise HTTPException(503, "application_unavailable") from None
+
+
 @router.post("/api/me/applications")
 def submit_application(
     payload: ApplicationInput, user: Principal = Depends(require_csrf_participant)

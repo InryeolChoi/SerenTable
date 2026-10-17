@@ -1,5 +1,7 @@
 # 이용권·모의 결제 계약 (Work #4 Task ①-c)
 
+**2026-10-17 Work #6 연결:** 승인된 임시 U03의 확정 시 1회권 사용 처리를 구현했다. 해당 신청의 영구 `table_assignment` 이력이 있으면 `USED`, 없으면 `HELD`이며 최초 배치 생성 시각을 `used_at`으로 응답한다. 확정과 배치는 한 트랜잭션이므로 실패 롤백은 권리를 소비하지 않는다. 배치의 `ended_at`으로 사용 여부를 되돌리지 않는다. 이미 확정된 기존 행에도 같은 조회 규칙이 적용되며 새 테이블·이관은 없다. 멤버십은 ACTIVE/EXPIRED를 유지한다. [구현·검증 기록](./overnight-implementation-2026-10-17.md).
+
 **2026-10-17 취소 경합 보완:** 결제는 참가자 잠금 뒤 신청의 `FOR NO KEY UPDATE`를 얻고 최신 SUBMITTED 상태를 확인한다. 취소가 먼저 끝나면 409 `application_not_payable`이며 결제·이용권을 추가하지 않는다. 매칭 배치 FK의 `FOR KEY SHARE`와 호환되는 잠금이다. CEO 확인 대기 U03/U04는 미정으로 유지한다.
 
 **기준:** 2026-10-16, Asia/Seoul. 위치: 참가 신청·이용권·결제 → 일정 신청·이용권·모의 결제 → ①-c 이용권·모의결제(Issue #4). [핵심 데이터 모델](./core-data-model.md)의 Payment·Entitlement·결제 상태, [구현 명세](./mvp-implementation-spec.md) APP-04·PAY-01/02·STA-01과 U03/U04 행, [공식 FAQ](./official-faq-2026-10-16.md) Q1·Q4·Q5, [ADR-0007](../adr/0007-prd-ticket-scope.md), [신청 계약](./application-contract.md)을 따른다.
@@ -19,7 +21,7 @@
 `backend/serentable/payments.py`의 `ENTITLEMENT_POLICY_VERSION` 하나로 묶고 결제·이용권 행의 `policy_version`에 기록한다. 정책이 바뀌면 새 버전으로 구분한다.
 
 - 멤버십은 **결제 완료 시각부터** 시작하고 **서울 기준 달력월**로 끝난다. 같은 서울 시각, 대상 월에 그 날짜가 없으면 말일로 보정한다(1/31 + 1개월 = 2/28, 윤년 2/29). 30일 환산을 쓰지 않는다. `add_calendar_months` 순수 함수로 시험한다.
-- 1회권은 신청 결제 시 해당 신청에 **보유(HELD)** 되며 테이블 확정 시 사용 처리한다. 매칭이 아직 없으므로 사용 처리는 구현하지 않았다.
+- 1회권은 신청 결제 시 해당 신청에 **보유(HELD)** 되며 테이블 확정 시 **사용(USED)** 처리한다. 배치 이력이 사용 근거이며 중복 실행으로 이용권·사용 근거가 추가되지 않는다.
 - 멤버십 매칭 실패 1회당 7일 연장은 구현·연결하지 않았다(MembershipExtension 테이블 없음).
 - **임시(기술 결정), CEO 확인 대기** — 적용 범위·중복 구매·`membership_too_short`(U03 확정 시 재검토): 멤버십은 지금 유효하고, **가장 이른 후보 마감 이전에 시작했으며**, 만료 시각이 신청의 **모든 후보 회차 시작 시각보다 늦을 때** 그 신청을 포함한다. 마감 뒤 다른 신청을 위해 산 멤버십은 이미 마감된 신청을 소급해 포함하지 않는다. 포함되면 새 결제를 요구하지 않고(`payment_required: false`, `coverage.source: "membership"`) 결제 요청은 409 `entitlement_already_covers`. 가장 늦은 후보 시작 전에 끝나는 멤버십 구매는 409 `membership_too_short`. 기존 멤버십이 신청을 포함하지 않으면 새 멤버십을 결제할 수 있고 기존 기간과 별개로 결제 시각부터 계산한다(갱신·합산 규칙 미정). 위 세 규칙은 모두 임시이며 CEO 확인 전이다.
 - 매칭 대상 여부는 회차별로 회차 마감 시점 기준으로 따로 판정한다([신청 계약](./application-contract.md) "매칭 대상 판정").
@@ -51,7 +53,7 @@
 | GET /api/me/entitlements | 참가자 | 본인 이용권 `{entitlements:[Entitlement]}` 최신순 |
 | GET /api/me/applications, GET /api/admin/applications | 기존 | Application에 `payments`(최신순 전체 시도), `coverage`, `payment_required` 추가. 운영자는 읽기만 한다 |
 
-`Payment = {id, application_id, state, mock, amount_krw, product:{code, name, kind, version, price_krw, period_months}, policy_version, simulated_failure, requested_at, completed_at}`. `Entitlement = {id, kind: SINGLE|MEMBERSHIP, product_code, payment_id, application_id(1회권만), application_state(1회권이 묶인 신청 상태, 멤버십 null), starts_at, expires_at(멤버십만), state: HELD|ACTIVE|EXPIRED, policy_version}`. `coverage = null | {source: "payment"|"membership", entitlement}`. 판정 순서는 인증 401 → 역할 403 → CSRF 403 → 본문 422 → 재전송 → 신청 소유 → 신청 상태 → 결제 마감 → 포함 여부 → 멤버십 기간. 응답은 `Cache-Control: no-store`.
+`Payment = {id, application_id, state, mock, amount_krw, product:{code, name, kind, version, price_krw, period_months}, policy_version, simulated_failure, requested_at, completed_at}`. `Entitlement = {id, kind: SINGLE|MEMBERSHIP, product_code, payment_id, application_id(1회권만), application_state(1회권이 묶인 신청 상태, 멤버십 null), starts_at, expires_at(멤버십만), state: HELD|USED|ACTIVE|EXPIRED, used_at, policy_version}`. `coverage = null | {source: "payment"|"membership", entitlement}`. 판정 순서는 인증 401 → 역할 403 → CSRF 403 → 본문 422 → 재전송 → 신청 소유 → 신청 상태 → 결제 마감 → 포함 여부 → 멤버십 기간. 응답은 `Cache-Control: no-store`.
 
 ## 화면
 
