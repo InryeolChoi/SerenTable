@@ -192,7 +192,7 @@ Work: 모임 안내·피드백·재방문 → 식당·채팅·알림. Task 추�
 식당 API 신규2 PASS, 채팅 별도 작업트리 실PG4 PASS·390px Chromium 영속/재연결/XSS PASS.
 채팅·알림 병합 완료. Claude Code 통합 검증: 새 격리 DB `serentable_work7_regression_test`에서 전체 pytest 242 PASS(476초), ruff·프런트 빌드 PASS.
 첫 전체 실행의 100명 규모 시험 정리 단계 FK 오류(worker가 만든 `app_notification`)는 시험 정리 범위를 넓혀 수정했다.
-로컬 Playwright는 포트 8000을 사용자의 다른 프로세스가 점유해 미실행이며 PR #41 CI로 확인한다.
+로컬 Playwright는 포트 8000을 사용자의 다른 프로세스가 점유해 미실행이다. 대신 `5dda339` CI [39034779407](https://github.com/InryeolChoi/SerenTable/actions/runs/39034779407)이 SUCCESS다(pytest 242, 브라우저 10, PG18 복구). 모임·단체방 전용 E2E 스펙은 아직 없다.
 `serentable_work7_gathering_test`에는 실패 정리로 남은 합성 계정이 있다. `serentable_work7_notifications_test`는 E2E 시작 시 초기화됐다. 둘 다 격리 시험 DB다. 이 중간 기록은 Work 완료 증거가 아니다.
 신규 로컬 DB `serentable_work7_gathering_test` 등만 사용하며 운영 migration/deploy/매칭/기존 데이터 변경 금지 유지.
 사용자 AGENTS.md와 .claude/.codex/claude 스크립트 미커밋 변경 보존.
