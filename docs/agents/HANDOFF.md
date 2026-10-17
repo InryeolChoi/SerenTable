@@ -4,6 +4,7 @@
 
 ## 먼저 확인할 현재 상태
 
+- **2026-10-17 Claude Code 인수·PR #37 Ready:** Codex 작업을 Claude Code가 이어받아 Git·PR 상태가 아래 기록과 일치함을 확인했다(HEAD `1f8bc0c`, #34/#35/#36/#37 모두 base main·CI SUCCESS). 사용자 요청으로 [PR #37](https://github.com/InryeolChoi/SerenTable/pull/37)을 Draft에서 Ready for review로 전환했다. 코드 변경·재검증은 없다. 다음은 사용자 병합(#34 → #36 → #37, #35 독립) 후 운영 반영 단계이며 운영 쓰기는 아직 없다. 사용자 미커밋 `AGENTS.md`·`.claude/`·`.codex/`·`scripts/claude-*.sh`는 보존했다.
 - **최종 병합 목적지 정리:** #34/#35/#36/#37은 모두 **main**을 대상으로 한다. 앞 기록/PR 초안의 '선행 브랜치를 base로 사용, 병합 후 main 변경'은 초기 분리 상태이며 현재는 해소됐다. 사용자 검토·병합 권장 순서 #34 → #36 → #37, #35 독립. 아직 운영 쓰기는 없다. #37 구현 dc714b0→보완4c05cda의 고정 재검토에서 P2 해결·추가 결함0, 로컬 신규5시험 중 골든1/거부2/부분실패1/프록시1을 각각 검증했다(보완 후 집중4 PASS). 최종 전체 CI와 Ready 여부는 실제 PR checks/상태를 우선한다. 별도 worktree는 만들지 않았고 검토 에이전트는 읽기 전용이었다.
 
 - **후속 합성 시연 B안:** 사용자 명시 승인 후 `codex/work5-synthetic-demo-scenario`, [PR #37](https://github.com/InryeolChoi/SerenTable/pull/37)(Refs #5, base #36 브랜치). [계약·Blaybus 문구](../design/synthetic-demo-scenario-contract.md). 운영자가 기존 어드민에서 만든 capacity100 회차 ID를 지정하고, 예약된 합성100명 ID/프로필·mock/정책 확인 후 API로 합성 동의·신청·모의 결제를 준비한다. 기본4계정은 보존, 기존 거절/혼합 회차는 쓰기 전 거부. 고정 요청 키로 부분 실패 재개, 시간 변경/회차 자동 생성/강제 매칭 없음. 실HTTP서버·PG17·별도 worker100명/필수위반0(1 PASS100.40초), 혼합/거절2 PASS, 중간 DB 오류49결제→재실행100 PASS. 독립 Spec의 환경 프록시 P2를 실제 RED로 확인해 직접 연결로 수정, Standards 정리 지연1건은5초 정리 예산으로 보완, 후속 집중4 PASS(26.16초). 최종 CI/재검토는 #37 확인. 로컬 보존 데모 DB에는 계정/프로필만 있고 시연 거래는 격리 시험 DB에서만 생성 후 fixture 정리됨. 운영 쓰기·실기기 시연은 미실행. 사용자 미커밋 설정은 보존.
