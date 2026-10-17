@@ -112,6 +112,24 @@ if (WEB_ROOT / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=WEB_ROOT / "assets"), name="assets")
 
 
+@app.get("/favicon.svg", include_in_schema=False)
+def brand_icon():
+    if not (WEB_ROOT / "favicon.svg").is_file():
+        raise HTTPException(503, "web_build_unavailable")
+    return FileResponse(WEB_ROOT / "favicon.svg", media_type="image/svg+xml")
+
+
+@app.get("/sw.js", include_in_schema=False)
+def push_service_worker():
+    if not (WEB_ROOT / "sw.js").is_file():
+        raise HTTPException(503, "web_build_unavailable")
+    return FileResponse(
+        WEB_ROOT / "sw.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"},
+    )
+
+
 @app.get("/login", include_in_schema=False)
 @app.get("/participant/profile", include_in_schema=False)
 @app.get("/participant/consent", include_in_schema=False)
