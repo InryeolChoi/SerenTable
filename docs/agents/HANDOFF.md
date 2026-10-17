@@ -1,6 +1,6 @@
 # 도구 간 작업 인계
 
-마지막 기록: 2026-10-17 (Asia/Seoul). Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
+마지막 기록: 2026-10-18 (Asia/Seoul). Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
 
 ## 먼저 확인할 현재 상태
 
@@ -251,3 +251,18 @@ PR42 `claude/work8-feedback`에 미병합 T4 f31f04b를 반영했다. 추천 자
 후속 PR43 통합에서 로컬Node22 모바일 E2E11 PASS(49.3초), 체크인→평가→운영예외·감사/CSV까지 확인했다. 신규 운영콘솔1개는 PR43에 있으며 PR42 단독 시험 결과로 확장하지 않는다. 공통 시험의 영속 안전/선호 상태를 테스트마다 초기화하고 CI검사시간예산25분만 적용했다. 최종 전체 회귀·CI 결과는 PR43 최신 HANDOFF와 docs/design/work8-work9-verification-2026-10-18.md를 확인한다.
 
 현재 Work8/7 브랜드 Task는 구현·격리 검증 결과를 Blaybus에 기록할 수 있으나 Work/Agenda는 운영 인수·미정정책 때문에 진행중을 유지한다. 운영 migration/deploy/data 변경·main 병합 금지, 사용자 AGENTS/.claude/.codex/scripts 보존.
+
+## 2026-10-18 Codex Work8·9 구현·로컬 검증 완료 (운영 미반영)
+
+최신 통합은 `codex/w9-integration`이며 기존 PR42(`claude/work8-feedback`)의 T4·추천 자격·안전 경합·브랜드 수정을 PR43(`claude/work9-operator-console`)에 반영했다. 대시보드 A·CSV 현재 인원·탭/CR 방어·감사 시험 범위 수정 완료. 신고/차단/선호는 공용 매칭 잠금→행 잠금이며 기존 확정·MBTI가중치·승인 최소60을 변경하지 않는다. 후속 브라우저 연결 검토에서 파비콘/서비스 워커404를 RED로 확인해 명시 정적 경로를 추가했다.
+
+- 원래 지정7파일 재현34 PASS/1 FAIL은 정상 회차 생성 감사와 CSV 시험 충돌이며 수정했다. 첫 통합 실행의3FAIL·6ERROR는 시험 사이 제외관계 누출로, 제품의 영속 안전 관계를 바꾸지 않고 공통 fixture를 격리했다. 같은순서17 PASS.
+- 새 로컬PG17 `serentable_w89_final_test`: **전체295 PASS(733.14초)**. 후속 정적 경로3 PASS. 코드/명령/중간실패는 검증 문서 참조.
+- 안전·평가·추천26 PASS, 신규 두PG연결 경합5개 RED→GREEN. 0012 전용 Work8 checkout+빈DB `serentable_w8_only_test` 인증19 PASS.
+- 포트8000 선확인·전용 `serentable_w89_e2e_test`, Node22 모바일 Chromium **11 PASS(52.2초)**. 새 단체방 게시/재접속→체크인→평가→운영예외→감사/CSV·권한 거절 포함.
+- Ruff·형식·타입·빌드·diff 검사 통과. 독립 Spec P1경합1건/Standards CSS·설계기록2건 수정 후 재검토 해결. 물리 스키마SVG·모바일 브랜드 화면 육안 확인.
+- PR42 최종코드7ec27b4 CI39051243303 진행 중. PR43 최신 기록 포함 후 CI 확인이 남아 있다. 이전 코드CI 취소는 성공이 아니다.
+
+[검증·12단계 증거·Blaybus Task별 수행/검증/남은 항목](../design/work8-work9-verification-2026-10-18.md)에 기록했다. 기존 Issue8/9에도 진행 댓글 반영. Blaybus는 사용자가 수동으로 갱신하며 Work/Agenda는 운영·미정정책 인수 전 진행중 유지한다. 선행 PR39는 main 문서 충돌 상태이며 임의 main병합 금지. 감사 보관·역할 분리·모의 환불 실패·대안 미응답 기준·운영자 사유 정책은 추가구현/확정하지 않았다.
+
+**운영migration/deploy/매칭재실행/기존데이터 변경·main병합 없음.** 실제 휴대폰 푸시·공개 데모 인수는 남았다. 사용자 AGENTS.md의30줄 미커밋변경 및 .claude/.codex/scripts/claude-*.sh를 커밋하지 않고 보존했다. 이번 세 managed 구현작업트리는 archive 요청했으며 앱 처리 전 남아 있을 수 있다. 사용자 Claude 작업트리와 기존 보존 DB는 유지한다. 다음 행동은 최신 CI 확인→PR42/43 Ready 여부 정리→운영 승인 전 공개 인수 계획 확인이다.

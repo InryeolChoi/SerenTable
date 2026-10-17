@@ -97,7 +97,7 @@
 
 바로 보는 자료: [확대·스크롤 뷰어](./erd/erd.html), [신청·결제 SVG](./erd/application-payment.svg), [매칭·모임 SVG](./erd/matching-gathering.svg), [피드백·운영 SVG](./erd/feedback-operations.svg). 같은 이름의 PNG도 제공하므로 Blaybus 중간 산출물에 올릴 수 있다. SVG는 확대해도 선명한 그림 파일이다. 그림은 아래 Mermaid 원문에서 생성하며 실제 DB에 적용된 스키마를 나타내지 않는다.
 
-재생성: Mermaid CLI를 준비한 환경에서 `python3 scripts/render_erd.py`를 실행한다. 별도 Chromium을 쓰면 `--puppeteer-config /path/to/config.json`, CLI가 PATH에 없으면 `--renderer /path/to/mmdc`를 지정한다. 원문 3개가 SVG·PNG 3개씩으로 출력된다.
+재생성: Mermaid CLI를 준비한 환경에서 `python3 scripts/render_erd.py`를 실행한다. 별도 Chromium을 쓰면 `--puppeteer-config /path/to/config.json`, CLI가 PATH에 없으면 `--renderer /path/to/mmdc`를 지정한다. 원문4개(초기 개념3개·Work7 물리1개)가 SVG·PNG4개씩으로 출력된다. 0012/0013 물리 요약은 별도 생성 스크립트를 사용한다.
 
 그림은 관계와 최소 키를 설명하며 전체 필드·SQL 타입·삭제 연쇄를 고정하지 않는다. 그림 사이 같은 이름은 동일 개념이다. 모든 보조 개념을 독립 테이블로 구현할 의무는 없다.
 
