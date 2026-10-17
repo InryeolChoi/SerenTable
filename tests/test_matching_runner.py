@@ -212,6 +212,33 @@ def test_four_paid_applications_are_seated_at_one_table_and_reported_over_http()
         assert stored_states() == {application_id: "CONFIRMED" for application_id in applications}
 
 
+def test_confirmation_uses_the_single_pass_once_and_retries_keep_its_usage_time():
+    with ExitStack() as stack:
+        operator = stack.enter_context(TestClient(app))
+        members = [stack.enter_context(TestClient(app)) for _ in range(4)]
+        login(operator, "operator")
+        for index, participant in enumerate(members, 1):
+            prepare(participant, f"participant-0{index}")
+        slot = due_slot(operator)
+        for participant in members:
+            apply_and_pay(participant, slot)
+        before = members[0].get("/api/me/entitlements").json()["entitlements"]
+        assert len(before) == 1 and before[0]["state"] == "HELD"
+        time.sleep(3.6)
+        assert run_slot_matching(slot)["state"] == "SUCCEEDED"
+        used = members[0].get("/api/me/entitlements").json()["entitlements"]
+        assert len(used) == 1
+        assert used[0]["state"] == "USED"
+        assert datetime.fromisoformat(used[0]["used_at"]) >= datetime.fromisoformat(
+            used[0]["starts_at"]
+        )
+        application = members[0].get("/api/me/applications").json()["applications"][0]
+        assert application["coverage"]["entitlement"] == used[0]
+        assert application["matching"]["state"] == "CONFIRMED"
+        assert run_slot_matching(slot) is None
+        assert members[0].get("/api/me/entitlements").json()["entitlements"] == used
+
+
 def test_unpaid_and_too_few_applications_are_left_out_with_a_reason():
     with ExitStack() as stack:
         operator = stack.enter_context(TestClient(app))
@@ -232,6 +259,83 @@ def test_unpaid_and_too_few_applications_are_left_out_with_a_reason():
         assert unpaid not in stored_states()
         listed = members[3].get("/api/me/applications").json()["applications"]
         assert listed[0]["matching"] is None
+        for participant in members[:3]:
+            (held,) = participant.get("/api/me/entitlements").json()["entitlements"]
+            assert held["state"] == "HELD" and held["used_at"] is None
+
+
+def test_a_database_failure_rolls_back_all_confirmations_and_rights_before_retry():
+    """Fail at the DB commit boundary after assignments, rather than mocking the engine."""
+    with ExitStack() as stack:
+        operator = stack.enter_context(TestClient(app))
+        members = [stack.enter_context(TestClient(app)) for _ in range(4)]
+        login(operator, "operator")
+        for index, participant in enumerate(members, 1):
+            prepare(participant, f"participant-0{index}")
+        slot = due_slot(operator)
+        for participant in members:
+            apply_and_pay(participant, slot)
+        time.sleep(3.6)
+        with database_engine().begin() as connection:
+            connection.execute(text("CREATE SEQUENCE test_confirmation_failure"))
+            connection.execute(
+                text("""CREATE FUNCTION test_confirmation_failure() RETURNS trigger
+            LANGUAGE plpgsql AS $$ BEGIN
+                IF NEW.state = 'SUCCEEDED' AND nextval('test_confirmation_failure') = 1 THEN
+                    RAISE EXCEPTION 'synthetic confirmation failure';
+                END IF; RETURN NEW;
+            END $$""")
+            )
+            connection.execute(
+                text("""CREATE TRIGGER test_confirmation_failure
+            BEFORE UPDATE ON match_run FOR EACH ROW
+            EXECUTE FUNCTION test_confirmation_failure()""")
+            )
+        try:
+            assert run_slot_matching(slot)["state"] == "FAILED"
+            for participant in members:
+                (application,) = participant.get("/api/me/applications").json()["applications"]
+                assert application["matching"]["state"] == "EXCEPTION"
+                assert application["matching"]["table"] is None
+                (held,) = participant.get("/api/me/entitlements").json()["entitlements"]
+                assert held["state"] == "HELD" and held["used_at"] is None
+            recovered = run_slot_matching(slot)
+            assert (recovered["state"], recovered["attempt"], recovered["seated_count"]) == (
+                "SUCCEEDED",
+                2,
+                4,
+            )
+            for participant in members:
+                (application,) = participant.get("/api/me/applications").json()["applications"]
+                assert application["matching"]["state"] == "CONFIRMED"
+                assert application["matching"]["table"]["member_count"] == 4
+                (used,) = participant.get("/api/me/entitlements").json()["entitlements"]
+                assert used["state"] == "USED" and used["used_at"] is not None
+            runs = operator.get("/api/admin/match-runs").json()["match_runs"]
+            assert [run["state"] for run in runs] == ["SUCCEEDED", "FAILED"]
+            assert [run["seated_count"] for run in runs] == [4, 0]
+        finally:
+            with database_engine().begin() as connection:
+                connection.execute(text("DROP TRIGGER test_confirmation_failure ON match_run"))
+                connection.execute(text("DROP FUNCTION test_confirmation_failure()"))
+                connection.execute(text("DROP SEQUENCE test_confirmation_failure"))
+
+
+def test_membership_remains_active_after_confirmation_and_does_not_become_single_use():
+    with ExitStack() as stack:
+        operator = stack.enter_context(TestClient(app))
+        members = [stack.enter_context(TestClient(app)) for _ in range(4)]
+        login(operator, "operator")
+        for index, participant in enumerate(members, 1):
+            prepare(participant, f"participant-0{index}")
+        slot = due_slot(operator)
+        for participant in members:
+            application_id = apply(participant, [slot]).json()["application"]["id"]
+            assert pay(participant, application_id, "membership_1m").status_code == 201
+        time.sleep(3.6)
+        assert run_slot_matching(slot)["seated_count"] == 4
+        (membership,) = members[0].get("/api/me/entitlements").json()["entitlements"]
+        assert membership["state"] == "ACTIVE" and membership["used_at"] is None
 
 
 def test_an_age_gap_leaves_the_table_unbuilt_and_names_the_reason():
@@ -324,7 +428,9 @@ def test_an_interrupted_generation_is_abandoned_and_replaced_by_a_new_attempt():
         for participant in members:
             apply_and_pay(participant, slot_id)
         time.sleep(3.6)
-        # A process that died mid-run leaves its generation behind, uncommitted to nothing.
+        # A durable stale RUNNING fixture exercises legacy/manual recovery. An actual
+        # killed worker rolls back its uncommitted generation; test_worker_crash_recovery
+        # checks that different case through a separate process and the public API.
         with database_engine().begin() as connection:
             connection.execute(
                 text("""INSERT INTO match_run

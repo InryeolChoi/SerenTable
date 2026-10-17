@@ -1,5 +1,13 @@
 # 개인정보·권한·보안 검증 기준
 
+**후속 합성 시나리오 B안:** 별도 명시 CLI만 합성100명의 동의·신청·모의 결제를 앱 API로 준비한다. 합성 ID/정책/mock 상품 확인, 혼합 회차·기존 동의 거절의 사전 중단, 고정 요청 키 재개, 환경 프록시·redirect 금지·세션 정리 예산을 적용한다. 기본 심사용 계정과 원본은 사용하지 않는다. [계약](./synthetic-demo-scenario-contract.md). 실제 운영 적재는 머지·배포·백업 후이며 현재 로컬 시험과 구분한다.
+
+**2026-10-17 합성 앱 시드:** 원본 비연결 합성100명 계정·프로필만 생성하고 자동 동의/거래는 만들지 않는다. 기본 로컬 전용 DB와 명시 Railway 모드를 구분하며, 후자는 프로젝트·환경·API 서비스 ID·private DB 대상·실행별 opt-in을 확인한다. 잘못된 ID/worker/query/libpq 우회와 암묵적 production 실행을 거부한다. 비밀번호·기존 프로필/활성 상태는 재실행으로 덮어쓰지 않고 중간 오류는 전체 롤백한다. [계약](./synthetic-demo-seed-contract.md). 운영 형식 확인만 수행했고 실제 운영 적재는 아직 아니다.
+
+**2026-10-17 원본 준비 CLI:** 원문 전체·가명/연락처·자유 입력을 복제하거나 출력하지 않고 집계만 반환한다. 준비 영역에 공개 API가 없으며 CLI는 별도 loopback 준비 DB만 허용하고 앱 DB·원격·production 실행을 거절한다. source_private는 PUBLIC 권한을 제거했고 실제 비권한 역할의 조회 거절을 시험한다. 소유자 권한에는 적용되지 않으므로 schema만으로 현재 운영 DB 소유자 앱 역할과 분리됐다고 주장하지 않는다. 별도 로컬 DB/연결이 실제 격리 수단이다. [상세](./source-preparation-contract.md).
+
+**2026-10-17 추가 경계:** 대체 일정 조회는 로그인한 참가자의 본인 SUBMITTED·NO_MATCH 신청만 허용한다. 타인/없는 ID의 동일 404, 운영자 403·익명 401, no-store를 실제 PostgreSQL HTTP에서 확인했다. 응답은 공개 회차 메타데이터만 포함하며 다른 신청자·개별 점수·개인정보를 포함하지 않는다. 읽기 요청은 신청/후보/결제/권리/매칭 상태를 변경하지 않는다. 전체 보안 인수와 실제 기기 검증을 완료한 것은 아니다.
+
 **Task:** 개발·배포 기반 확보 → 핵심 데이터·화면·보안 설계 → 개인정보·권한·보안 검증 기준 정리
 
 **추적:** [Task Issue #19](https://github.com/InryeolChoi/SerenTable/issues/19), [Work Issue #15](https://github.com/InryeolChoi/SerenTable/issues/15)
