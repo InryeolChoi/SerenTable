@@ -14,7 +14,7 @@
 - `GET /api/admin/push-deliveries`: `{deliveries:[{id,notification_id,subscription_id,state,attempts,next_attempt_at,last_error_code,sent_at}]}` 최신200개. 운영자만.
 - `GET /api/admin/gathering-exceptions`: `{exceptions:[{id,dining_table_id,kind,state,reason_code,created_at,updated_at}]}` 최신200개. 운영자만.
 
-`enqueue_notification(connection,user_id,event_key,kind,title,body,url,now)`는 호출자 트랜잭션에 참여한다. `(user_id,event_key)` 및 `(notification_id,subscription_id)` 고유키로 알림·작업 중복을 방지한다. url은 `/participant`만 허용한다. 앱내알림은 구독·푸시 설정과 무관하게 저장된다. 미구독은 delivery가 없고 not_subscribed로 보인다.
+`enqueue_notification(connection,user_id,event_key,kind,title,body,url,now)`는 호출자 트랜잭션에 참여한다. `(user_id,event_key)` 및 `(notification_id,subscription_id)` 고유키로 알림·작업 중복을 방지한다. url은 `/participant`, `/participant/gatherings`, `/participant/rooms`만 허용한다. 앱내알림은 구독·푸시 설정과 무관하게 저장된다. 미구독은 delivery가 없고 not_subscribed로 보인다.
 
 `dispatch_notifications()`는 각 delivery 트랜잭션/행잠금을 소유하고 SKIP LOCKED로 여러 worker 경쟁을 분리한다. 외부 HTTP 전송과 DB commit은 원자적이지 않다. 제공자 수락 후 commit 전 프로세스 중단 시 재전송되어 중복 수신할 수 있는 at-least-once 경계다. 실제 수락 없이 SENT를 저장하지 않는다. 최초 포함3회, 실패 후1분/5분. 최종 FAILED와 event_key 고유 운영자 예외를 저장한다. 구독만료404/410은 구독 비활성+UNAVAILABLE, 미설정·기본 네트워크 비활성·미구독은 시도0 UNAVAILABLE로 실패재시도와 구분한다. UNAVAILABLE은 자동 재발송하지 않으며 설정 변경이 과거 안내를 소급 발송하지 않는다.
 
@@ -23,7 +23,7 @@
 - `WEB_PUSH_VAPID_PRIVATE_KEY`: base64url 무패딩32바이트 P-256 private scalar를 환경변수로만 제공. 경로/파일로 해석하지 않는다.
 - `WEB_PUSH_VAPID_SUBJECT`: `mailto:` 연락 주소.
 - `WEB_PUSH_NETWORK_ENABLED=true`: 실제 전송 허용. 기본 비활성. 운영/실기기 전송 승인은 이번 구현 범위에 없다.
-- pywebpush2.5.0/py-vapid1.9.6의 암호화·VAPID 서명을 재사용한다. 공개키는 개인키에서 도출하여 불일치를 막는다. 단말 잠금화면 payload와 서비스 워커 표시/클릭은 일반 새 안내+고정 `/participant`; 개인이름·연락처·장소·테이블정보를 넣지 않는다.
+- pywebpush2.5.0/py-vapid1.9.6의 암호화·VAPID 서명을 재사용한다. 공개키는 개인키에서 도출하여 불일치를 막는다. 단말 잠금화면 payload와 서비스 워커 표시는 일반 새 안내+고정 `/participant/gatherings`; 개인이름·연락처·장소·테이블정보를 넣지 않는다.
 
 정확한 허용 호스트는 `fcm.googleapis.com`, `updates.push.services.mozilla.com`이다. HTTPS443만, userinfo/IP/fragment/control/backslash 거부. auth16바이트·p256dh65바이트 엄격 base64url과 P-256 곡선점 검증. Apple은 공식 자료가 wildcard만 명시하여 정확 host 근거가 확보되지 않아 현재 미지원이다. 그 외 공급자도 거부한다.
 

@@ -132,7 +132,7 @@ def send_push(subscription, session=None):
                 {
                     "title": "우연한 식탁",
                     "body": "새 안내가 도착했습니다. 앱에서 확인해 주세요.",
-                    "url": "/participant",
+                    "url": "/participant/gatherings",
                 }
             ),
             vapid_private_key=config[0],
