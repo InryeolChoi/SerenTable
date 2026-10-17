@@ -125,6 +125,12 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
   await expect(confirmed).toContainText("같은 식탁 소개:");
   for (const suffix of ["01", "02", "03", "04"])
     await expect(confirmed).toContainText(`매칭 식탁 ${suffix}`);
+  // MAT-12: tablemates appear by display name only, never by contact or Instagram ID.
+  const statusText = await participants[0].locator("main").innerText();
+  expect(statusText).not.toContain("010-0000-0000");
+  for (const suffix of ["02", "03", "04"])
+    expect(statusText).not.toContain(`synthetic_match_${suffix}`);
+  await confirmed.screenshot({ path: testInfo.outputPath("matching-confirmed-mobile.png") });
   // A slot the runner left out says why, instead of staying "waiting" forever.
   await expect(mine.filter({ hasText: partial.name })).toContainText(
     "매칭: 매칭 실패 (NO_MATCH) · 함께 앉을 인원이 부족합니다",
