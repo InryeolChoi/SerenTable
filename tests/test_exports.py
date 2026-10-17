@@ -160,13 +160,14 @@ def test_tables_csv_lists_each_confirmed_table_with_score_venue_and_check_ins(sl
 
 
 def export_audit():
-    # Ticket C owns the audit read API; until it merges the trail is read from its table.
+    # Restrict this export test to export actions; fixture creation is audited too.
     with database_engine().connect() as connection:
         return [
             tuple(row)
             for row in connection.execute(
                 text("""SELECT a.action, a.target_type, a.target_id, a.after_state, u.login_id
-                FROM operator_audit a JOIN app_user u ON u.id = a.actor_id ORDER BY a.id""")
+                FROM operator_audit a JOIN app_user u ON u.id = a.actor_id
+                WHERE a.action = 'export' ORDER BY a.id""")
             ).all()
         ]
 
@@ -190,3 +191,50 @@ def test_only_operators_export_known_slots_and_each_export_is_audited(slot):
         ("export", "event_slot", slot["id"], {"file": "tables", "rows": 0}, "operator"),
         ("export", "event_slot", slot["id"], {"file": "applications", "rows": 5}, "operator"),
     ]
+
+
+@pytest.mark.parametrize("prefix", ["\t", "\r"])
+def test_csv_guards_legacy_control_prefix_cells(slot, prefix):
+    # Legacy/imported data can predate the profile API's whitespace trimming.
+    unsafe_name = prefix + "=SUM(1)"
+    with database_engine().begin() as connection:
+        connection.execute(
+            text("""UPDATE participant_profile SET data=jsonb_set(data,'{display_name}',
+                to_jsonb(CAST(:name AS text))) WHERE user_id=(
+                SELECT id FROM app_user WHERE login_id='participant-01')"""),
+            {"name": unsafe_name},
+        )
+    rows = parse(download(slot["operator"], "applications.csv", slot["id"]))
+    assert rows[1][1] == "'" + unsafe_name
+
+
+def test_tables_csv_counts_only_current_confirmed_assignments(slot):
+    table_id = match_and_seat(slot)
+    # Simulate ended, no-longer-confirmed and moved historical assignments.
+    # Keep the original table's recorded match-time size (4) unchanged.
+    with database_engine().begin() as connection:
+        connection.execute(
+            text("UPDATE table_assignment SET ended_at=now() WHERE application_id=:app"),
+            {"app": slot["applications"][0]},
+        )
+        connection.execute(
+            text("""UPDATE match_participation SET state='NO_MATCH',dining_table_id=NULL
+                WHERE application_id=:app"""),
+            {"app": slot["applications"][1]},
+        )
+        other_table = str(uuid.uuid4())
+        connection.execute(
+            text("""INSERT INTO dining_table(id,match_run_id,event_slot_id,member_count,score)
+                SELECT :other,match_run_id,event_slot_id,4,score FROM dining_table
+                WHERE id=:original"""),
+            {"other": other_table, "original": table_id},
+        )
+        connection.execute(
+            text("UPDATE match_participation SET dining_table_id=:other WHERE application_id=:app"),
+            {"other": other_table, "app": slot["applications"][2]},
+        )
+    rows = parse(download(slot["operator"], "tables.csv", slot["id"]))
+    original = next(row for row in rows[1:] if row[0] == table_id)
+    assert original[2:4] == ["1", "'@멘션"]
+    empty = next(row for row in rows[1:] if row[0] == other_table)
+    assert empty[2:4] == ["0", ""]
