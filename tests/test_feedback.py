@@ -208,7 +208,7 @@ def test_unanswered_members_get_exactly_one_reminder_after_a_day(table):
     for member in silent:
         sent = reminders(member)
         assert len(sent) == 1
-        assert sent[0]["url"].startswith("/participant")
+        assert sent[0]["url"] == "/participant/history"
     # Answering later never brings another reminder.
     assert send(silent[0], "PUT", path(table["id"]), RATINGS).status_code == 200
     run_feedback_jobs()

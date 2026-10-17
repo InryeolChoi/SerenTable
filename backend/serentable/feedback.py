@@ -236,6 +236,6 @@ def run_feedback_jobs():
                 "우연한 식탁 모임 후기",
                 "지난 모임은 어떠셨나요? 참가 이력에서 비공개 평가를 남겨 주세요. "
                 "평가는 다른 참가자에게 공개되지 않으며, 남기지 않아도 다음 신청은 가능합니다.",
-                "/participant",
+                "/participant/history",
                 row["now"],
             )
