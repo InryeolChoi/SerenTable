@@ -15,4 +15,15 @@ def seeded_database(monkeypatch):
     monkeypatch.setenv("DEMO_PARTICIPANT_PASSWORD", "synthetic-participant-password")
     monkeypatch.setenv("DEMO_OPERATOR_PASSWORD", "synthetic-operator-password")
     subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=True)
+    # Safety preferences and restrictions are deliberately durable in the product.
+    # Independent test scenarios must not inherit another test's exclusions or sanctions.
+    from serentable.database import database_engine
+    from sqlalchemy import text
+
+    with database_engine().begin() as connection:
+        connection.execute(
+            text("""TRUNCATE participant_exclusion, participant_sanction,
+            person_preference, safety_report, attendance_check_in, no_show_review,
+            table_feedback, push_subscription, app_notification, operator_audit CASCADE""")
+        )
     subprocess.run([sys.executable, "-m", "serentable.seed_demo_accounts"], check=True)
