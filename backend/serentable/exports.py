@@ -23,7 +23,7 @@ router = APIRouter()
 
 SEOUL = timezone(timedelta(hours=9))
 # Spreadsheet apps evaluate a cell that starts with one of these as a formula.
-FORMULA_TRIGGERS = ("=", "+", "-", "@")
+FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")
 UNNAMED = "참가자"
 
 APPLICATION_HEADER = ["신청 ID", "표시명", "신청 상태", "결제 상태", "매칭 상태", "제출 시각"]
@@ -113,7 +113,7 @@ def export_applications(
 
 
 TABLE_HEADER = ["테이블 ID", "점수", "인원", "표시명 목록", "식당명", "체크인 수"]
-TABLE_ROWS = """SELECT t.id, t.score, t.member_count, v.name AS venue_name,
+TABLE_ROWS = """SELECT t.id, t.score, v.name AS venue_name,
     (SELECT count(*) FROM attendance_check_in ci WHERE ci.dining_table_id = t.id)
         AS check_ins
     FROM dining_table t
@@ -126,6 +126,9 @@ TABLE_ROWS = """SELECT t.id, t.score, t.member_count, v.name AS venue_name,
 TABLE_MEMBERS = """SELECT ta.dining_table_id, ta.user_id,
     p.data ->> 'display_name' AS display_name
     FROM table_assignment ta
+    JOIN match_participation mp ON mp.application_id = ta.application_id
+      AND mp.user_id = ta.user_id AND mp.dining_table_id = ta.dining_table_id
+      AND mp.event_slot_id = ta.event_slot_id AND mp.state = 'CONFIRMED'
     LEFT JOIN participant_profile p ON p.user_id = ta.user_id
     WHERE ta.event_slot_id = :slot AND ta.ended_at IS NULL"""
 
@@ -141,7 +144,7 @@ def table_rows(connection, slot_id):
             str(row["id"]),
             # Runs before ADR-0011 recorded no score.
             "" if row["score"] is None else f"{row['score']:.2f}",
-            row["member_count"],
+            len(names.get(row["id"], [])),
             ", ".join(name for name, _ in sorted(names.get(row["id"], []))),
             row["venue_name"] or "",
             row["check_ins"],
