@@ -126,6 +126,40 @@ def test_a_participant_is_never_confirmed_at_two_tables_at_the_same_time():
             assert sum(a["matching"]["state"] == "CONFIRMED" for a in mine) == 1
 
 
+def test_the_run_records_policy_and_table_scores_for_the_operator_only():
+    """ADR-0011 / MAT-12: the operator history explains scores; participants never see them."""
+    with ExitStack() as stack:
+        operator = stack.enter_context(TestClient(app))
+        members = [stack.enter_context(TestClient(app)) for _ in range(4)]
+        login(operator, "operator")
+        for index, participant in enumerate(members, start=1):
+            prepare(participant, f"participant-0{index}")
+        slot_id = due_slot(operator)
+        for participant in members:
+            apply_and_pay(participant, slot_id)
+        time.sleep(3.6)
+        (summary,) = run_due_matches()
+        assert summary["seated_count"] == 4
+        (run,) = operator.get("/api/admin/match-runs").json()["match_runs"]
+        assert (run["algorithm_version"], run["rule_version"]) == (
+            "dp-repair-swap-v1",
+            "adr-0011-2026-10-17",
+        )
+        assert run["policy"]["version"] == "prd-weighted-v1"
+        assert run["policy"]["min_score"] == "50"
+        (table,) = run["tables"]
+        # Same profile for all four (COMPLETE_PROFILE): age 100, interest 100, trait
+        # "different" from an identical self trait 0, new 100; gender and MBTI cannot be
+        # computed. (.25*100 + .15*100 + .10*0 + .15*100) / .65 = 1100/13 = 84.62.
+        assert table["member_count"] == 4
+        assert table["score"] == "84.62"
+        assert table["components"]["gender"] is None
+        assert table["components"]["trait"] == "0.00"
+        for participant in members:
+            body = participant.get("/api/me/applications").text
+            assert "score" not in body and "components" not in body
+
+
 def test_the_planner_seats_as_many_as_the_oracle_and_never_breaks_a_hard_constraint():
     cases = [
         [1995, 1995, 1995, 1995],
