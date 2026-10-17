@@ -14,6 +14,7 @@ from serentable.auth import (
     require_participant,
 )
 from serentable.database import database_engine
+from serentable.match_resolution import lock_matching
 
 router = APIRouter()
 
@@ -160,6 +161,9 @@ def put_preferences(
     if len(set(targets)) != len(targets):
         raise HTTPException(422, "duplicate_target")
     with database_engine().begin() as connection:
+        # Both exclusions and mutual-MEET_AGAIN score inputs belong to the worker
+        # snapshot: serialize every choice change (including clearing) before row writes.
+        lock_matching(connection)
         require_ended(connection, table_id, user.id)
         mates = set(
             connection.execute(
