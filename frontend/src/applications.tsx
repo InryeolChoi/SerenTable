@@ -263,6 +263,7 @@ const matchingReasons: Record<string, string> = {
   age_gap: "나이 차이 조건을 맞출 수 없습니다",
   no_valid_table: "조건에 맞는 테이블을 만들 수 없습니다",
   overlapping_confirmation: "같은 시간대의 다른 식탁에 이미 확정되었습니다",
+  no_qualifying_table: "조건과 최소 매칭 점수를 함께 만족하는 테이블을 찾지 못했습니다",
   runner_error: "자동 매칭 오류로 운영자 확인이 필요합니다",
   stale_generation: "중단된 실행을 정리했습니다",
 };
@@ -458,7 +459,8 @@ export function MyApplications({
                       </button>
                     )}
                   {(application.matching?.state === "ALTERNATIVE_OFFERED" ||
-                    application.matching?.state === "NO_MATCH") && (
+                    (application.matching?.state === "NO_MATCH" &&
+                      application.matching.reason_code !== "overlapping_confirmation")) && (
                     <AlternativeSlots applicationId={application.id} />
                   )}
                 </div>

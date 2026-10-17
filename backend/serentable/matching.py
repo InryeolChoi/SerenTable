@@ -35,6 +35,7 @@ from serentable.database import database_engine
 from serentable.eligibility import CANDIDATES, ELIGIBLE
 from serentable.events import SLOT_COLUMNS, slot_json
 from serentable.matching_score import (
+    MAX_AGE_GAP,
     Member,
     component_scores,
     policy_from_environment,
@@ -49,7 +50,6 @@ router = APIRouter()
 # by a shared import).
 MIN_TABLE_SIZE = 4
 MAX_TABLE_SIZE = 6
-MAX_AGE_GAP = 8
 
 BASELINE_ALGORITHM_VERSION = "age-ordered-dp-v2"
 ALGORITHM_VERSION = "dp-repair-swap-v1"
@@ -66,8 +66,9 @@ CAPACITY = "capacity"
 UNKNOWN_AGE = "unknown_age"
 AGE_GAP = "age_gap"
 NO_VALID_TABLE = "no_valid_table"
-EXCLUDED_PAIR = "excluded_pair"
-BELOW_MIN_SCORE = "below_min_score"
+# The age-only baseline could seat this person, but the search found no table that also
+# avoids excluded pairs and reaches the minimum score. A local search proves no more.
+NO_QUALIFYING_TABLE = "no_qualifying_table"
 # Already confirmed at another slot whose time overlaps this one (PRD §7.4).
 OVERLAPPING_CONFIRMATION = "overlapping_confirmation"
 
@@ -389,7 +390,7 @@ def _policy_allocation(roster, capacity, policy, exclusions, met_pairs):
             person.application_id,
             _reason(roster, years, searchable, index, capacity)
             if index not in baseline
-            else _policy_reason(search, index),
+            else NO_QUALIFYING_TABLE,
         )
         for index, person in enumerate(roster)
         if index not in seated
@@ -404,14 +405,6 @@ def _policy_allocation(roster, capacity, policy, exclusions, met_pairs):
         table_components=tuple(components for _, components in scored),
         search_complete=complete,
     )
-
-
-def _policy_reason(search, index):
-    """Why someone the age-only baseline could seat was left out: exclusion or score."""
-    user = search.members[index].user_id
-    if any(user in pair for pair in search.exclusions):
-        return EXCLUDED_PAIR
-    return BELOW_MIN_SCORE
 
 
 # Eligible applications for one slot, in submission order. Paid by the slot close, live
@@ -571,9 +564,9 @@ def _execute(connection, slot_id):
                 "run": run_id,
                 "slot": slot_id,
                 "count": len(members),
-                "score": two_places(score),
+                "score": _two_places(score),
                 "components": json.dumps(
-                    {k: None if v is None else two_places(v) for k, v in components.items()}
+                    {k: None if v is None else _two_places(v) for k, v in components.items()}
                 ),
             },
         )
@@ -629,7 +622,9 @@ def _execute(connection, slot_id):
             connection,
             application_id,
             owners[application_id],
-            "ALTERNATIVE_OFFERED",
+            # Seated elsewhere at that time: this application simply ends, with nothing
+            # to choose. Every other unseated application awaits a resolution choice.
+            "NO_MATCH" if reason == OVERLAPPING_CONFIRMATION else "ALTERNATIVE_OFFERED",
             None,
             None,
             run_id,
@@ -691,7 +686,7 @@ def _participant(row):
     )
 
 
-def two_places(value):
+def _two_places(value):
     """Exact half-up rounding of a non-negative score to two decimals, as text."""
     cents = int(Fraction(value) * 100 + Fraction(1, 2))
     return f"{cents // 100}.{cents % 100:02d}"

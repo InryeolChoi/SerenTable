@@ -103,6 +103,16 @@ def latest_consent_ids(connection, user_id):
     return {row["purpose"]: row["id"] for row in rows}
 
 
+def offers_alternatives(matching_state, reason_code):
+    """ALTERNATIVE_OFFERED, or a NO_MATCH written before ADR-0011 for the same outcome.
+
+    A NO_MATCH for overlapping_confirmation means the user is already seated at that time.
+    """
+    if matching_state == "ALTERNATIVE_OFFERED":
+        return True
+    return matching_state == "NO_MATCH" and reason_code != "overlapping_confirmation"
+
+
 @router.get("/api/me/applications/{application_id}/alternatives")
 def list_application_alternatives(
     application_id: uuid.UUID, user: Principal = Depends(require_participant)
@@ -117,7 +127,8 @@ def list_application_alternatives(
         with database_engine().connect() as connection:
             application = (
                 connection.execute(
-                    text("""SELECT a.state, mp.state AS matching_state FROM application a
+                    text("""SELECT a.state, mp.state AS matching_state, mp.reason_code
+                FROM application a
                 LEFT JOIN match_participation mp ON mp.application_id = a.id
                 WHERE a.id = :id AND a.user_id = :user"""),
                     {"id": application_id, "user": user.id},
@@ -127,10 +138,8 @@ def list_application_alternatives(
             )
             if application is None:
                 raise HTTPException(404, "application_not_found")
-            # Rows written before ADR-0011 say NO_MATCH for the same unseated outcome.
-            if application["state"] != "SUBMITTED" or application["matching_state"] not in (
-                "ALTERNATIVE_OFFERED",
-                "NO_MATCH",
+            if application["state"] != "SUBMITTED" or not offers_alternatives(
+                application["matching_state"], application["reason_code"]
             ):
                 raise HTTPException(409, "alternatives_not_available")
             now = locked_now(connection)

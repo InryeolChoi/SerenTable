@@ -117,10 +117,16 @@ def test_a_participant_is_never_confirmed_at_two_tables_at_the_same_time():
         states = stored_states()
         confirmed = [a for a in earlier + later if states.get(a) == "CONFIRMED"]
         assert len(confirmed) == 4
-        unseated = [a for a in earlier + later if states.get(a) == "ALTERNATIVE_OFFERED"]
-        assert len(unseated) == 4
+        # Already seated at that time: this application's matching ends, with no
+        # alternatives offered (it is not a failure to resolve).
+        ended = [a for a in earlier + later if states.get(a) == "NO_MATCH"]
+        assert len(ended) == 4
         reasons = {item["reason_code"] for s in summaries for item in s["unseated"]}
         assert reasons == {"overlapping_confirmation"}
+        for participant, application_id in zip(members, later, strict=True):
+            path = f"/api/me/applications/{application_id}/alternatives"
+            if application_id in ended:
+                assert participant.get(path).status_code == 409
         for participant in members:
             mine = participant.get("/api/me/applications").json()["applications"]
             assert sum(a["matching"]["state"] == "CONFIRMED" for a in mine) == 1

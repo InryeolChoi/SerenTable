@@ -31,8 +31,7 @@ def policy(min_score):
     return Policy(weights=DEFAULT_POLICY.weights, min_score=Fraction(min_score))
 
 
-# Four men, ages 8 apart at the extremes, nothing in common and wanting what nobody is:
-# age 0, gender 0, MBTI (ISTJ/ENFP differ in all 4 -> 80; ISTJ-ISTJ 100 ...) see below.
+# Four men, ages 8 apart at the extremes, nothing in common and wanting what nobody is.
 POOR = [
     person(1, 1990, mbtis=("ISTJ",), interests=("music",), desired=("passionate",)),
     person(2, 1998, mbtis=("ENFP",), interests=("travel",), desired=("passionate",)),
@@ -47,7 +46,8 @@ def test_a_table_below_the_minimum_score_is_not_built():
     # .15*520/6 + .15*100 = 13 + 15 = 28 < 50.
     plan = plan_allocation(POOR, 24, policy=policy(50))
     assert plan.tables == ()
-    assert {reason for _, reason in plan.unseated} == {"below_min_score"}
+    # A local search cannot prove no table exists, so the reason says what it found.
+    assert {reason for _, reason in plan.unseated} == {"no_qualifying_table"}
 
 
 def test_with_a_zero_minimum_the_same_table_is_built_and_scored():
@@ -76,7 +76,7 @@ def test_a_lone_excluded_pair_that_cannot_be_split_leaves_people_out_with_the_re
     excluded = frozenset({frozenset({"user-01", "user-02"})})
     plan = plan_allocation(people, 24, policy=policy(0), exclusions=excluded)
     assert plan.seated_count == 0
-    assert dict(plan.unseated)["app-01"] == "excluded_pair"
+    assert dict(plan.unseated)["app-01"] == "no_qualifying_table"
 
 
 def test_swaps_group_shared_interests_when_the_seat_count_is_equal():
