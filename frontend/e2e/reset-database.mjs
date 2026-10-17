@@ -16,6 +16,14 @@ if (!local.has(host)) {
   );
   process.exit(1);
 }
+execFileSync("uv", ["run", "python", "-c", `
+from sqlalchemy import text
+from serentable.database import database_engine
+with database_engine().begin() as connection:
+    if connection.execute(text("SELECT to_regclass('public.event_slot')")).scalar():
+        tables = "event_slot, application" if connection.execute(text("SELECT to_regclass('public.application')")).scalar() else "event_slot"
+        connection.execute(text(f"TRUNCATE {tables} CASCADE"))
+`], { cwd: "..", env: { ...process.env, PYTHONPATH: "backend" }, stdio: "inherit" });
 for (const step of [
   ["downgrade", "base"],
   ["upgrade", "head"],

@@ -34,6 +34,7 @@ from serentable.clock import iso, locked_now
 from serentable.database import database_engine
 from serentable.eligibility import CANDIDATES, ELIGIBLE
 from serentable.events import SLOT_COLUMNS, slot_json
+from serentable.match_resolution import extend_final_failure, lock_matching
 from serentable.matching_score import (
     MAX_AGE_GAP,
     Member,
@@ -486,6 +487,7 @@ def run_slot_matching(slot_id):
 
 
 def _execute(connection, slot_id):
+    lock_matching(connection)
     slot = (
         connection.execute(
             text("SELECT id, capacity, matches_at FROM event_slot WHERE id = :id FOR UPDATE"),
@@ -642,6 +644,9 @@ def _execute(connection, slot_id):
             "id": run_id,
         },
     )
+    for application_id, reason in unseated:
+        if reason != OVERLAPPING_CONFIRMATION:
+            extend_final_failure(connection, application_id, finished)
     return {
         "event_slot_id": str(slot_id),
         "match_run_id": str(run_id),
@@ -718,6 +723,7 @@ def _record_exception(slot_id, reason="runner_error"):
     """
     try:
         with database_engine().begin() as connection:
+            lock_matching(connection)
             slot = connection.execute(
                 text("SELECT id FROM event_slot WHERE id = :id FOR UPDATE"), {"id": slot_id}
             ).scalar()

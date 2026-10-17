@@ -18,6 +18,7 @@ from serentable.clock import iso, locked_now
 from serentable.database import database_engine
 from serentable.eligibility import eligible_slot_ids
 from serentable.events import SLOT_COLUMNS, field_error, slot_json
+from serentable.match_resolution import resolution_json, single_right, target_allowed
 from serentable.matching import participation_details
 from serentable.payments import payment_details
 from serentable.profile import consent_state, profile_state, read_profile
@@ -47,14 +48,30 @@ def applications_json(connection, rows, now, with_participant=False):
     candidates = {}
     if ids:
         for slot in connection.execute(
-            text(f"""SELECT c.application_id, {SLOT_COLUMNS}
+            text(f"""SELECT c.application_id, c.live, c.source_resolution_id, {SLOT_COLUMNS}
             FROM application_candidate c
             JOIN event_slot s ON s.id = c.event_slot_id
             JOIN region r ON r.code = s.region_code
             WHERE c.application_id = ANY(:ids) ORDER BY s.starts_at, r.sort_order"""),
             {"ids": ids},
         ).mappings():
-            candidates.setdefault(slot["application_id"], []).append(slot_json(slot, now))
+            candidates.setdefault(slot["application_id"], []).append(
+                slot_json(slot, now)
+                | {
+                    "live": slot["live"],
+                    "source_resolution_id": str(slot["source_resolution_id"])
+                    if slot["source_resolution_id"]
+                    else None,
+                }
+            )
+    history = {}
+    if ids:
+        for resolution in connection.execute(
+            text("""SELECT * FROM match_resolution WHERE application_id=ANY(:ids)
+                ORDER BY created_at DESC, id"""),
+            {"ids": ids},
+        ).mappings():
+            history.setdefault(resolution["application_id"], []).append(resolution_json(resolution))
     payments = payment_details(connection, rows, now)
     eligible = eligible_slot_ids(connection, ids, now)
     matching = participation_details(connection, ids)
@@ -69,6 +86,7 @@ def applications_json(connection, rows, now, with_participant=False):
             # The stored matching axis, or null when no run has reached this application
             # yet; the screen then derives "waiting" from eligibility as before.
             "matching": matching[row["id"]],
+            "resolutions": history.get(row["id"], []),
         }
         | payments[row["id"]]
         | (
@@ -108,6 +126,8 @@ def offers_alternatives(matching_state, reason_code):
 
     A NO_MATCH for overlapping_confirmation means the user is already seated at that time.
     """
+    if reason_code in ("pass_held", "mock_refunded", "membership_held"):
+        return False
     if matching_state == "ALTERNATIVE_OFFERED":
         return True
     return matching_state == "NO_MATCH" and reason_code != "overlapping_confirmation"
@@ -127,7 +147,8 @@ def list_application_alternatives(
         with database_engine().connect() as connection:
             application = (
                 connection.execute(
-                    text("""SELECT a.state, mp.state AS matching_state, mp.reason_code
+                    text("""SELECT a.state, mp.state AS matching_state, mp.reason_code,
+                    mp.match_run_id
                 FROM application a
                 LEFT JOIN match_participation mp ON mp.application_id = a.id
                 WHERE a.id = :id AND a.user_id = :user"""),
@@ -172,8 +193,34 @@ def list_application_alternatives(
                     .mappings()
                     .all()
                 )
+            if alternatives:
+                has_single = single_right(connection, application_id) is not None
+                alternatives = [
+                    slot
+                    for slot in alternatives
+                    if target_allowed(connection, user.id, slot["id"], now)
+                    and (
+                        has_single
+                        or connection.execute(
+                            text("""SELECT 1 FROM entitlement e
+                            JOIN payment p ON p.id=e.payment_id
+                            WHERE e.user_id=:user AND e.kind='MEMBERSHIP' AND p.state='PAID'
+                            AND e.starts_at<=least(:now,:close) AND e.expires_at>:start
+                            LIMIT 1"""),
+                            {
+                                "user": user.id,
+                                "now": now,
+                                "close": slot["closes_at"],
+                                "start": slot["starts_at"],
+                            },
+                        ).scalar()
+                    )
+                ]
             return private_response(
                 {
+                    "failure_run_id": str(application["match_run_id"])
+                    if application["match_run_id"]
+                    else None,
                     "pending_candidates": [slot_json(slot, now) for slot in pending],
                     "alternatives": [slot_json(slot, now) for slot in alternatives],
                 }
@@ -205,7 +252,7 @@ def submit_application(
                 chosen = set(
                     connection.execute(
                         text("""SELECT event_slot_id FROM application_candidate
-                        WHERE application_id = :id"""),
+                        WHERE application_id = :id AND source_resolution_id IS NULL"""),
                         {"id": prior},
                     ).scalars()
                 )
@@ -290,17 +337,17 @@ def cancel_application(
                 raise HTTPException(404, "application_not_found")
             now = locked_now(connection)
             if state == "SUBMITTED":
-                earliest_close = min(
+                closes = list(
                     connection.execute(
                         text("""SELECT s.closes_at FROM application_candidate c
                         JOIN event_slot s ON s.id = c.event_slot_id
-                        WHERE c.application_id = :id FOR SHARE OF s"""),
+                        WHERE c.application_id = :id AND c.live FOR SHARE OF s"""),
                         {"id": application_id},
                     ).scalars()
                 )
                 # Matching may have held this slot until after the deadline.
                 now = locked_now(connection)
-                if earliest_close <= now:
+                if not closes or min(closes) <= now:
                     raise HTTPException(409, "application_cancel_closed")
                 connection.execute(
                     text("""UPDATE application SET state = 'CANCELED', canceled_at = :now

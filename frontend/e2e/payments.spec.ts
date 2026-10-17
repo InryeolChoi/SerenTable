@@ -98,7 +98,8 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
   const mock = participant.getByRole("region", { name: "모의 결제" });
   await expect(mock).toContainText("모의 결제 · 실제 결제가 발생하지 않습니다");
   await expect(mock).toContainText("화요일 24:00 이후 환불 불가");
-  await expect(mock).toContainText("세부 환불 정책 미정");
+  await expect(mock).toContainText("일반 취소의 세부 정책은 미정입니다");
+  await expect(mock).toContainText("시스템 최종 매칭 실패의 미사용 1회권은 시간 제한 없이 전액 모의 환불");
   await expect(mock).toContainText("노쇼·취소 정책 미정");
   await expect(mock).toContainText("결제 금액 9,900원");
   await mock.getByRole("checkbox", { name: /실패 시뮬레이션/ }).check();

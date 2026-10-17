@@ -72,10 +72,13 @@ PAYMENT_COLUMNS = """p.id, p.application_id, p.state, p.product_code, p.product_
 p.product_kind, p.product_version, p.amount_krw, p.period_months, p.policy_version,
 p.simulated_failure, p.requested_at, p.completed_at"""
 ENTITLEMENT_COLUMNS = """e.id, e.user_id, e.payment_id, e.kind, e.application_id, e.starts_at,
-e.expires_at, e.policy_version, p.product_code,
+e.expires_at, e.policy_version, p.product_code, p.state AS payment_state,
+(SELECT b.application_id FROM entitlement_binding b WHERE b.entitlement_id=e.id AND b.ended_at
+IS NULL) AS reserved_application_id,
 (SELECT a.state FROM application a WHERE a.id = e.application_id) AS application_state,
 (SELECT min(ta.created_at) FROM table_assignment ta
- WHERE ta.application_id = e.application_id) AS used_at"""
+ JOIN entitlement_binding b ON b.application_id=ta.application_id
+ WHERE b.entitlement_id=e.id) AS used_at"""
 
 
 def payment_json(row):
@@ -105,7 +108,11 @@ def entitlement_json(row, now):
         # Assignments and confirmation commit together; rolled-back runs never consume
         # a pass. Historical assignments remain even if a future reallocation ends them:
         # ending an assignment must not silently restore a previously used right (U03).
-        state = "USED" if row["used_at"] is not None else "HELD"
+        state = (
+            "REFUNDED"
+            if row["payment_state"] == "REFUNDED"
+            else ("USED" if row["used_at"] is not None else "HELD")
+        )
     else:
         state = "ACTIVE" if now < row["expires_at"] else "EXPIRED"
     return {
@@ -122,6 +129,12 @@ def entitlement_json(row, now):
         "used_at": iso(row["used_at"]),
         "state": state,
         "policy_version": row["policy_version"],
+        "reserved_application_id": str(row["reserved_application_id"])
+        if row["reserved_application_id"]
+        else None,
+        "reusable": row["kind"] == "SINGLE"
+        and state == "HELD"
+        and row["reserved_application_id"] is None,
     }
 
 
@@ -146,9 +159,20 @@ def payment_details(connection, rows, now):
     ).mappings():
         details[payment["application_id"]]["payments"].append(payment_json(payment))
     for entitlement in connection.execute(
-        text(f"""SELECT {ENTITLEMENT_COLUMNS}, p.application_id AS paid_for
+        text(f"""SELECT {ENTITLEMENT_COLUMNS}, b.application_id AS paid_for
         FROM entitlement e JOIN payment p ON p.id = e.payment_id
-        WHERE p.application_id = ANY(:ids)"""),
+        JOIN entitlement_binding b ON b.entitlement_id=e.id AND b.ended_at IS NULL
+        WHERE b.application_id = ANY(:ids) AND p.state='PAID'"""),
+        {"ids": ids},
+    ).mappings():
+        details[entitlement["paid_for"]]["coverage"] = {
+            "source": "payment",
+            "entitlement": entitlement_json(entitlement, now),
+        }
+    for entitlement in connection.execute(
+        text(f"""SELECT {ENTITLEMENT_COLUMNS}, p.application_id AS paid_for
+        FROM entitlement e JOIN payment p ON p.id=e.payment_id
+        WHERE e.kind='MEMBERSHIP' AND p.state='PAID' AND p.application_id=ANY(:ids)"""),
         {"ids": ids},
     ).mappings():
         details[entitlement["paid_for"]]["coverage"] = {
@@ -164,14 +188,26 @@ def payment_details(connection, rows, now):
                     "source": "membership",
                     "entitlement": entitlement_json(membership, now),
                 }
-        detail["payment_required"] = row["state"] == "SUBMITTED" and detail["coverage"] is None
+        detail["payment_required"] = (
+            row["state"] == "SUBMITTED"
+            and detail["coverage"] is None
+            and bool(
+                connection.execute(
+                    text(
+                        "SELECT 1 FROM application_candidate "
+                        "WHERE application_id=:id AND live LIMIT 1"
+                    ),
+                    {"id": row["id"]},
+                ).scalar()
+            )
+        )
     return details
 
 
 def latest_candidate_start(connection, application_id):
     return connection.execute(
         text("""SELECT max(s.starts_at) FROM application_candidate c
-        JOIN event_slot s ON s.id = c.event_slot_id WHERE c.application_id = :id"""),
+        JOIN event_slot s ON s.id = c.event_slot_id WHERE c.application_id = :id AND c.live"""),
         {"id": application_id},
     ).scalar()
 
@@ -187,10 +223,10 @@ def covering_membership(connection, user_id, application_id, now):
             text(f"""WITH bounds AS (
                 SELECT max(s.starts_at) AS latest_start, min(s.closes_at) AS earliest_close
                 FROM application_candidate c JOIN event_slot s ON s.id = c.event_slot_id
-                WHERE c.application_id = :application_id)
+                WHERE c.application_id = :application_id AND c.live)
             SELECT {ENTITLEMENT_COLUMNS} FROM entitlement e
             JOIN payment p ON p.id = e.payment_id CROSS JOIN bounds b
-            WHERE e.user_id = :user_id AND e.kind = 'MEMBERSHIP'
+            WHERE e.user_id = :user_id AND e.kind = 'MEMBERSHIP' AND p.state='PAID'
               AND e.starts_at <= least(:now, b.earliest_close)
               AND e.expires_at > :now AND e.expires_at > b.latest_start
             ORDER BY e.expires_at DESC, e.id LIMIT 1"""),
@@ -261,16 +297,16 @@ def pay_for_application(
             # FOR SHARE makes a close/match step that locks the slots FOR UPDATE wait for this
             # payment; the deadline is judged after the lock waits, by the database clock,
             # and that clock also stamps the payment and any membership it grants.
-            earliest_close = min(
+            closes = list(
                 connection.execute(
                     text("""SELECT s.closes_at FROM application_candidate c
                     JOIN event_slot s ON s.id = c.event_slot_id
-                    WHERE c.application_id = :id FOR SHARE OF s"""),
+                    WHERE c.application_id = :id AND c.live FOR SHARE OF s"""),
                     {"id": application_id},
                 ).scalars()
             )
             now = locked_now(connection)
-            if earliest_close <= now:
+            if not closes or min(closes) <= now:
                 raise HTTPException(409, "payment_closed")
             coverage = payment_details(connection, [application], now)[application_id]["coverage"]
             if coverage is not None:
@@ -347,13 +383,14 @@ def complete_mock_payment(
         {"id": payment_id, "now": now},
     )
     single = product["kind"] == "SINGLE"
+    entitlement_id = uuid.uuid4()
     connection.execute(
         text("""INSERT INTO entitlement
         (id, user_id, payment_id, kind, application_id, starts_at, expires_at, policy_version)
         VALUES (:id, :user_id, :payment_id, :kind, :application_id, :starts, :expires,
          :policy)"""),
         {
-            "id": uuid.uuid4(),
+            "id": entitlement_id,
             "user_id": user_id,
             "payment_id": payment_id,
             "kind": product["kind"],
@@ -364,6 +401,14 @@ def complete_mock_payment(
             "policy": ENTITLEMENT_POLICY_VERSION,
         },
     )
+
+    if single:
+        connection.execute(
+            text("""INSERT INTO entitlement_binding
+            (id,entitlement_id,application_id,user_id,started_at)
+            VALUES(:id,:id,:app,:user,:now)"""),
+            {"id": entitlement_id, "app": application_id, "user": user_id, "now": now},
+        )
 
 
 @router.get("/api/me/entitlements")
