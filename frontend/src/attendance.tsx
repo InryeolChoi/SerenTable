@@ -23,7 +23,14 @@ function checkInError(error: unknown) {
   return message(error);
 }
 
-export function CheckInSection({ tableId }: { tableId: string }) {
+export function CheckInSection({
+  tableId,
+  checkedIn = false,
+}: {
+  tableId: string;
+  // Already checked in according to the history list; the time is not repeated there.
+  checkedIn?: boolean;
+}) {
   const request = useScopedApi();
   const [state, setState] = useState<CheckIn | null>(null);
   const [pending, setPending] = useState(false);
@@ -47,6 +54,8 @@ export function CheckInSection({ tableId }: { tableId: string }) {
     <div className="actions">
       {state ? (
         <Notice>체크인 완료 · {show(state.checked_in_at)}</Notice>
+      ) : checkedIn ? (
+        <Notice>체크인 완료</Notice>
       ) : (
         <button type="button" className="primary" onClick={() => void submit()} disabled={pending}>
           {pending ? "체크인 중" : "도착 체크인"}
