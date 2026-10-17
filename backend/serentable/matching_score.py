@@ -58,9 +58,9 @@ DEFAULT_WEIGHTS = {
     "trait": Fraction(1, 10),
     "new": Fraction(3, 20),
 }
-# The weights are a design hypothesis, not estimated from satisfaction data. 50 is a
-# development value until the 40..80 sensitivity analysis is approved (ADR-0011 §4).
-DEFAULT_POLICY = Policy(weights=DEFAULT_WEIGHTS, min_score=Fraction(50))
+# The weights are a design hypothesis, not estimated from satisfaction data. 60 is the
+# operating minimum the user approved after the 40..80 sensitivity analysis (ADR-0011 §4).
+DEFAULT_POLICY = Policy(weights=DEFAULT_WEIGHTS, min_score=Fraction(60))
 
 
 def policy_from_environment():
