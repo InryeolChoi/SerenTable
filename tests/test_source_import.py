@@ -39,7 +39,7 @@ HEADERS = [
 ]
 
 
-def workbook(path, *, formula=False, bad_header=False):
+def workbook(path, *, formula=False, bad_header=False, regions="홍대/합정", age="25"):
     """Independent synthetic values, never a source-data copy."""
     ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
     root = Element("worksheet", xmlns=ns)
@@ -57,11 +57,11 @@ def workbook(path, *, formula=False, bad_header=False):
                     "PRIVATE-SENTINEL-SAME-NAME",
                     "",
                     "",
-                    "25",
+                    age,
                     "여성",
                     "",
                     mbti,
-                    "홍대/합정",
+                    regions,
                     "운동 (헬스, 러닝, 클라이밍 등), 독서·글쓰기",
                     "경청을 잘 함",
                     "나와 비슷한 사람",
@@ -262,3 +262,46 @@ def test_load_rejects_the_application_database_and_remote_targets(tmp_path, sour
     )
     assert remote.returncode == 2
     assert remote.stderr.strip() == "source_database_must_be_local"
+
+
+def test_connection_options_cannot_override_the_checked_database_destination(tmp_path):
+    source = workbook(tmp_path / "synthetic.xlsx")
+    # Port 1 is deliberately closed loopback, so RED cannot contact a real target.
+    result = cli(
+        "load",
+        source,
+        environment={
+            "SOURCE_DATABASE_URL": "postgresql://local-only@127.0.0.1:1/serentable_source_test?dbname=unrelated_db&hostaddr=127.0.0.1",
+        },
+    )
+    assert result.returncode == 2
+    assert result.stderr.strip() == "source_database_options_not_allowed"
+
+
+def test_libpq_environment_cannot_override_the_checked_destination(tmp_path):
+    source = workbook(tmp_path / "synthetic.xlsx")
+    result = cli(
+        "load",
+        source,
+        environment={
+            "SOURCE_DATABASE_URL": "postgresql://local-only@127.0.0.1:1/serentable_source_test",
+            "PGHOSTADDR": "127.0.0.1",
+        },
+    )
+    assert result.returncode == 2
+    assert result.stderr.strip() == "source_database_environment_options_not_allowed"
+
+
+@pytest.mark.parametrize("regions", ["잠실강남/신논현", "/"])
+def test_unseparated_or_empty_choice_tokens_are_reviewed_instead_of_guessed(tmp_path, regions):
+    source = workbook(tmp_path / "synthetic.xlsx", regions=regions)
+    result = cli("preview", source)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["review_counts"]["source_regions_unresolved"] == 3
+
+
+def test_unbounded_age_exponents_are_reviewed_without_allocating_a_large_integer(tmp_path):
+    source = workbook(tmp_path / "synthetic.xlsx", age="1E1000000000")
+    result = cli("preview", source)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["review_counts"]["source_age_invalid"] == 3

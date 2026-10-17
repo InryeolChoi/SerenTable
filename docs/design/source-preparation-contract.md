@@ -8,12 +8,14 @@
 
 검증 경계는 기존 사용자 승인된 실제 PostgreSQL·외부 작업 실행기 경계의 CLI다. `preview → load → report`를 별도 프로세스로 실행하고 합성 입력의 알려진 집계·멱등·DB 오류 롤백을 확인한다. schema 접근 거절은 실제 PostgreSQL 역할로 검증한다.
 
-## 정규화 버전 source-preparation-v1
+## 정규화 버전 source-preparation-v2
+
+선택 문구 사전은 앱 프로필의 실시간 목록을 가져오지 않는 고정 버전이다. 앱 화면의 문구 변경으로 같은 규칙 버전의 결과가 달라지지 않게 한다. v1 초기 준비 배치에서 선택지 구분자 검사가 부족한 것을 발견해, 원문 재검토 결과를 덮어쓰지 않고 v2로 적재했다.
 
 | 항목 | 처리 |
 |---|---|
 | 식별 | 원본 SHA-256 + 규칙 버전으로 배치, 시트 + 실제 행 번호로 응답 구분. 가명으로 병합/식별하지 않음 |
-| 이름·연락처·Instagram·직업 | 가명과 원문은 DB에 복제하지 않음. 연락처/Instagram/직업은 null과 missing/not_imported 코드로 구별 |
+| 이름·연락처·Instagram·직업 | 가명과 원문은 DB에 복제하지 않음. 연락처/Instagram/직업은 null과 missing/not_imported 코드로 구별. 성별 자유 문자열도 이번 허용 필드에 포함하지 않음 |
 | 나이 | 유효 정수는 source_age로 보존. 기준 연도·나이 방식이 없으므로 birth_year=null, birth_year_unresolved |
 | MBTI | 대소문자·주변 공백 정리, 유효 선택 복수 보존. 설명/미인식 문자가 섞이면 전체 목록을 비우고 검토 코드. 비표준 값을 유사 유형으로 고치지 않음 |
 | 관심사·성향·지역·식사 가격 | 알려진 원본 선택 문구를 먼저 인식하고 구분자를 처리. 괄호 안 쉼표로 쪼개지 않음. 독서·글쓰기는 reading_writing 통합 원본 분류이며 앱 두 항목 선택으로 바꾸지 않음. 미해석 잔여 문자열이 있으면 해당 목록을 비우고 검토 코드 |
@@ -38,6 +40,8 @@
 
 ## 실행
 
+접속 대상 확인을 우회하지 않도록 SOURCE_DATABASE_URL의 query 옵션은 모두 거절한다. 앱 URL에 query가 있어 안전하게 비교할 수 없어도 거절한다. PGHOST·PGHOSTADDR·PGPORT·PGDATABASE·PGSERVICE·PGSERVICEFILE·PGOPTIONS 설정이 있으면 접속 대상/역할 우회를 막기 위해 거절한다(값은 출력하지 않음). 포트 기본값도 명시한다.
+
 로컬 준비 전용 DB를 만들고 기존 운영 지침의 Alembic 명령으로 head까지 적용한다. 다른 개발/운영 DB를 덮어쓰지 않는다. 비밀번호·DB 주소를 PR·Blaybus에 붙이지 않는다. 환경 변수는 자동으로 .env에서 읽지 않는다.
 
 ```sh
@@ -53,6 +57,10 @@ PYTHONPATH=backend uv run python -m serentable.source_import report <batch-uuid>
 
 ## 검증과 실제 적재 기록
 
-- 합성 CLI 시험 8개 PASS: 복수 MBTI·통합 관심사·누락·원본 불변, 재적재/동시 적재, 중간 실제 DB 오류 롤백·재시도, 비권한 역할 거절, 앱 DB/원격 DB 거절, 수식/헤더 거절.
+- 합성 CLI 시험 **13개 PASS**: 복수 MBTI·통합 관심사·누락·원본 불변, 재적재/동시 적재, 중간 실제 DB 오류 롤백·재시도, 비권한 역할 거절, 앱 DB/원격 DB 거절, 수식/헤더 거절, URL/환경 변수에 의한 대상 변경 거절, 구분자 없는 선택지/빈 토큰 검토, 큰 지수 나이 입력의 안전한 거절.
 - 제공 원본 미리보기 294행, 기존 SHA-256과 일치. 출생연도/거래/동의 관련 검토294행, 연락처/Instagram/직업 누락294행, 지역 미해석20행, 음식 검토124행, MBTI 미인식4행·설명/잔여 혼합 검토5행. 이는 기존 토큰 검출 감사와 달리 유효 부분만 임의 채택하지 않은 엄격한 선택 판정이다.
-- 실제 원본 적재·전체 회귀·독립 검토·CI는 아래에 후속 기록한다. 운영 적재나 원본 기반 앱 시드 완료로 표시하지 않는다.
+- 실제 원본을 PostgreSQL18 전용 준비 DB `serentable_source_preparation`에 적재했다. Docker `serentable-source-prep-pg18`, loopback55440, 전용 named volume `serentable-source-preparation-pg18`에 보존한다. 앱 런타임에는 이 연결을 제공하지 않았다. 비밀번호/연결 문자열은 기록하지 않는다.
+- 현재 규칙 v2 배치 `de81f5e7-7d36-49a4-8c0e-ede593df697d`: 294행, 최초 created=true → 재실행 false·같은 배치, 원본 checksum 불변. 지역 미해석은21행이다. 초기 v1은294행/미해석20행이며 구분자 검사 보완으로1행이 검토 대상에 추가돼 v2로 구분했다. 총2개 규칙 배치/588개 변환 이력 행은 원본588명이나 중복 참가자가 아니다. 현재 규칙의 응답 수는294개다.
+- 준비 DB의 app_user/application/payment/consent_record는 모두0건으로 독립 집계 확인했다. 과거 날짜·출생연도·실제 거래·앱 동의를 생성하지 않았다. 원본 XLSX·개별 정규화 응답은 Git/PR/정적 자산에 포함하지 않는다.
+- 별도 빈 PostgreSQL18 DB에서 0008 up→0007 down→0008 up 왕복 PASS. 실제 준비 배치에 downgrade를 실행하지 않았다.
+- 독립 검토에서 URL query 대상 우회(P1), 선택지 사이 문법 검증 누락(P2)을 발견해 외부 CLI RED→GREEN으로 수정했다. 전체 회귀 첫 로컬 실행은132 PASS/마감 경계5 FAIL이었고, 제품 변경 없이 해당5개를 재검증해 PASS했다. 사후 호스트/DB 시계 차이는 약2ms였으나 당시 원인을 확정하지 않았다. 최초 고정 커밋4d1db99 CI38989574156은 전체 검사 SUCCESS였다. 수정 후 최종 CI는 PR checks에서 확인하며 로컬 첫 실패를 전체 통과로 바꿔 적지 않는다.

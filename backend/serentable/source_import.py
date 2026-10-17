@@ -23,12 +23,69 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
 
 from serentable.database import engine_for
-from serentable.profile import OPTIONS
 
-RULES_VERSION = "source-preparation-v1"
+RULES_VERSION = "source-preparation-v2"
 HEADER_HASH = "1d523a3cc21faa1876a0b020e2dbcaa7fde3032b390a049a9b22746f8fd995de"
 NS = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+# Frozen source vocabulary for RULES_VERSION. App labels may evolve independently;
+# importing the live profile catalog would silently change historical normalization.
+SOURCE_CHOICES = {
+    "I": (
+        "source_regions",
+        {
+            "hongdae": "홍대/합정",
+            "jamsil": "잠실",
+            "gangnam": "강남/신논현",
+            "euljiro": "을지로/종로",
+        },
+    ),
+    "J": (
+        "source_interests",
+        {
+            "movies_drama": "영화·드라마",
+            "music": "음악",
+            "reading_writing": "독서·글쓰기",
+            "exercise": "운동 (헬스, 러닝, 클라이밍 등)",
+            "food_cafes": "맛집·카페 탐방",
+            "travel": "여행",
+            "photo_video": "사진·영상",
+            "exhibitions_performances_art": "전시·공연·아트",
+            "fashion_beauty": "패션·뷰티",
+            "self_development_study": "자기계발·공부",
+        },
+    ),
+    "K": (
+        "source_self_traits",
+        {
+            "calm": "잔잔하고 조용한 편",
+            "energetic": "활기차고 에너지 있는 편",
+            "deep_conversation": "깊은 대화를 좋아함",
+            "light_humor": "가볍고 유머 있는 대화를 좋아함",
+            "listener": "경청을 잘 함",
+            "conversation_leader": "이야기를 이끄는 편",
+        },
+    ),
+    "L": (
+        "source_desired_traits",
+        {
+            "similar": "나와 비슷한 사람",
+            "different": "나와 다른 자극을 주는 사람",
+            "deep_conversation": "깊은 대화가 되는 사람",
+            "comfortable_humor": "편하고 유머 있는 사람",
+            "passionate": "열정 있는 사람",
+            "calm_stable": "잔잔하고 안정적인 사람",
+        },
+    ),
+    "M": (
+        "source_meal_budgets",
+        {
+            "10000_20000": "10,000~20,000원",
+            "20000_30000": "20,000~30,000원",
+            "30000_plus": "30,000원 이상 (상관 없음)",
+        },
+    ),
+}
 
 
 class SourceRejected(ValueError):
@@ -51,13 +108,21 @@ def source_choices(value, choices):
     """
     remaining = compact(value)
     selected = []
-    for code, label in sorted(choices.items(), key=lambda item: -len(compact(item[1]))):
-        label = compact(label)
-        if label in remaining:
-            selected.append(code)
-            remaining = remaining.replace(label, "")
-    if remaining.strip(",，;/|·"):
-        return [], True
+    labels = sorted(
+        ((code, compact(label)) for code, label in choices.items()), key=lambda item: -len(item[1])
+    )
+    while remaining:
+        found = next(((code, label) for code, label in labels if remaining.startswith(label)), None)
+        if found is None:
+            return [], True
+        code, label = found
+        selected.append(code)
+        remaining = remaining[len(label) :]
+        if remaining:
+            following = remaining.lstrip(",，;/|·")
+            if following == remaining or not following:
+                return [], True
+            remaining = following
     return sorted(set(selected)), False
 
 
@@ -75,7 +140,13 @@ def normalize(cells):
         review.append(f"{field}_not_imported" if get(column) else f"{field}_missing")
     try:
         age = Decimal(get("E"))
-        source_age = int(age) if age.is_finite() and age == int(age) and 0 <= age <= 150 else None
+        # Check the bound before int(): a short exponent such as 1E1000000000 must
+        # never ask Python to allocate an enormous integer while reading a cell.
+        source_age = (
+            int(age)
+            if age.is_finite() and 0 <= age <= 150 and age == age.to_integral_value()
+            else None
+        )
     except (InvalidOperation, ValueError, OverflowError):
         source_age = None
     if source_age is None:
@@ -88,15 +159,6 @@ def normalize(cells):
     elif remainder.strip(" \t\r\n,，;/|·+&()"):
         mbtis = []
         review.append("mbti_needs_review")
-    interests = {
-        **{
-            key: label
-            for key, label in OPTIONS["interests"].items()
-            if key not in ("reading", "writing")
-        },
-        "reading_writing": "독서·글쓰기",
-        "exercise": "운동 (헬스, 러닝, 클라이밍 등)",
-    }
     normalized = {
         "source_age": source_age,
         "birth_year": None,
@@ -106,22 +168,7 @@ def normalize(cells):
         "mbtis": mbtis,
         "food_status": "unreviewed" if get("Q") else "unknown",
     }
-    for column, field, choices in [
-        (
-            "I",
-            "source_regions",
-            {
-                "hongdae": "홍대/합정",
-                "jamsil": "잠실",
-                "gangnam": "강남/신논현",
-                "euljiro": "을지로/종로",
-            },
-        ),
-        ("J", "source_interests", interests),
-        ("K", "source_self_traits", OPTIONS["self_traits"]),
-        ("L", "source_desired_traits", OPTIONS["desired_traits"]),
-        ("M", "source_meal_budgets", OPTIONS["meal_budget_bands"]),
-    ]:
+    for column, (field, choices) in SOURCE_CHOICES.items():
         choices_found, unresolved = source_choices(get(column), choices)
         normalized[field] = choices_found
         if unresolved or not get(column):
@@ -234,6 +281,21 @@ def preparation_engine():
     if not value:
         raise SourceRejected("source_database_required")
     url = make_url(value)
+    if url.query:
+        raise SourceRejected("source_database_options_not_allowed")
+    if any(
+        os.environ.get(key)
+        for key in (
+            "PGHOST",
+            "PGHOSTADDR",
+            "PGPORT",
+            "PGDATABASE",
+            "PGSERVICE",
+            "PGSERVICEFILE",
+            "PGOPTIONS",
+        )
+    ):
+        raise SourceRejected("source_database_environment_options_not_allowed")
     if url.get_backend_name() != "postgresql" or url.host not in ("localhost", "127.0.0.1", "::1"):
         raise SourceRejected("source_database_must_be_local")
     if not (url.database or "").startswith("serentable_source_"):
@@ -243,11 +305,14 @@ def preparation_engine():
     app_url = os.environ.get("DATABASE_URL")
     if app_url:
         app = make_url(app_url)
+        if app.query:
+            raise SourceRejected("application_database_options_not_supported")
         hosts = {"localhost", "127.0.0.1", "::1"}
         same_host = app.host == url.host or app.host in hosts and url.host in hosts
         if same_host and (app.port or 5432) == (url.port or 5432) and app.database == url.database:
             raise SourceRejected("source_database_is_application_database")
-    return engine_for(value)
+    # Supply the port explicitly so libpq cannot choose a different implicit target.
+    return engine_for(url.set(port=url.port or 5432).render_as_string(hide_password=False))
 
 
 def report_batch(connection, batch_id):
@@ -343,7 +408,16 @@ def main():
     except SourceRejected as error:
         print(str(error), file=sys.stderr)
         return 2
-    except (OSError, BadZipFile, KeyError, ValueError, ET.ParseError, SQLAlchemyError):
+    except (
+        OSError,
+        BadZipFile,
+        KeyError,
+        IndexError,
+        TypeError,
+        ValueError,
+        ET.ParseError,
+        SQLAlchemyError,
+    ):
         print("source_preparation_failed", file=sys.stderr)
         return 2
     return 0
