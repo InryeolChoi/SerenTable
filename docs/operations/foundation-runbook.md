@@ -22,6 +22,8 @@ docker compose logs app worker
 
 ## 호스트에서 자동 검사 실행
 
+합성 참가자100명 앱 시드의 명시 실행·대상 제한·재실행 보존 규칙은 [시드 계약](../design/synthetic-demo-seed-contract.md)을 따른다. 원본 준비 DB, 테스트 초기화 DB, 보존할 로컬 데모 DB는 서로 다르다. 데모 DB `serentable_demo_hackathon_20261017`을 아래 테스트 명령이나 Playwright 초기화 대상으로 지정하지 않는다. 이 시드는 배포 시 자동 실행되지 않는다.
+
 이 경로는 호스트에 Node22·uv 0.13.1과 Python 3.12가 필요하다. 아래 명령은 저장소 루트의 같은 셸에서 순서대로 실행한다. `.env`와 `.env.example`은 자동으로 읽지 않으므로 두 DB 변수를 명시적으로 export해야 한다. **테스트에는 운영 DB나 일반 개발 DB를 지정하지 않는다.** 별도 PostgreSQL 인스턴스를 테스트 전용으로 사용한다.
 
 ### 1. 별도 테스트 DB 준비

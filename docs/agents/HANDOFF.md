@@ -1,8 +1,14 @@
 # 도구 간 작업 인계
 
-마지막 기록: 2026-10-17 02:39 KST. Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
+마지막 기록: 2026-10-17 (Asia/Seoul). Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
 
 ## 먼저 확인할 현재 상태
+
+- **시드 운영 경로 보완:** 사용자 '이거 되면 운영db에도 데이터 넣을꺼지?'에 따라 로컬 검증→머지/배포→백업→Railway 명시 시드→공개 API 확인을 다음 운영 단계로 명시했다. `--target railway`와 `preflight`, 고정 프로젝트/환경/API service ID 일치·private DB·실행별 opt-in, query/libpq 우회 거부를 추가했다. 실제 SSH로 대상 metadata/연결형식/암호설정 여부 boolean 확인만 수행, 운영 쓰기 없음. 집중22 PASS(10.92초), 초기 코드00bfe94 전체154 PASS·CI38993123503 SUCCESS(API154/브라우저 수는 CI 확인). Railway 보완 후 최종 CI는 #36 checks 확인. 아래 로컬 전용 문구는 초기 범위이며 최신은 시드 계약의 운영 순서를 따른다.
+
+- **합성 데모 시드 승인·구현:** `codex/work5-synthetic-demo-seed`, 고정 구현 `00bfe94`, [PR #36](https://github.com/InryeolChoi/SerenTable/pull/36)(Refs #5, base는 PR #34의 `codex/work5-source-preparation`). #34 사용자 병합 후 base를 main으로 변경한다. [계약·실행·Blaybus 문구](../design/synthetic-demo-seed-contract.md), ADR-0010·명세 U05/U17을 따른다. 사용자 A/A 승인: 원본 비연결 합성 참가자100명 앱 시드, 인원 우선→테이블 내 모든 쌍 관심사 Jaccard 합→신청 순서 단계 점수. 이번 코드는 시드이며 점수 구현은 다음이다. 전용 로컬 PG17 DB `serentable_demo_hackathon_20261017`에100계정·100프로필 실제 적재, 재실행 신규0/0, 보존 필요. 원본 준비 DB·운영 DB는 사용하지 않았다. 이 데모 DB에 기본 운영자/참가자4명 시드는 아직 미실행. CLI/PG/HTTP12 PASS(8.71초), 독립 Standards/Spec 수정필요0. 전체 회귀·최종 CI는 PR 확인. 동의·신청·결제 자동 생성, 공개 배포 적재·자격 증명 전달은 미완료이며 Task/Work #5 진행 중. 사용자 AGENTS/개인설정/스크립트 보존.
+- **실제 worker 종료 검증 완료:** [PR #35](https://github.com/InryeolChoi/SerenTable/pull/35), head `2174283`, base main `2039eaa`, Ready for review. CI [38992717260](https://github.com/InryeolChoi/SerenTable/actions/runs/38992717260) SUCCESS(API/오라클130·브라우저10·이미지·PG18 격리 복원). 실제 worker 확정 직전 SIGKILL→트랜잭션 롤백→새 프로세스4명/1테이블/USED→재실행 불변. [기록·Blaybus 문구](../operations/worker-crash-verification.md)는 #35 브랜치/PR에서 확인(현재 시드 브랜치에 없음). 독립 Spec P2(재실행 오류의 성공 오판) 수정 후 집중1 PASS, 관련18 PASS. Standards 차단0, 기본3초 모집 창은 느린 환경의 시험 신뢰성 보완 후보. 저장된 RUNNING fixture와 실제 중단은 구분. Task/Work #6은 진행 중. #34와 독립 병합 가능. #29는 과거 HANDOFF 변경만 남아 병합 보류 권장.
+- **Task 상태 정정:** PR #33의 '100명 실행 사례와 작은 정답 사례 준비'는 사례 준비 범위에서 완료 가능하다. 나머지 '자동 실행·확정·대안·이동/환불 구현', '필수조건·중복·중단 복구 검증'과 Work #5/#6·Agenda는 진행 중. 사용자 Blaybus 반영은 미확인이다.
 
 - **2026-10-17 Work #5 원본 준비 검토 준비:** PR #33은 main `2039eaa`에 머지됨. `codex/work5-source-preparation`, [PR #34](https://github.com/InryeolChoi/SerenTable/pull/34)(Refs #5). 사용자 승인·정확한 Task별 Blaybus 복사 문구·실행·이슈는 [원본 준비 계약](../design/source-preparation-contract.md)·ADR-0009가 기준. 별도 로컬PG18 전용 CLI preview/load/report·private schema0008, 원본294응답 v2배치 적재·재실행 중복0·원본불변·앱계정/신청/결제/동의0. 초기v1도보존해총588개 변환 이력이지만 사람588명이 아님. 준비 컨테이너 `serentable-source-prep-pg18` loopback55440·named volume 유지, 런타임에 연결 제공 안함. CLI/실제PG 집중13 PASS·PG18 up/down/up PASS. 고정4d1db99 리뷰 P1(URL옵션우회)·P2(선택구분자)를 f9dbf67에서수정, 재검토 차단0. 첫로컬전체132PASS/마감5FAIL은코드변경없이집중5PASS,당시원인미확정. 최초CI38989574156 SUCCESS·최종은PRchecks확인. 앱데모시드/운영적재·Work전체완료 아님. 사용자 AGENTS.md·개인설정/스크립트 보존.
 

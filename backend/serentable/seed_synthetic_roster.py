@@ -1,4 +1,4 @@
-"""Explicit local demo provisioning; never reads or transforms source responses."""
+"""Explicit synthetic demo provisioning; never reads or transforms source responses."""
 
 import argparse
 import json
@@ -16,6 +16,11 @@ from serentable.profile import Profile
 RULES_VERSION = "independent-synthetic-roster-v1"
 COUNT = 100
 LOGIN_PREFIX = "synthetic-demo-"
+RAILWAY_TARGET = {
+    "RAILWAY_PROJECT_ID": "e10b5d09-4b75-43c4-b46b-13414b96f11f",
+    "RAILWAY_ENVIRONMENT_ID": "ec632dcd-2bc7-450c-9a98-bfc291c25338",
+    "RAILWAY_SERVICE_ID": "b546da36-d001-49d7-943b-566f85420161",
+}
 INTERESTS = (
     "movies_drama",
     "music",
@@ -71,8 +76,8 @@ def profile_for(index):
     )
 
 
-def configuration():
-    if os.getenv("SYNTHETIC_DEMO_SEED_ENABLED") != "1" or os.getenv("APP_ENV") == "production":
+def configuration(target):
+    if os.getenv("SYNTHETIC_DEMO_SEED_ENABLED") != "1":
         raise ValueError
     password = os.getenv("DEMO_PARTICIPANT_PASSWORD", "")
     if not 12 <= len(password) <= 128:
@@ -80,8 +85,6 @@ def configuration():
     url = make_url(os.environ["DATABASE_URL"])
     if (
         url.get_backend_name() != "postgresql"
-        or url.host not in {"localhost", "127.0.0.1", "::1"}
-        or not (url.database or "").startswith("serentable_demo_")
         or url.query
         or any(
             os.getenv(key)
@@ -95,6 +98,19 @@ def configuration():
                 "PGOPTIONS",
             )
         )
+    ):
+        raise ValueError
+    if target == "local":
+        if (
+            os.getenv("APP_ENV") == "production"
+            or url.host not in {"localhost", "127.0.0.1", "::1"}
+            or not (url.database or "").startswith("serentable_demo_")
+        ):
+            raise ValueError
+    elif (
+        any(os.getenv(key) != value for key, value in RAILWAY_TARGET.items())
+        or not (url.host or "").endswith(".railway.internal")
+        or url.database != "railway"
     ):
         raise ValueError
     return url.set(drivername="postgresql+psycopg", port=url.port or 5432), password
@@ -150,16 +166,20 @@ def preview():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("preview", "load"))
+    parser.add_argument("command", choices=("preview", "preflight", "load"))
+    parser.add_argument("--target", choices=("local", "railway"), default="local")
     args = parser.parse_args()
     if args.command == "preview":
         print(json.dumps(preview(), ensure_ascii=False))
         return 0
     try:
-        url, password = configuration()
+        url, password = configuration(args.target)
     except (ValueError, KeyError, SQLAlchemyError):
         print("synthetic_roster_configuration_invalid", file=sys.stderr)
         return 2
+    if args.command == "preflight":
+        print(json.dumps({**preview(), "target": args.target, "configuration_valid": True}))
+        return 0
     try:
         result = load(url, password)
     except SeedConflict:
@@ -168,7 +188,7 @@ def main():
     except (SQLAlchemyError, ValueError):
         print("synthetic_roster_unavailable", file=sys.stderr)
         return 1
-    print(json.dumps(result, ensure_ascii=False))
+    print(json.dumps({**result, "target": args.target}, ensure_ascii=False))
     return 0
 
 

@@ -183,6 +183,51 @@ def test_an_existing_reserved_login_is_not_adopted_or_overwritten(roster_databas
         engine.dispose()
 
 
+RAILWAY_ENVIRONMENT = {
+    "APP_ENV": "production",
+    "SYNTHETIC_DEMO_SEED_ENABLED": "1",
+    "DEMO_PARTICIPANT_PASSWORD": "synthetic-participant-password",
+    "DATABASE_URL": "postgresql://postgres:not-a-real-password@postgres.railway.internal/railway",
+    "RAILWAY_PROJECT_ID": "e10b5d09-4b75-43c4-b46b-13414b96f11f",
+    "RAILWAY_ENVIRONMENT_ID": "ec632dcd-2bc7-450c-9a98-bfc291c25338",
+    "RAILWAY_SERVICE_ID": "b546da36-d001-49d7-943b-566f85420161",
+}
+
+
+def test_explicit_railway_preflight_accepts_only_the_known_app_target_without_connecting():
+    result = seed("preflight", "--target", "railway", environment=RAILWAY_ENVIRONMENT)
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert report["target"] == "railway" and report["configuration_valid"] is True
+    assert "not-a-real-password" not in result.stdout + result.stderr
+    assert "postgres.railway.internal" not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"RAILWAY_PROJECT_ID": "another-project"},
+        {"RAILWAY_ENVIRONMENT_ID": "another-environment"},
+        {"RAILWAY_SERVICE_ID": "00478bf1-c6eb-4c37-8cea-eb3670a20143"},
+        {"DATABASE_URL": "postgresql://example.invalid/railway"},
+        {"DATABASE_URL": "postgresql://postgres.railway.internal/serentable_source_preparation"},
+        {"DATABASE_URL": "postgresql://postgres.railway.internal/railway?host=example.invalid"},
+        {"SYNTHETIC_DEMO_SEED_ENABLED": ""},
+        {"PGHOSTADDR": "192.0.2.1"},
+    ],
+)
+def test_railway_seed_refuses_other_targets_and_overrides_before_connecting(changes):
+    result = seed("load", "--target", "railway", environment={**RAILWAY_ENVIRONMENT, **changes})
+    assert result.returncode == 2
+    assert result.stderr.strip() == "synthetic_roster_configuration_invalid"
+
+
+def test_railway_environment_never_enables_a_remote_seed_implicitly():
+    result = seed("load", environment=RAILWAY_ENVIRONMENT)
+    assert result.returncode == 2
+    assert result.stderr.strip() == "synthetic_roster_configuration_invalid"
+
+
 @pytest.mark.parametrize(
     "changes",
     [
