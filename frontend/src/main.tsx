@@ -524,6 +524,7 @@ function ConsentPage() {
 }
 function ParticipantHome({ navigate }: { navigate: (path: string) => void }) {
   const request = useScopedApi();
+  const [passRevision, setPassRevision] = useState(0);
   const [profile, setProfile] = useState<ProfileState | null>(null);
   const [consent, setConsent] = useState<ConsentState | null>(null);
   const [error, setError] = useState("");
@@ -569,8 +570,8 @@ function ParticipantHome({ navigate }: { navigate: (path: string) => void }) {
           동의 내용 확인
         </button>
       </div>
-      <MyApplications navigate={navigate} />
-      <MyEntitlements />
+      <MyApplications navigate={navigate} onChanged={() => setPassRevision(value => value + 1)} />
+      <MyEntitlements key={passRevision} />
       <p className="notice">
         신청 제출과 모의 결제 완료는 참가 확정이 아닙니다. 매칭 결과는 별도로
         안내합니다.

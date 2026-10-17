@@ -13,6 +13,7 @@ from serentable.applications import router as applications_router
 from serentable.auth import router as auth_router
 from serentable.database import database_engine
 from serentable.events import router as events_router
+from serentable.match_resolution import router as resolution_router
 from serentable.matching import router as matching_router
 from serentable.payments import router as payments_router
 from serentable.profile import router as profile_router
@@ -24,6 +25,7 @@ app.include_router(events_router)
 app.include_router(applications_router)
 app.include_router(payments_router)
 app.include_router(matching_router)
+app.include_router(resolution_router)
 
 
 @app.exception_handler(RequestValidationError)

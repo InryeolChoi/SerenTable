@@ -19,8 +19,10 @@ from sqlalchemy import text
 # Columns used: c = application_candidate, a = application, s = event_slot.
 ELIGIBLE = """c.live AND a.state = 'SUBMITTED' AND (
     EXISTS (
-        SELECT 1 FROM payment p JOIN entitlement e ON e.payment_id = p.id
-        WHERE p.application_id = a.id AND p.state = 'PAID' AND e.kind = 'SINGLE'
+        SELECT 1 FROM entitlement_binding b JOIN entitlement e ON e.id=b.entitlement_id
+        JOIN payment p ON e.payment_id = p.id
+        WHERE b.application_id = a.id AND b.ended_at IS NULL
+          AND b.started_at <= least(:now, s.closes_at) AND p.state = 'PAID' AND e.kind = 'SINGLE'
           AND p.completed_at <= least(:now, s.closes_at))
     OR EXISTS (
         SELECT 1 FROM entitlement e JOIN payment p ON p.id = e.payment_id
