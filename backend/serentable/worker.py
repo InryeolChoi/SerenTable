@@ -44,6 +44,9 @@ def match_due_slots():
 def gathering_jobs():
     try:
         run_gathering_jobs()
+        from serentable.feedback import run_feedback_jobs
+
+        run_feedback_jobs()
         from serentable.notifications import dispatch_notifications
 
         dispatch_notifications()

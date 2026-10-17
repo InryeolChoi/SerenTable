@@ -196,3 +196,23 @@ Work: 모임 안내·피드백·재방문 → 식당·채팅·알림. Task 추�
 `serentable_work7_gathering_test`에는 실패 정리로 남은 합성 계정이 있다. `serentable_work7_notifications_test`는 E2E 시작 시 초기화됐다. 둘 다 격리 시험 DB다. 이 중간 기록은 Work 완료 증거가 아니다.
 신규 로컬 DB `serentable_work7_gathering_test` 등만 사용하며 운영 migration/deploy/매칭/기존 데이터 변경 금지 유지.
 사용자 AGENTS.md와 .claude/.codex/claude 스크립트 미커밋 변경 보존.
+
+## 2026-10-18 Work #8 병렬 구현 체크포인트 (Claude Code)
+
+- **최소 점수 확정:** 사용자가 운영 최소 매칭 점수 **60**을 승인했다(ADR-0011 §4). PR #39 브랜치 `1044bd4`에 반영했고 관련 시험 225 PASS다. 운영 반영은 별도 승인이다.
+- **머지 상태:** PR #35·#29는 main에 머지됐다(사용자). #40은 #39 브랜치에 머지됐다.
+- **정책 승인(ADR-0014):** 사용자가 U15·U09·U08을 승인했다.
+  - U15: 시작 30분 전~종료 체크인, 미체크인은 노쇼 후보, 운영자 확인 후 확정 노쇼
+  - U09: 신고 접수 즉시 분리, 기각돼도 분리 유지
+  - U08: 규칙 기반 최소 반영
+- **통합 브랜치:** `claude/work8-feedback`([Draft PR #42](https://github.com/InryeolChoi/SerenTable/pull/42), base #41)이다. T0 `6df26c7`에 스키마 0012·계약·모듈 골격을 넣었다.
+- **병렬 진행:** T1 체크인·노쇼, T2 평가·선호·리마인드, T3 신고·차단·제재, B 브랜드 적용을 각자 `claude/work8-t1|t2|t3|brand` 별도 작업 트리에서 진행 중이다. T4 이력·추천·매칭 반영은 T1~T3 이후다. 티켓 그래프는 [계약](../design/feedback-contract.md)에 있다.
+- **격리 DB:** `serentable_w8_t0..t3`, `serentable_minscore_test`, `serentable_work7_regression_test`를 사용한다. 운영 쓰기는 없다.
+
+## 2026-10-18 Codex Work8 T4·안전 경합 검증 인계
+
+PR42 `claude/work8-feedback`에 미병합 T4 f31f04b를 반영했다. 추천 자격/시간 중복을 41364eb로 보완하고, 독립 리뷰의 신고·차단·선호 변경/매칭 경합은 2a2b53e에서 기존 공용 잠금→사용자·선호 행 잠금 순서로 수정했다. 신규 PG 두 연결 경합5개 RED→GREEN, 안전·평가·추천26 PASS(160.56초), T4 신규포함5 PASS. 상호 재만남은 점수 면제만이며 신고/차단/비선호 H5는 유지한다. 최소 점수는 사용자 승인60이며 기존 E2E50 기대를 정렬했다. 브랜드 CSS 경계색#d7c6af복원. U16 등 미정정책은 추가구현하지 않았다.
+
+후속 PR43 통합에서 로컬Node22 모바일 E2E11 PASS(49.3초), 체크인→평가→운영예외·감사/CSV까지 확인했다. 신규 운영콘솔1개는 PR43에 있으며 PR42 단독 시험 결과로 확장하지 않는다. 공통 시험의 영속 안전/선호 상태를 테스트마다 초기화하고 CI검사시간예산25분만 적용했다. 최종 전체 회귀·CI 결과는 PR43 최신 HANDOFF와 docs/design/work8-work9-verification-2026-10-18.md를 확인한다.
+
+현재 Work8/7 브랜드 Task는 구현·격리 검증 결과를 Blaybus에 기록할 수 있으나 Work/Agenda는 운영 인수·미정정책 때문에 진행중을 유지한다. 운영 migration/deploy/data 변경·main 병합 금지, 사용자 AGENTS/.claude/.codex/scripts 보존.

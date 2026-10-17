@@ -152,7 +152,7 @@ def test_the_run_records_policy_and_table_scores_for_the_operator_only():
             "adr-0011-2026-10-17",
         )
         assert run["policy"]["version"] == "prd-weighted-v1"
-        assert run["policy"]["min_score"] == "50"
+        assert run["policy"]["min_score"] == "60"
         (table,) = run["tables"]
         # Same profile for all four (COMPLETE_PROFILE): age 100, interest 100, trait
         # "different" from an identical self trait 0, new 100; gender and MBTI cannot be

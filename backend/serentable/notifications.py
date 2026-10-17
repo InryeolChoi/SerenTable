@@ -22,7 +22,12 @@ router = APIRouter()
 
 
 def enqueue_notification(connection, user_id, event_key, kind, title, body, url, now):
-    if url not in ("/participant", "/participant/gatherings", "/participant/rooms"):
+    if url not in (
+        "/participant",
+        "/participant/gatherings",
+        "/participant/rooms",
+        "/participant/history",
+    ):
         raise ValueError("notification_url_not_allowed")
     notification_id = connection.execute(
         text("""INSERT INTO app_notification

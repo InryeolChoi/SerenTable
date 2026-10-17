@@ -231,6 +231,8 @@ function validationMessage(status: number, detail: unknown) {
   }
   if (status === 503 && detail === "login_busy")
     return "로그인 요청이 잠시 몰렸습니다. 잠시 후 다시 시도해 주세요.";
+  if (status === 403 && detail === "participation_restricted")
+    return "현재 참가가 제한되어 새 신청을 할 수 없습니다. 자세한 내용은 운영자에게 문의해 주세요.";
   return errorMessage(status);
 }
 function errorMessage(status: number) {

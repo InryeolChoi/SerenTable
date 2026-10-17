@@ -78,4 +78,4 @@ def test_the_default_policy_is_the_recorded_hypothesis():
         Fraction(1, 5),
         Fraction(3, 20),
     )
-    assert DEFAULT_POLICY.min_score == 50
+    assert DEFAULT_POLICY.min_score == 60
