@@ -1,0 +1,68 @@
+erDiagram
+    dining_table ||--o{ attendance_check_in : check_in
+    dining_table ||--o{ no_show_review : review
+    dining_table ||--o{ table_feedback : rating
+    dining_table ||--o{ person_preference : preference
+    dining_table |o--o{ safety_report : context
+    app_user ||--o{ attendance_check_in : participant
+    app_user ||--o{ no_show_review : participant_and_reviewer
+    app_user ||--o{ table_feedback : participant
+    app_user ||--o{ person_preference : rater_and_target
+    app_user ||--o{ safety_report : reporter_and_subject
+    safety_report |o--o{ participant_sanction : evidence
+    app_user ||--o{ participant_sanction : subject_and_operator
+    app_user |o--o{ operator_audit : actor
+    app_user |o--o{ gathering_exception : resolver
+    dining_table |o--o{ gathering_exception : context
+    attendance_check_in {
+        uuid dining_table_id PK,FK
+        uuid user_id PK,FK
+        timestamptz checked_in_at
+    }
+    no_show_review {
+        uuid dining_table_id PK,FK
+        uuid user_id PK,FK
+        string decision
+        uuid reviewed_by FK
+        timestamptz reviewed_at
+    }
+    table_feedback {
+        uuid dining_table_id PK,FK
+        uuid user_id PK,FK
+        smallint five_ratings
+        timestamptz submitted_at
+    }
+    person_preference {
+        uuid dining_table_id PK,FK
+        uuid rater_id PK,FK
+        uuid target_id PK,FK
+        string choice
+    }
+    safety_report {
+        uuid id PK
+        uuid reporter_id FK
+        uuid reported_id FK
+        uuid dining_table_id FK
+        string state
+    }
+    participant_sanction {
+        uuid id PK
+        uuid user_id FK
+        uuid report_id FK
+        string kind
+        timestamptz ends_at
+    }
+    operator_audit {
+        bigint id PK
+        uuid actor_id FK
+        string target_type
+        text target_id
+        jsonb before_state
+        jsonb after_state
+    }
+    gathering_exception {
+        uuid id PK
+        uuid dining_table_id FK
+        text resolution_note
+        uuid resolved_by FK
+    }
