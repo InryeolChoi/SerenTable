@@ -17,6 +17,7 @@ from serentable.auth import (
     require_participant,
 )
 from serentable.database import database_engine
+from serentable.profile import OPTIONS
 
 router = APIRouter()
 
@@ -337,7 +338,9 @@ def process_table(connection, table_id):
         room,
         members,
         "CONFIRMED",
-        "모임이 확정되었습니다. 모임 안내를 확인해 주세요.",
+        "모임이 확정되었습니다. 모임 시각·장소는 모임 안내에서 확인해 주세요. "
+        "취소 가능 여부는 신청 현황에서 확인하세요. 시스템 매칭 실패의 미사용 1회권은 "
+        "전액 모의 환불할 수 있으며 멤버십 금액 환불은 지원하지 않습니다.",
         now,
     )
     venue = allocate_venue(connection, table, members, now)
@@ -374,11 +377,15 @@ def process_table(connection, table_id):
         )
     if now >= table["starts_at"]:
         interests = sorted({i for m in members for i in m["data"].get("interests", [])})
-        label = interests[0] if interests else "새로운 경험"
+        label = (
+            OPTIONS["interests"].get(interests[0], "새로운 경험") if interests else "새로운 경험"
+        )
+        traits = {t for m in members for t in m["data"].get("self_traits", [])}
+        style = "차분하게 서로의 이야기를 듣고" if "listener" in traits else "가볍게 돌아가며"
         body = (
             f"오늘의 대화 주제 ① {label}에 관심을 갖게 된 계기는 무엇인가요? "
             f"② {label}와 관련해 추천하고 싶은 경험은? "
-            "③ 요즘 새로 시도해 보고 싶은 활동은? "
+            f"③ {style} {label}를 함께 즐길 방법을 이야기해 보세요. "
             "아이스브레이킹: 서로 표시명과 오늘 기대하는 한 가지를 돌아가며 소개해 주세요."
         )
         emit(connection, table_id, room, members, "START_CONTENT", body, now)

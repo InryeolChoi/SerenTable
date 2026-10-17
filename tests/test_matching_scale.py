@@ -41,7 +41,9 @@ def hundred_accounts():
         # This is the same disposable local test DB as the ordinary fixture. Remove only
         # the added accounts after clearing the test business rows; no account leaks into
         # later tests that expect the four ordinary demo participants.
-        truncate("event_slot, participant_profile, consent_record")
+        truncate(
+            "event_slot, participant_profile, consent_record, app_notification, push_subscription"
+        )
         ids = [account["id"] for account in accounts]
         with database_engine().begin() as connection:
             connection.execute(

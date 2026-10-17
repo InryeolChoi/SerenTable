@@ -19,6 +19,9 @@ import {
   type ParticipantDetail,
 } from "./api";
 import { AdminEventsPage, ParticipantEventsPage } from "./events";
+import { AdminVenuesPage, GatheringsPage } from "./gatherings";
+import { RoomsPage } from "./chat";
+import { NotificationsPanel } from "./notifications";
 import {
   AdminApplicationsPage,
   ApplyPage,
@@ -886,6 +889,8 @@ function App() {
             >
               {user.role === "operator" ? "참가자 관리" : "입력 상태"}
             </a>
+            <a href={user.role === "operator" ? "/admin/venues" : "/participant/gatherings"} onClick={e => {e.preventDefault(); navigate(user.role === "operator" ? "/admin/venues" : "/participant/gatherings");}}>{user.role === "operator" ? "식당 배정" : "모임 안내"}</a>
+            {user.role === "participant" && <a href="/participant/rooms" onClick={e => {e.preventDefault(); navigate("/participant/rooms");}}>단체방</a>}
             {user.role === "operator" && (
               <a
                 href="/admin/events"
@@ -952,6 +957,7 @@ function App() {
         )}
         <main id="main">
           {logoutError && <Notice error>{logoutError}</Notice>}
+          {user?.role === "participant" && <NotificationsPanel />}
           {loading ? (
             <Notice>로그인 상태를 확인하고 있습니다…</Notice>
           ) : initialError ? (
@@ -970,7 +976,9 @@ function App() {
               </button>
             </section>
           ) : user.role === "operator" ? (
-            path === "/admin/events" ? (
+            path === "/admin/venues" ? (
+              <AdminVenuesPage />
+            ) : path === "/admin/events" ? (
               <AdminEventsPage />
             ) : path === "/admin/applications" ? (
               <AdminApplicationsPage />
@@ -985,6 +993,10 @@ function App() {
               applicationId={path.slice("/participant/payment/".length)}
               navigate={navigate}
             />
+          ) : path === "/participant/rooms" ? (
+            <RoomsPage />
+          ) : path === "/participant/gatherings" ? (
+            <GatheringsPage />
           ) : path === "/participant/events" ? (
             <ParticipantEventsPage />
           ) : path === "/participant/profile" ? (
