@@ -21,9 +21,14 @@ def seeded_database(monkeypatch):
     from sqlalchemy import text
 
     with database_engine().begin() as connection:
+        audit = connection.execute(text("SELECT to_regclass('public.operator_audit')")).scalar()
         connection.execute(
-            text("""TRUNCATE participant_exclusion, participant_sanction,
+            text(
+                """TRUNCATE participant_exclusion, participant_sanction,
             person_preference, safety_report, attendance_check_in, no_show_review,
-            table_feedback, push_subscription, app_notification, operator_audit CASCADE""")
+            table_feedback, push_subscription, app_notification"""
+                + (", operator_audit" if audit else "")
+                + " CASCADE"
+            )
         )
     subprocess.run([sys.executable, "-m", "serentable.seed_demo_accounts"], check=True)
