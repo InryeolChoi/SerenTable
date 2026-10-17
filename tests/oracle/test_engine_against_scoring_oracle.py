@@ -10,12 +10,13 @@ only validity and "never above the optimum" are hard requirements.
 import random
 from fractions import Fraction
 
+from serentable.matching import Participant, plan_allocation
+from serentable.matching_score import DEFAULT_WEIGHTS, Policy
+
 from oracle.scoring import DEFAULT_POLICY as ORACLE_POLICY
 from oracle.scoring import Member as OracleMember
 from oracle.scoring import Policy as OraclePolicy
 from oracle.scoring import best_allocation, objective, validate_allocation
-from serentable.matching import Participant, plan_allocation
-from serentable.matching_score import DEFAULT_WEIGHTS, Policy
 
 INTERESTS = ["music", "reading", "travel", "exercise", "food_cafes"]
 TYPES = ["INTJ", "ENFP", "ISTJ", "ESFP", "INFP"]
@@ -40,9 +41,7 @@ def scenario(seed):
             )
         )
     users = [p["user_id"] for p in people]
-    exclusions = frozenset(
-        frozenset(rng.sample(users, 2)) for _ in range(rng.randint(0, 2))
-    )
+    exclusions = frozenset(frozenset(rng.sample(users, 2)) for _ in range(rng.randint(0, 2)))
     met = frozenset(frozenset(rng.sample(users, 2)) for _ in range(rng.randint(0, 2)))
     capacity = rng.choice([6, 8, 10, 24])
     minimum = rng.choice([0, 40, 50, 60, 70])
