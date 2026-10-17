@@ -542,6 +542,21 @@ function MatchHistory() {
                   ? ` · ${matchingReasons[run.reason_code] ?? run.reason_code}`
                   : ""}
               </p>
+              {run.policy && (
+                <p className="small">
+                  최소 점수 {Number(run.policy.min_score)} · 정책 {run.policy.version}
+                  {run.search_complete === false ? " · 탐색 시간 상한 도달" : ""}
+                </p>
+              )}
+              {run.tables.some((table) => table.score !== null) && (
+                <ul className="candidates" aria-label="테이블 점수">
+                  {run.tables.map((table) => (
+                    <li key={table.id}>
+                      {table.member_count}명 · 테이블 점수 {table.score}
+                    </li>
+                  ))}
+                </ul>
+              )}
               {run.members.length > 0 && (
                 <ul className="candidates">
                   {run.members.map((member) => (

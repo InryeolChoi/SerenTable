@@ -146,6 +146,15 @@ export type MatchRun = {
   started_at: string;
   finished_at: string | null;
   event_slot: EventSlot;
+  /** Absent on runs recorded before ADR-0011. */
+  policy: { version: string; min_score: string; weights: Record<string, string> } | null;
+  search_complete: boolean | null;
+  tables: {
+    id: string;
+    member_count: number;
+    score: string | null;
+    components: Record<string, string | null> | null;
+  }[];
   members: MatchRunMember[];
 };
 export type Application = {

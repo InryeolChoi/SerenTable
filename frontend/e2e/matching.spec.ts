@@ -157,6 +157,11 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
     .locator(":scope > li");
   const run = history.filter({ hasText: full.name });
   await expect(run).toContainText("확정 4명");
+  // ADR-0011: years 1994..1997 (age 62.5), shared interest 100, "similar" to the same
+  // self trait 100, all new 100; gender and MBTI cannot be computed.
+  // (.25*62.5 + .15*100 + .10*100 + .15*100) / .65 = 85.58
+  await expect(run).toContainText("최소 점수 50");
+  await expect(run).toContainText("테이블 점수 85.58");
   await expect(run).toContainText("participant-01");
   await expect(history.filter({ hasText: partial.name })).toContainText(
     "확정 0명",
