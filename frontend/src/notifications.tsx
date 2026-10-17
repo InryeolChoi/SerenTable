@@ -54,14 +54,14 @@ export function NotificationsPanel() {
     } catch { setError("구독 해제를 완료하지 못했습니다. 다시 시도해 주세요."); }
     finally { setBusy(false); }
   }
-  return <section aria-labelledby="notifications-heading">
+  return <section className="panel notifications-panel" aria-labelledby="notifications-heading">
     <h2 id="notifications-heading">알림</h2>
     <p>모임 안내는 앱 내 알림에 보관됩니다. 푸시는 이 기기에서 허용할 수 있습니다.</p>
     <button type="button" disabled={busy} onClick={() => void enablePush()}>이 기기 푸시 허용</button>
     {subscriptionId && <button type="button" disabled={busy} onClick={() => void disablePush()}>푸시 해제</button>}
-    {status && <p role="status">{status}</p>}{error && <p role="alert">{error}</p>}
-    {notices.length === 0 && <p>도착한 알림이 없습니다.</p>}
-    <ul>{notices.map(notice => <li key={notice.id}>
+    {status && <p className="notice" role="status">{status}</p>}{error && <p className="notice error" role="alert">{error}</p>}
+    {notices.length === 0 && <p className="muted small">도착한 알림이 없습니다.</p>}
+    <ul className="notification-list">{notices.map(notice => <li key={notice.id}>
       <strong>{notice.title}</strong><p>{notice.body}</p>
       <time dateTime={notice.created_at}>{new Date(notice.created_at).toLocaleString("ko-KR")}</time>
       {!notice.read_at && <button type="button" onClick={() => { void api(`/api/me/notifications/${notice.id}/read`, { method: "POST" }).then(reload).catch(() => setError("읽음 처리에 실패했습니다.")); }}>읽음으로 표시</button>}
