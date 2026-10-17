@@ -109,7 +109,7 @@ def list_application_alternatives(
 ):
     """STA-04: recruitment information only; never transfer a booking or its payment.
 
-    An earlier NO_MATCH is not final while a consented, paid candidate still awaits a
+    An earlier ALTERNATIVE_OFFERED is not final while a consented, paid candidate still awaits a
     successful run. Existing live choices on any of this user's applications are omitted
     from alternatives so the list does not suggest submitting a duplicate candidate.
     """
@@ -127,7 +127,11 @@ def list_application_alternatives(
             )
             if application is None:
                 raise HTTPException(404, "application_not_found")
-            if application["state"] != "SUBMITTED" or application["matching_state"] != "NO_MATCH":
+            # Rows written before ADR-0011 say NO_MATCH for the same unseated outcome.
+            if application["state"] != "SUBMITTED" or application["matching_state"] not in (
+                "ALTERNATIVE_OFFERED",
+                "NO_MATCH",
+            ):
                 raise HTTPException(409, "alternatives_not_available")
             now = locked_now(connection)
             eligible = eligible_slot_ids(connection, [application_id], now)[application_id]

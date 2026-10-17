@@ -51,6 +51,8 @@ CAPACITY = "capacity"
 UNKNOWN_AGE = "unknown_age"
 AGE_GAP = "age_gap"
 NO_VALID_TABLE = "no_valid_table"
+# Already confirmed at another slot whose time overlaps this one (PRD §7.4).
+OVERLAPPING_CONFIRMATION = "overlapping_confirmation"
 
 
 @dataclass(frozen=True)
@@ -155,7 +157,14 @@ def _reason(roster, years, searchable, index, capacity):
 # Eligible applications for one slot, in submission order. Paid by the slot close, live
 # candidate, SUBMITTED, and not already confirmed in another slot (U07).
 TARGET_SQL = f"""SELECT a.id AS application_id, a.user_id,
-    (p.data ->> 'birth_year')::int AS birth_year
+    (p.data ->> 'birth_year')::int AS birth_year,
+    EXISTS (
+        SELECT 1 FROM match_participation other
+        JOIN event_slot os ON os.id = other.event_slot_id
+        WHERE other.user_id = a.user_id AND other.state = 'CONFIRMED'
+          AND other.event_slot_id <> s.id
+          AND os.starts_at < s.ends_at AND s.starts_at < os.ends_at
+    ) AS overlap_confirmed
     {CANDIDATES}
     LEFT JOIN participant_profile p ON p.user_id = a.user_id
     WHERE c.event_slot_id = :slot_id AND {ELIGIBLE}
@@ -277,8 +286,14 @@ def _execute(connection, slot_id):
         [
             Participant(application_id=str(row["application_id"]), birth_year=row["birth_year"])
             for row in rows
+            if not row["overlap_confirmed"]
         ],
         slot["capacity"],
+    )
+    unseated = plan.unseated + tuple(
+        (str(row["application_id"]), OVERLAPPING_CONFIRMATION)
+        for row in rows
+        if row["overlap_confirmed"]
     )
     for members in plan.tables:
         table_id = uuid.uuid4()
@@ -323,7 +338,7 @@ def _execute(connection, slot_id):
                 None,
                 now,
             )
-    for application_id, reason in plan.unseated:
+    for application_id, reason in unseated:
         connection.execute(
             text("""INSERT INTO match_run_member
             (match_run_id, application_id, user_id, outcome, reason_code)
@@ -339,7 +354,7 @@ def _execute(connection, slot_id):
             connection,
             application_id,
             owners[application_id],
-            "NO_MATCH",
+            "ALTERNATIVE_OFFERED",
             None,
             None,
             run_id,
@@ -361,7 +376,7 @@ def _execute(connection, slot_id):
         "tables": [list(table) for table in plan.tables],
         "unseated": [
             {"application_id": application_id, "reason_code": reason}
-            for application_id, reason in plan.unseated
+            for application_id, reason in unseated
         ],
     }
 

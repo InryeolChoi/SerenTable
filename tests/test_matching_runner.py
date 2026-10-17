@@ -98,6 +98,34 @@ def stored_states():
         }
 
 
+def test_a_participant_is_never_confirmed_at_two_tables_at_the_same_time():
+    """PRD §7.4: separate applications for two simultaneous slots seat the user once."""
+    with ExitStack() as stack:
+        operator = stack.enter_context(TestClient(app))
+        members = [stack.enter_context(TestClient(app)) for _ in range(4)]
+        login(operator, "operator")
+        for index, participant in enumerate(members, start=1):
+            prepare(participant, f"participant-0{index}")
+        # Same evening, two regions: the duplicate-candidate rule does not cover this.
+        first = due_slot(operator, region="hongdae", close_in=6.0)
+        second = due_slot(operator, region="gangnam", close_in=6.0)
+        later = [apply_and_pay(participant, second) for participant in members]
+        earlier = [apply_and_pay(participant, first) for participant in members]
+        time.sleep(6.6)
+        summaries = run_due_matches()
+        assert sorted(summary["seated_count"] for summary in summaries) == [0, 4]
+        states = stored_states()
+        confirmed = [a for a in earlier + later if states.get(a) == "CONFIRMED"]
+        assert len(confirmed) == 4
+        unseated = [a for a in earlier + later if states.get(a) == "ALTERNATIVE_OFFERED"]
+        assert len(unseated) == 4
+        reasons = {item["reason_code"] for s in summaries for item in s["unseated"]}
+        assert reasons == {"overlapping_confirmation"}
+        for participant in members:
+            mine = participant.get("/api/me/applications").json()["applications"]
+            assert sum(a["matching"]["state"] == "CONFIRMED" for a in mine) == 1
+
+
 def test_the_planner_seats_as_many_as_the_oracle_and_never_breaks_a_hard_constraint():
     cases = [
         [1995, 1995, 1995, 1995],
@@ -254,7 +282,7 @@ def test_unpaid_and_too_few_applications_are_left_out_with_a_reason():
         # The unpaid application is not a target at all; three are not enough for a table.
         assert (summary["state"], summary["seated_count"]) == ("SUCCEEDED", 0)
         assert {item["reason_code"] for item in summary["unseated"]} == {"not_enough_eligible"}
-        assert stored_states() == {application_id: "NO_MATCH" for application_id in paid}
+        assert stored_states() == {application_id: "ALTERNATIVE_OFFERED" for application_id in paid}
         # No run reached the unpaid application, so its stored axis stays empty.
         assert unpaid not in stored_states()
         listed = members[3].get("/api/me/applications").json()["applications"]
@@ -353,7 +381,7 @@ def test_an_age_gap_leaves_the_table_unbuilt_and_names_the_reason():
         reasons = {item["application_id"]: item["reason_code"] for item in summary["unseated"]}
         assert reasons[applications[0]] == "age_gap"
         assert set(reasons.values()) <= {"age_gap", "no_valid_table"}
-        assert set(stored_states().values()) == {"NO_MATCH"}
+        assert set(stored_states().values()) == {"ALTERNATIVE_OFFERED"}
 
 
 def test_a_multi_slot_application_is_seated_in_only_its_earliest_slot():
@@ -550,7 +578,7 @@ def test_late_failure_record_cannot_replace_a_successful_retry():
         assert [run["state"] for run in runs] == ["SUCCEEDED"]
         for participant in members:
             application = participant.get("/api/me/applications").json()["applications"][0]
-            assert application["matching"]["state"] == "NO_MATCH"
+            assert application["matching"]["state"] == "ALTERNATIVE_OFFERED"
 
 
 def test_cancel_and_matching_do_not_deadlock_on_the_assignment_foreign_key(monkeypatch):

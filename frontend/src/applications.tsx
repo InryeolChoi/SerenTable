@@ -251,6 +251,7 @@ export function ApplyPage({
  */
 const matchingLabels: Record<string, string> = {
   CONFIRMED: "매칭 확정",
+  ALTERNATIVE_OFFERED: "매칭 실패 · 대안 선택 대기",
   NO_MATCH: "매칭 실패",
   EXCEPTION: "매칭 예외",
 };
@@ -261,6 +262,7 @@ const matchingReasons: Record<string, string> = {
   unknown_age: "출생연도가 없어 나이 조건을 확인할 수 없습니다",
   age_gap: "나이 차이 조건을 맞출 수 없습니다",
   no_valid_table: "조건에 맞는 테이블을 만들 수 없습니다",
+  overlapping_confirmation: "같은 시간대의 다른 식탁에 이미 확정되었습니다",
   runner_error: "자동 매칭 오류로 운영자 확인이 필요합니다",
   stale_generation: "중단된 실행을 정리했습니다",
 };
@@ -455,7 +457,8 @@ export function MyApplications({
                         {pending === application.id ? "취소 중…" : "신청 취소"}
                       </button>
                     )}
-                  {application.matching?.state === "NO_MATCH" && (
+                  {(application.matching?.state === "ALTERNATIVE_OFFERED" ||
+                    application.matching?.state === "NO_MATCH") && (
                     <AlternativeSlots applicationId={application.id} />
                   )}
                 </div>

@@ -133,7 +133,7 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
   await confirmed.screenshot({ path: testInfo.outputPath("matching-confirmed-mobile.png") });
   // A slot the runner left out says why, instead of staying "waiting" forever.
   await expect(mine.filter({ hasText: partial.name })).toContainText(
-    "매칭: 매칭 실패 (NO_MATCH) · 함께 앉을 인원이 부족합니다",
+    "매칭: 매칭 실패 · 대안 선택 대기 (ALTERNATIVE_OFFERED) · 함께 앉을 인원이 부족합니다",
   );
   const unseated = mine.filter({ hasText: partial.name });
   await unseated.getByRole("button", { name: "다른 일정 확인" }).click();
