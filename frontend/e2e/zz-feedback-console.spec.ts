@@ -50,7 +50,7 @@ test("참가 이력에서 체크인·평가하고 운영 현황에서 예외·�
     await members[0].goto("/participant/history");
     const card = members[0].locator("article").filter({has:members[0].getByRole("button",{name:"도착 체크인"})});
     await card.getByRole("button",{name:"도착 체크인"}).click();
-    await expect(card.getByText(/체크인 완료/)).toBeVisible();
+    await expect(members[0].getByRole("status").filter({hasText:"체크인 완료"})).toBeVisible();
     isolatedClock(slot.id,true);
     await members[0].reload();
     const evaluation = members[0].getByRole("region",{name:"모임 평가"});
