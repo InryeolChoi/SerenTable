@@ -183,3 +183,16 @@ docs/agents/record-maintenance.md에 따라 작업 결과·검증·중단 시 �
 기록 갱신 기준은 [공통 기록 갱신 절차](record-maintenance.md)에 모았다. 이번 변경은 기존 Work #1의 기술 결정 및 미결정 항목 정리 결과에 대한 운영 지침 보강이며 새 제품 Task를 만들지 않는다. 커밋/PR 링크를 남기고, 두 도구가 같은 checkout을 동시에 수정하는 상태는 해소한 뒤 넘긴다. 별도 작업 트리에는 공통 미커밋 변경이 자동 복사되지 않는다.
 
 공식 근거: [OpenAI AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md), [Claude 프로젝트 메모리](https://code.claude.com/docs/en/memory), [Claude 설정](https://code.claude.com/docs/en/settings), [Claude MCP](https://code.claude.com/docs/en/mcp). [Gemini 지침·파일 가져오기](https://geminicli.com/docs/cli/gemini-md/), [Cursor AGENTS.md](https://cursor.com/docs/rules), [GitHub Copilot 저장소 지침](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions). 사용자 도구·모델·계정 설정은 해당 세션의 실제 상태를 우선한다.
+
+## 2026-10-17 Work #7 구현 진행 체크포인트
+
+최신 작업은 `codex/work7-gathering-integration`(시작 e3d4240, 선행 PR #40)과 [Draft PR #41](https://github.com/InryeolChoi/SerenTable/pull/41)이다.
+Work: 모임 안내·피드백·재방문 → 식당·채팅·알림. Task 추가 없음.
+[승인 계약](../design/gathering-contract.md)·ADR-0013: U10 확인된 음식/예산만 배정, U12 푸시 최대3회·1/5분, 미지원/미설정 구분.
+식당 API 신규2 PASS, 채팅 별도 작업트리 실PG4 PASS·390px Chromium 영속/재연결/XSS PASS.
+채팅·알림 병합 완료. Claude Code 통합 검증: 새 격리 DB `serentable_work7_regression_test`에서 전체 pytest 242 PASS(476초), ruff·프런트 빌드 PASS.
+첫 전체 실행의 100명 규모 시험 정리 단계 FK 오류(worker가 만든 `app_notification`)는 시험 정리 범위를 넓혀 수정했다.
+로컬 Playwright는 포트 해제 후 `db33ded`에서 재실행해 모바일 Chromium 10 PASS(37.5초, 격리 DB `serentable_work7_notifications_test`). 또한 `5dda339` CI [39034779407](https://github.com/InryeolChoi/SerenTable/actions/runs/39034779407)이 SUCCESS다(pytest 242, 브라우저 10, PG18 복구). 모임·단체방 전용 E2E 스펙은 아직 없다.
+`serentable_work7_gathering_test`에는 실패 정리로 남은 합성 계정이 있다. `serentable_work7_notifications_test`는 E2E 시작 시 초기화됐다. 둘 다 격리 시험 DB다. 이 중간 기록은 Work 완료 증거가 아니다.
+신규 로컬 DB `serentable_work7_gathering_test` 등만 사용하며 운영 migration/deploy/매칭/기존 데이터 변경 금지 유지.
+사용자 AGENTS.md와 .claude/.codex/claude 스크립트 미커밋 변경 보존.

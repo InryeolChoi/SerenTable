@@ -11,10 +11,13 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from serentable.applications import router as applications_router
 from serentable.auth import router as auth_router
+from serentable.chat import router as chat_router
 from serentable.database import database_engine
 from serentable.events import router as events_router
+from serentable.gatherings import router as gatherings_router
 from serentable.match_resolution import router as resolution_router
 from serentable.matching import router as matching_router
+from serentable.notifications import router as notifications_router
 from serentable.payments import router as payments_router
 from serentable.profile import router as profile_router
 
@@ -22,9 +25,12 @@ app = FastAPI(title="SerenTable", docs_url=None, redoc_url=None, openapi_url=Non
 app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(events_router)
+app.include_router(gatherings_router)
 app.include_router(applications_router)
 app.include_router(payments_router)
 app.include_router(matching_router)
+app.include_router(chat_router)
+app.include_router(notifications_router)
 app.include_router(resolution_router)
 
 
@@ -105,6 +111,9 @@ if (WEB_ROOT / "assets").is_dir():
 @app.get("/", include_in_schema=False)
 @app.get("/participant", include_in_schema=False)
 @app.get("/admin", include_in_schema=False)
+@app.get("/admin/venues", include_in_schema=False)
+@app.get("/participant/gatherings", include_in_schema=False)
+@app.get("/participant/rooms", include_in_schema=False)
 @app.get("/admin/events", include_in_schema=False)
 @app.get("/participant/events", include_in_schema=False)
 @app.get("/participant/apply", include_in_schema=False)

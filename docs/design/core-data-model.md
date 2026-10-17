@@ -382,3 +382,30 @@ ScheduledJob은 시각·대상·논리 효과 키·처리 결과·다음 시도 
 | A5-W1 운영자 예외·안전 종합 관리 | U09/U16 검토/처분·CSV·개인정보/감사 보관 | 일괄 수정·전체 열 공개 전 |
 
 CSV는 원본 테이블 전체 덤프가 아니라 역할별 허용 필드 출력이다. U18/U20 배포·백업·원격 검증은 A1-W2 별도 Task가 담당한다. 새로운 Work/Task를 추가하지 않는다. 데이터 감사의 결측을 사실로 보완하지 않았고 제품 구현·마이그레이션·원본 변경은 없다. PR 생성만으로 부모 Work나 후속 구현을 완료 처리하지 않는다.
+
+## Work #7 물리 스키마 0011 (운영 미반영)
+
+[확정 후 안내 계약](gathering-contract.md)·[ADR-0013](../adr/0013-gathering-delivery.md)을 기준으로
+회차별 한 테이블 단위 `venue_inventory`와 `venue_allocation`을 도입한다.
+참가 테이블·재고 각각 UNIQUE로 중복 소비를 막고 `venue_food_approval`은 해당 테이블의 현재 음식 조건 해시에 묶인다.
+`chat_room`은 참가 테이블당 하나이며 `chat_message`는 사용자 요청 키/시스템 이벤트 키로 멱등 저장한다.
+모든 게시자는 room 잠금 후 메시지 순번을 할당한다.
+`app_notification`은 수신자·이벤트당 하나, `push_delivery`는 알림·구독당 하나다.
+`gathering_exception`은 식당 부족/발송 반복 실패를 안전한 사유 코드로 기록한다.
+방 게시·식당 배정·앱 알림은 테이블 트랜잭션에서 함께 커밋한다. 외부 푸시 전송은 별도이며 정확히 한 번 수신을 보장하지 않는다.
+기존 설계 ERD 그림은 개념 설계이며, 다음 물리 스키마 관계도가 0011 추가분이다.
+
+```mermaid
+erDiagram
+  dining_table ||--o| venue_allocation : receives
+  venue_inventory ||--o| venue_allocation : consumed_once
+  dining_table ||--o{ venue_food_approval : verified_snapshot
+  venue_inventory ||--o{ venue_food_approval : suitability
+  dining_table ||--o| chat_room : owns
+  chat_room ||--o{ chat_message : persists
+  app_user ||--o{ app_notification : receives
+  app_user ||--o{ push_subscription : owns
+  app_notification ||--o{ push_delivery : queues
+  push_subscription ||--o{ push_delivery : destination
+  dining_table ||--o{ gathering_exception : unresolved
+```
