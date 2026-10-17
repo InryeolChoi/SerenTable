@@ -33,7 +33,7 @@
 
 ## 검증 증거와 남은 항목
 
-전용 PostgreSQL17 `serentable_work7_notifications_test`, loopback55432, Python3.12.12 별도 작업트리 venv. transport 검증 RED는 모듈 부재, API RED는 enqueue 함수 부재, 서명 전달 RED는 py-vapid raw bytes 입력 불일치로 실제 확인했다. 수정 후 `PYTHONPATH=backend TEST_DATABASE_URL=<전용DB> uv run pytest tests/test_notifications.py -q`: 9 PASS. 실제PG public API의 익명/CSRF/소유권·읽음/구독/해제 멱등·중복enqueue·3회1분/5분/최종 단일예외·410비활성·미설정·기본네트워크비활성·외부fake 암호화/VAPID 수락·mixed DNS거부·별도 dispatch 프로세스 검증이다. fake 성공은 기기 수신 증거가 아니다. Node26 호스트 `npm run build --prefix frontend` PASS; 통합 Node22와 브라우저 동작은 메인 담당의 후속 검증이다. 프런트엔드는 기존 화면/디자인 토큰을 사용하며 새 디자인 시스템을 추가하지 않는다.
+전용 PostgreSQL17 `serentable_work7_notifications_test`, loopback55432, Python3.12.12 별도 작업트리 venv. transport 검증 RED는 모듈 부재, API RED는 enqueue 함수 부재, 서명 전달 RED는 py-vapid raw bytes 입력 불일치로 실제 확인했다. 수정 후 `PYTHONPATH=backend TEST_DATABASE_URL=<전용DB> uv run pytest tests/test_notifications.py -q`: 9 PASS. 알림+인증+프로필 회귀37 PASS(27.01초, 구현 a724fe4). 실제PG public API의 익명/CSRF/소유권·읽음/구독/해제 멱등·중복enqueue·3회1분/5분/최종 단일예외·410비활성·미설정·기본네트워크비활성·외부fake 암호화/VAPID 수락·mixed DNS거부·별도 dispatch 프로세스 검증이다. fake 성공은 기기 수신 증거가 아니다. Node26 호스트 `npm run build --prefix frontend` PASS; 통합 Node22와 브라우저 동작은 메인 담당의 후속 검증이다. 프런트엔드는 기존 화면/디자인 토큰을 사용하며 새 디자인 시스템을 추가하지 않는다.
 
 실제 provider 네트워크/실제 지원 기기·권한 UI·Chrome/iOS 수신, 운영 환경설정·배포·운영 마이그레이션은 미검증. 실기기 수신을 INF-01 완료로 기록하지 않는다. 총 실패 후 예외만 제공하며 자동 재발송/수동 retry 관리 API는 범위에 없다.
 
