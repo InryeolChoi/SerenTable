@@ -46,6 +46,18 @@ test("참가 이력에서 체크인·평가하고 운영 현황에서 예외·�
     }
     await operator.waitForTimeout(Math.max(0,close+700-Date.now()));
     execFileSync("uv",["run","python","-m","serentable.worker","--once"],{cwd:"..",env:{...process.env,PYTHONPATH:"backend"}});
+    const applications = await (await members[0].request.get("/api/me/applications")).json();
+    const own = applications.applications.find((item: {matching?: {event_slot_id: string}}) => item.matching?.event_slot_id === slot.id);
+    const rooms = await (await members[0].request.get("/api/me/rooms")).json();
+    const room = rooms.rooms.find((item: {dining_table_id: string}) => item.dining_table_id === own.matching.table.id);
+    await members[0].goto("/participant/rooms");
+    await members[0].getByLabel("참여할 단체방").selectOption(room.id);
+    await members[0].getByLabel("메시지", {exact:true}).fill("통합 검증에서 인사드립니다.");
+    await members[0].getByRole("button", {name:"보내기",exact:true}).click();
+    await expect(members[0].getByRole("list",{name:"메시지 목록"})).toContainText("통합 검증에서 인사드립니다.");
+    await members[0].reload();
+    await members[0].getByLabel("참여할 단체방").selectOption(room.id);
+    await expect(members[0].getByRole("list",{name:"메시지 목록"})).toContainText("통합 검증에서 인사드립니다.");
     isolatedClock(slot.id,false);
     await members[0].goto("/participant/history");
     const card = members[0].locator("article").filter({has:members[0].getByRole("button",{name:"도착 체크인"})});
