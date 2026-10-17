@@ -4,6 +4,7 @@
 
 ## 먼저 확인할 현재 상태
 
+- **2026-10-17 Claude Code 운영 합성100명 적재 완료:** PR #34·#36·#37은 사용자가 main에 병합(`f070c3c`), main CI SUCCESS·Railway API 배포 `f070c3c` 확인. 사용자 승인으로 운영 DB 새 백업(`.local-backups/railway-20261017-pre-demo-seed.dump`, 로컬 PG18 복원 PASS) 후 Railway API SSH에서 `seed_synthetic_roster` preflight→load(계정100·프로필100)→재실행0/0, 공개 HTTPS로 운영자/합성 계정 로그인·프로필 완성100·기본4명 보존·동의/신청/이용권0을 확인했다. [실행 기록](../design/synthetic-demo-seed-contract.md). **다음:** 운영자 화면에서 정원100 전용 회차 생성 → 별도 승인 후 `seed_demo_scenario --slot-id … --target railway` → 공개 API/worker 인수. PR #35는 열림(독립 병합 가능). 기록 브랜치 `claude/work5-railway-demo-seed-record`. 이 세션의 Railway CLI는 `npm exec @railway/cli@5.69.0`(로그인됨)이며 백업 명령은 `.claude/settings.local.json` 허용 규칙이 필요했다. 사용자 미커밋 `AGENTS.md`·`.claude/`·`.codex/`·`scripts/claude-*.sh`는 보존.
 - **2026-10-17 Claude Code 인수·PR #37 Ready:** Codex 작업을 Claude Code가 이어받아 Git·PR 상태가 아래 기록과 일치함을 확인했다(HEAD `1f8bc0c`, #34/#35/#36/#37 모두 base main·CI SUCCESS). 사용자 요청으로 [PR #37](https://github.com/InryeolChoi/SerenTable/pull/37)을 Draft에서 Ready for review로 전환했다. 코드 변경·재검증은 없다. 다음은 사용자 병합(#34 → #36 → #37, #35 독립) 후 운영 반영 단계이며 운영 쓰기는 아직 없다. 사용자 미커밋 `AGENTS.md`·`.claude/`·`.codex/`·`scripts/claude-*.sh`는 보존했다.
 - **최종 병합 목적지 정리:** #34/#35/#36/#37은 모두 **main**을 대상으로 한다. 앞 기록/PR 초안의 '선행 브랜치를 base로 사용, 병합 후 main 변경'은 초기 분리 상태이며 현재는 해소됐다. 사용자 검토·병합 권장 순서 #34 → #36 → #37, #35 독립. 아직 운영 쓰기는 없다. #37 구현 dc714b0→보완4c05cda의 고정 재검토에서 P2 해결·추가 결함0, 로컬 신규5시험 중 골든1/거부2/부분실패1/프록시1을 각각 검증했다(보완 후 집중4 PASS). 최종 전체 CI와 Ready 여부는 실제 PR checks/상태를 우선한다. 별도 worktree는 만들지 않았고 검토 에이전트는 읽기 전용이었다.
 

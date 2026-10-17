@@ -41,13 +41,21 @@ CLI와 실제 PostgreSQL·HTTP API를 경계로 한다. 미리보기 모듈 없�
 
 ## Railway 심사용 운영 DB 적재 순서
 
-사용자가 로컬 검증 후 운영 적재 의도를 재확인했다. 현재 **대상 형식 확인만 완료, 적재는 미실행**이다. 공식 CLI SSH로 API 컨테이너의 프로젝트·환경·서비스 일치, private DB·기대 DB명·query 없음·합성 암호 설정 길이를 boolean으로 확인했다. 비밀값은 내보내지 않았다.
+사용자가 로컬 검증 후 운영 적재 의도를 재확인했다. **2026-10-17 사용자 승인으로 1~5단계를 실행했다(아래 실행 기록).** 그 이전에는 대상 형식 확인만 했다. 공식 CLI SSH로 API 컨테이너의 프로젝트·환경·서비스 일치, private DB·기대 DB명·query 없음·합성 암호 설정 길이를 boolean으로 확인했다. 비밀값은 내보내지 않았다.
 
 1. main 대상 PR #34 → #36을 사용자 검토·머지하고, B안 시연에는 후속 #37도 병합한다. API/worker 배포 버전과 readiness를 확인한다. PR #35는 독립 병합 가능하다.
 2. [기존 백업 절차](../operations/postgres-recovery.md)로 새 논리 백업을 보존한다. 운영 DB에 복원하거나 초기화하지 않는다.
 3. 같은 공식 Railway SSH의 프로젝트·environment·API service를 명시한 원격 명령에서 `env SYNTHETIC_DEMO_SEED_ENABLED=1 python -m serentable.seed_synthetic_roster preflight --target railway`를 실행한다. 비밀번호는 기존 컨테이너 환경에서만 사용한다.
 4. 확인한 같은 컨테이너에서 명령의 `preflight`를 `load`로 바꿔1회 실행하고 집계를 기록한다. 다시 실행해 신규0/0을 확인한다. opt-in은 해당 명령 프로세스에만 적용하고 서비스 시작/Pre-deploy에는 넣지 않는다.
 5. 공개 HTTPS의 운영자 목록과 합성 계정 로그인·프로필 조회로 확인한다. 기존 계정·신청·결제 보존과 동의/거래 미생성을 구분해 기록한다. 심사용 자격 증명은 공개 PR에 올리지 않고 제출 경로로 전달한다.
+
+### 2026-10-17 운영 적재 실행 기록 (Claude Code)
+
+- 1단계: main CI [38996755819](https://github.com/InryeolChoi/SerenTable/actions/runs/38996755819) SUCCESS, Railway API 배포 SUCCESS, 공개 `/api/health` 버전 `f070c3c`(#37 병합), worker-health alive.
+- 2단계: `postgres_recovery.py backup`으로 `.local-backups/railway-20261017-pre-demo-seed.dump`(50,479바이트, 0600, SHA-256 `fb7c9cb5…4db8`, Git 제외) 보존. 새 PG18 임시 컨테이너 restore PASS(heartbeat1·readiness·worker-health). 업무 19테이블 데이터가 archive 목록에 있음을 확인했으나 행 수·제약 검증은 하지 않았다. 운영 DB에는 복원하지 않았다.
+- 3~4단계: API 서비스 SSH에서 `preflight --target railway` configuration_valid true → `load` 1회 신규 계정100·프로필100 → 재실행 신규0/0. opt-in은 해당 명령에만 적용했다.
+- 5단계: 같은 컨테이너에서 공개 HTTPS로 확인(비밀번호는 컨테이너 환경에서만 사용, 출력 없음). 운영자 로그인200, 참가자 전체104(합성100·기본4명 보존), 합성 프로필 완성100, 전체 신청1건(기존 검증 신청)·합성 신청0. `synthetic-demo-001`/`100` 로그인200·프로필 완성·동의/신청/이용권 0.
+- 미실행: 전용 정원100 회차 생성과 `seed_demo_scenario`(합성 동의·신청·모의 결제), 심사용 자격 증명 전달, 브라우저/실기기 확인.
 
 원본 변환의 날짜/나이 정책, 공개 배포 DB 적재·심사용 계정 전달, 대량 모의 거래·실행 시나리오와 매칭 점수 구현은 남아 있다. 따라서 Work #5와 본 Task 전체는 **진행 중**이다. 새 Work/Task는 만들지 않는다.
 
