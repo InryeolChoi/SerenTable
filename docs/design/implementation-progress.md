@@ -1,5 +1,7 @@
 # MVP 구현 분류 및 실행 기록
 
+**2026-10-17 Work #5 원본 준비:** 사용자 승인 후 [PR #34](https://github.com/InryeolChoi/SerenTable/pull/34)에서 응답별 식별·누락 보존·엄격한 선택지 정규화·집계 CLI·별도 로컬 준비 DB 적재를 구현했다. [정확한 Task별 수행/검증/Blaybus 문구](./source-preparation-contract.md)를 따른다. 현재v2 원본294행·재실행 중복0, 앱 계정/신청/결제/동의0, 집중CLI/PG13개 통과·PG18 마이그레이션 왕복 확인. 이는 앱용 데모 시드나 Work #5 전체 완료가 아니다. 기존 PR #33은 main `2039eaa`에 머지됐다.
+
 **2026-10-17 자율 구현:** [PR #33](https://github.com/InryeolChoi/SerenTable/pull/33)에서 Work #5/#6의 확정 1회권 사용 표시·미매칭 대체 일정 조회·100명 DB/worker 사례·확정 오류 롤백 검증을 보완한다. [이번 범위·검증·Blaybus 문구](./overnight-implementation-2026-10-17.md)를 현재 기록으로 삼는다. 이동/보관/연장/환불·점수·제외 관계 입력·원본 시드 정책과 최종 제출 인수는 미정/미완료다.
 
 **2026-10-17 실제 배포 인수:** PR #31 main `93195f6`의 API/worker 배포와 공개 HTTPS의 합성 로그인→회차→신청→모의 결제 실패/성공→재전송→상태 조회→취소 검증을 완료했다. [실행 증거·잔여·Blaybus 문구](../operations/application-deployment-verification.md)를 기준으로 현재 모의 MVP 범위의 신청·이용권·결제 Agenda 완료를 안내한다. 연장/환불 정책과 배포 브라우저·실기기를 완료한 것은 아니다.

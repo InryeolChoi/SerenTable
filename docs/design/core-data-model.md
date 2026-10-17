@@ -1,5 +1,9 @@
 # 핵심 ERD·상태·무결성 제약 설계
 
+## Work #5의 원본 응답 준비 영역
+
+2026-10-17 승인된 응답별 식별·누락 보존 규칙에 따라 `0008_source_preparation`이 `source_private.import_batch`와 `response_staging`을 만든다. 앱 사용자/프로필/신청/결제와 FK로 연결하지 않는다. 실제 원본은 별도 로컬 준비 DB에만 적재하고 앱 런타임 DB 연결과 분리한다. [규칙·물리 제약·권한](./source-preparation-contract.md), [별도 ERD 그림](./erd/source-preparation.svg)을 따른다. 아래 기존 3개 ERD는 서비스 도메인 설계이며 준비 영역을 참가자로 표현하지 않는다.
+
 ## Work #3의 물리 스키마 적용 범위
 
 전체 ERD는 후속 기능까지 포함하는 설계도다. 통합 브랜치의 migration `0002_auth`·`0003_profile`이 적용하는 범위만 아래에 구분한다. main/운영 DB에 적용했다고 주장하지 않는다.
