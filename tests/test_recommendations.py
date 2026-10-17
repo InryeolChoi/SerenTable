@@ -240,7 +240,8 @@ def test_the_next_matching_separates_excluded_pairs_and_spares_mutual_meet_again
         assert saved.status_code == 200, saved.text
 
     prefer(p1, [(i2, "MEET_AGAIN"), (i3, "AVOID")])  # mutual with p2; p1 avoids p3
-    prefer(p2, [(i1, "MEET_AGAIN")])
+    prefer(p2, [(i1, "MEET_AGAIN"), (i4, "MEET_AGAIN")])
+    prefer(p4, [(i2, "MEET_AGAIN")])  # mutual wishes cannot override a later report
     prefer(p3, [(i4, "MEET_AGAIN")])  # one-sided: p4 never answers in kind
     report = {"dining_table_id": table, "reported_id": i4, "reason_code": "other"}
     assert send(p2, "POST", "/api/me/reports", report).status_code == 201
@@ -266,3 +267,51 @@ def test_the_next_matching_separates_excluded_pairs_and_spares_mutual_meet_again
     # The second table appears in each member's history as upcoming, after nothing else.
     cards = history(p1)
     assert [card["event_slot_id"] for card in cards] == [slot, first_table["slot"]]
+
+
+def test_recommendations_exclude_overlapping_confirmations_but_keep_adjacent_slots(first_table):
+    operator = first_table["operator"]
+    member = first_table["members"][0]
+
+    # The existing confirmed table is at day +7, 19:00..21:00. Two different
+    # regions still conflict in time; the interval beginning at its end does not.
+    with database_engine().connect() as connection:
+        starts, ends = connection.execute(
+            text("SELECT starts_at,ends_at FROM event_slot WHERE id=:id"),
+            {"id": first_table["slot"]},
+        ).one()
+
+    def create(region, start):
+        response = send(
+            operator,
+            "POST",
+            "/api/admin/event-slots",
+            {
+                "region_code": region,
+                "starts_at": start.isoformat(),
+                "ends_at": (start + timedelta(hours=2)).isoformat(),
+                "closes_at": (start - timedelta(days=2)).isoformat(),
+                "matches_at": (start - timedelta(days=1)).isoformat(),
+                "capacity": 24,
+            },
+        )
+        assert response.status_code == 201, response.text
+        return response.json()["event_slot"]["id"]
+
+    create("jamsil", starts)
+    adjacent = create("gangnam", ends)
+    assert [slot for slot, _ in recommendations(member)] == [adjacent]
+
+
+def test_recommendations_follow_active_sanctions_without_penalizing_warnings(first_table):
+    from test_safety import sanction
+
+    operator = first_table["operator"]
+    member = first_table["members"][0]
+    user_id = first_table["ids"][0]
+    slot, _ = open_slot(operator, "jamsil", 6, 3)
+    assert [item[0] for item in recommendations(member)] == [slot]
+    assert sanction(operator, user_id, "WARNING").status_code == 201
+    assert [item[0] for item in recommendations(member)] == [slot]
+    assert sanction(operator, user_id, "PERMANENT_BAN").status_code == 201
+    assert recommendations(member) == []

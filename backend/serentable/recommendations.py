@@ -7,6 +7,7 @@ from serentable.auth import Principal, private_response, require_participant
 from serentable.clock import SEOUL
 from serentable.database import database_engine
 from serentable.events import SLOT_COLUMNS, slot_json
+from serentable.safety import participation_restricted
 
 router = APIRouter()
 
@@ -91,6 +92,10 @@ RECOMMENDATIONS = f"""WITH seats AS (
     WHERE s.closes_at>:now
       AND NOT EXISTS(SELECT 1 FROM application_candidate c
         WHERE c.user_id=:user_id AND c.live AND c.event_slot_id=s.id)
+      AND NOT EXISTS(SELECT 1 FROM match_participation mp
+        JOIN event_slot confirmed ON confirmed.id=mp.event_slot_id
+        WHERE mp.user_id=:user_id AND mp.state='CONFIRMED'
+          AND confirmed.starts_at<s.ends_at AND s.starts_at<confirmed.ends_at)
     ORDER BY rank,s.starts_at,r.sort_order"""
 
 WEEKDAY_NAMES = ("월", "화", "수", "목", "금", "토", "일")
@@ -109,6 +114,8 @@ def reason(row):
 def get_recommendations(user: Principal = Depends(require_participant)):
     with database_engine().connect() as connection:
         now = connection.execute(text("SELECT clock_timestamp()")).scalar_one()
+        if participation_restricted(connection, user.id, now):
+            return private_response({"recommendations": []})
         rows = (
             connection.execute(text(RECOMMENDATIONS), {"user_id": user.id, "now": now})
             .mappings()
