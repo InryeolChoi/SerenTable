@@ -1,5 +1,21 @@
 # 핵심 ERD·상태·무결성 제약 설계
 
+## Work #6 실패 해결의 추가 물리 스키마 (0010)
+
+2026-10-17 사용자 승인 정책과 [ADR-0012](../adr/0012-matching-failure-resolution.md)를 구현한다. **격리 시험 DB에만 적용했으며 운영에는 적용하지 않았다.** 기존 전체 ERD는 논리 설계이고 아래 표가 이번 물리 변경이다. [추가 ERD SVG](./erd/matching-resolution.svg)·[PNG](./erd/matching-resolution.png)는 주요 참조 관계를 보여주는 별도 그림이다(외부 user/run/slot 관계 일부 생략).
+
+| 테이블·변경 | 실제 책임·제약 |
+|---|---|
+| match_resolution | 신청/실패 실행당 선택 1개, 사용자/요청 키 UNIQUE, 소유자 FK, TRANSFER일 때만 대상 회차 필수. 이전 상태·실패 사유·동의 주체·시각·정책을 보존 |
+| application_candidate.source_resolution_id | nullable 신규 FK. 기존 행 NULL을 유지해 원제출 멱등 비교를 보존. 과거 후보는 삭제 없이 live=false |
+| entitlement_binding | 원권리·원구매 참조와 별도의 신청 예약 이력. 권리·신청 각각 활성 예약 최대 1개, 권리/신청 소유자 복합 FK. 기존 SINGLE은 원신청 예약을 backfill하고 구매/사용/확정 데이터는 변경하지 않음 |
+| membership_extension | application_id PK로 동일 신청의 대안 재시도 중복 연장 방지. 이전/결과 만료·정책·시각. 결과는 이전 +7일 CHECK |
+| payment.state | 기존 값에 REFUNDED를 추가. 원금·상품·원구매 신청·완료 시각은 보존 |
+| mock_refund_event | 원결제/전이 상태 PK, 요청→처리→완료 감사 이력·전액·시각. 실제 PG 호출 없음 |
+
+현재 상태: 실패 → 명시적 이동 이력 TRANSFERRED + 현재 WAITING, 보관/모의 환불 → NO_MATCH와 사유. 권리는 활성 예약과 영구 배치 이력으로 판정하며 이미 사용한 권리를 되살리지 않는다. 매칭 성공·오류 기록·해결·재사용은 같은 transaction advisory lock을 첫 잠금으로 사용한다. 스케줄·점수 알고리즘·기존 확정 테이블은 유지한다. 환불된 데이터가 있는 0010 downgrade는 상태 제약으로 거부하며, 운영 복구는 백업/전방 수정 계획을 별도 검토한다.
+
+
 ## Work #5의 원본 응답 준비 영역
 
 2026-10-17 승인된 응답별 식별·누락 보존 규칙에 따라 `0008_source_preparation`이 `source_private.import_batch`와 `response_staging`을 만든다. 앱 사용자/프로필/신청/결제와 FK로 연결하지 않는다. 실제 원본은 별도 로컬 준비 DB에만 적재하고 앱 런타임 DB 연결과 분리한다. [규칙·물리 제약·권한](./source-preparation-contract.md), [별도 ERD 그림](./erd/source-preparation.svg)을 따른다. 아래 기존 3개 ERD는 서비스 도메인 설계이며 준비 영역을 참가자로 표현하지 않는다.

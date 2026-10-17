@@ -88,7 +88,7 @@ export type Catalog = {
 export type Payment = {
   id: string;
   application_id: string;
-  state: "PENDING" | "PAID" | "FAILED";
+  state: "PENDING" | "PAID" | "FAILED" | "REFUNDED";
   mock: true;
   amount_krw: number;
   product: Product & { version: string };
@@ -108,7 +108,9 @@ export type Entitlement = {
   starts_at: string;
   expires_at: string | null;
   used_at: string | null;
-  state: "HELD" | "USED" | "ACTIVE" | "EXPIRED";
+  state: "HELD" | "USED" | "ACTIVE" | "EXPIRED" | "REFUNDED";
+  reserved_application_id: string | null;
+  reusable: boolean;
   policy_version: string;
 };
 export type MatchingState =
@@ -146,6 +148,15 @@ export type MatchRun = {
   started_at: string;
   finished_at: string | null;
   event_slot: EventSlot;
+  /** Absent on runs recorded before ADR-0011. */
+  policy: { version: string; min_score: string; weights: Record<string, string> } | null;
+  search_complete: boolean | null;
+  tables: {
+    id: string;
+    member_count: number;
+    score: string | null;
+    components: Record<string, string | null> | null;
+  }[];
   members: MatchRunMember[];
 };
 export type Application = {
@@ -153,7 +164,7 @@ export type Application = {
   state: "DRAFT" | "SUBMITTED" | "CANCELED";
   submitted_at: string | null;
   canceled_at: string | null;
-  candidates: EventSlot[];
+  candidates: (EventSlot & { live: boolean; source_resolution_id: string | null })[];
   payments: Payment[];
   coverage: {
     source: "payment" | "membership";
@@ -163,6 +174,8 @@ export type Application = {
   /** Candidate slots whose matching would include this application (paid by the close). */
   matching_eligible_slot_ids: string[];
   matching: MatchParticipation | null;
+  refund_state: "REFUND_AVAILABLE" | null;
+  resolutions: { id: string; action: "TRANSFER" | "HOLD" | "REFUND"; state: string; created_at: string; event_slot_id: string | null; refund_events: { state: string; amount_krw: number; created_at: string }[] }[];
   participant?: { id: string; login_id: string };
 };
 let csrfToken: string | null = null;
