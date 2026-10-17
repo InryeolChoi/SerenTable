@@ -43,7 +43,7 @@ CLI와 실제 PostgreSQL·HTTP API를 경계로 한다. 미리보기 모듈 없�
 
 사용자가 로컬 검증 후 운영 적재 의도를 재확인했다. 현재 **대상 형식 확인만 완료, 적재는 미실행**이다. 공식 CLI SSH로 API 컨테이너의 프로젝트·환경·서비스 일치, private DB·기대 DB명·query 없음·합성 암호 설정 길이를 boolean으로 확인했다. 비밀값은 내보내지 않았다.
 
-1. PR #34 → #36을 사용자 검토·머지하고, API/worker 배포 버전과 readiness를 확인한다. PR #35는 독립 병합 가능하다.
+1. main 대상 PR #34 → #36을 사용자 검토·머지하고, B안 시연에는 후속 #37도 병합한다. API/worker 배포 버전과 readiness를 확인한다. PR #35는 독립 병합 가능하다.
 2. [기존 백업 절차](../operations/postgres-recovery.md)로 새 논리 백업을 보존한다. 운영 DB에 복원하거나 초기화하지 않는다.
 3. 같은 공식 Railway SSH의 프로젝트·environment·API service를 명시한 원격 명령에서 `env SYNTHETIC_DEMO_SEED_ENABLED=1 python -m serentable.seed_synthetic_roster preflight --target railway`를 실행한다. 비밀번호는 기존 컨테이너 환경에서만 사용한다.
 4. 확인한 같은 컨테이너에서 명령의 `preflight`를 `load`로 바꿔1회 실행하고 집계를 기록한다. 다시 실행해 신규0/0을 확인한다. opt-in은 해당 명령 프로세스에만 적용하고 서비스 시작/Pre-deploy에는 넣지 않는다.
