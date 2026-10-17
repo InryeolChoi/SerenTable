@@ -1,8 +1,11 @@
 # 도구 간 작업 인계
 
-마지막 기록: 2026-10-17 02:39 KST. Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
+마지막 기록: 2026-10-17 (Asia/Seoul). Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
 
 ## 먼저 확인할 현재 상태
+
+- **Work #6 실제 worker 강제 종료 시험:** main `2039eaa` 기반 `codex/work6-worker-crash-verification`, [PR #35](https://github.com/InryeolChoi/SerenTable/pull/35)(Refs #6). [중단 검증·Blaybus 문구](../operations/worker-crash-verification.md). 실 worker 확정 직전 SIGKILL → 전부 롤백 → 새 worker 4명·1테이블 확정 → 재실행 불변. PG17 전용 `serentable_worker_crash_test`에서 집중1 PASS·관련18 PASS(69.53초), Ruff PASS. Spec 리뷰 재실행 오류 미검출1건 보완, 최종 재실행/CI는 PR 확인. 실제 종료는 미커밋 RUNNING도 롤백하므로 attempt1이며 기존 저장된 RUNNING fixture와 구분. Work #6/Task는 진행 중. PR #33의 100명 사례 준비 Task만 완료 가능으로 문서 정정(Blaybus 사용자 반영 미확인). PR #34 CI SUCCESS·MERGEABLE 확인, 사용자 머지 필요. PR #29는 과거 HANDOFF 갱신만 남아 병합 보류 권장. 사용자 AGENTS/개인설정 보존.
+- **다음 Work #5 승인(2026-10-17):** 사용자는 앱용 데모를 원본과 연결하지 않은 합성 참가자100명으로 구성하는 A, 매칭 점수는 인원 우선→모든 테이블 내 쌍의 관심사 Jaccard 합→신청 순서로 단계 구현하는 A를 승인했다. 원본294응답은 비공개 준비 DB에 보존. 앱 데모 시드와 점수의 계약/구현은 이어서 진행하며, 승인 사실을 전체 선호조건·원본 기반 계정 변환·운영 적재 완료로 확대하지 않는다.
 
 - **2026-10-17 자율 구현 검토 준비:** 통합 브랜치 `codex/overnight-matching-progress`, [PR #33](https://github.com/InryeolChoi/SerenTable/pull/33)(Refs #5/#6, main 사용자 머지 전). 시작 `39dd3d0`은 PR #32 기록을 포함한다. [범위·검증·Blaybus 복사 문구](../design/overnight-implementation-2026-10-17.md)가 최신이다. 확정 시 1회권 USED/used_at, 본인 NO_MATCH 대체 일정 읽기 조회·UI, 원본 무관 100명 DB/worker, 확정 저장 오류 롤백·재시도를 보완했다. 로컬 PG17 API/오라클129·브라우저10 PASS, 100명/18테이블 위반0·worker0.566초(한 사례 실측·SLA 아님). 고정 `39dd3d0...505da29` 독립 Standards P3 문구1건 정정, Spec 결함0. 최종 CI는 PR checks 확인. 운영 배포·실기기는 이번 미실행, Work #5/#6/아젠다는 진행 중 유지. 연장/이동/보관/환불·점수·제외 관계 입력·원본 시드 정책은 미정. 사용자 AGENTS.md·미추적 설정/스크립트는 보존했다.
 

@@ -15,7 +15,8 @@
 - 종료된 트랜잭션의 실행 이력·배치·권리 사용이 롤백되고, 새 worker가 4명·1테이블을 정상 확정한다.
 - 확정 이전 1회권은 HELD·사용 시각 없음, 확정 이후 USED·사용 시각 있음이다. 한 번 더 실행해도 실행 이력과 이용권 사용 시각이 변하지 않는다.
 - 실제 중단은 미커밋 실행 세대도 롤백하므로 재시작 성공의 attempt는 1이다. 기존의 저장된 RUNNING → ABANDONED 시험은 별도의 지속된 중단 상태 fixture이며 실제 프로세스 종료와 동일시하지 않는다.
-- 운영 DB·원본 준비 DB는 사용하지 않았다. 제품 코드·스키마·정책 변경은 없다. 회귀/CI 결과는 해당 PR checks와 인계 기록에 추가한다.
+- 관련 매칭 회귀 합계 **18개 PASS**(69.53초), Ruff check·format PASS. 독립 Spec 검토에서 마지막 재실행이 오류 없이 완료됐는지 추가 확인하도록 보완했다.
+- 운영 DB·원본 준비 DB는 사용하지 않았다. 제품 코드·스키마·정책 변경은 없다. 전체 CI는 [PR #35 checks](https://github.com/InryeolChoi/SerenTable/pull/35/checks)에서 확인한다.
 
 ## 남은 항목
 
@@ -38,5 +39,5 @@
 - Task와 상위 Work는 진행 중으로 유지한다.
 
 [PR]
-생성 후 이 문서와 인계 기록에 연결한다.
+https://github.com/InryeolChoi/SerenTable/pull/35
 ```

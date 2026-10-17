@@ -114,7 +114,7 @@ def test_killed_worker_rolls_back_confirmation_and_a_new_process_recovers_once()
             assert held["state"] == "HELD" and held["used_at"] is None
 
         def restart():
-            return subprocess.run(
+            result = subprocess.run(
                 [sys.executable, "-m", "serentable.worker", "--once"],
                 env={**os.environ, "PYTHONPATH": "backend"},
                 capture_output=True,
@@ -122,6 +122,10 @@ def test_killed_worker_rolls_back_confirmation_and_a_new_process_recovers_once()
                 timeout=30,
                 check=True,
             )
+            assert "worker_heartbeat_ok" in result.stderr
+            assert "worker_matching_unavailable" not in result.stderr
+            assert "worker_database_unavailable" not in result.stderr
+            return result
 
         assert "worker_matching_ok runs=1" in restart().stderr
         (run,) = operator.get("/api/admin/match-runs").json()["match_runs"]
