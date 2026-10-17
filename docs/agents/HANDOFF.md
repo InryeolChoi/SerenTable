@@ -4,6 +4,8 @@
 
 ## 먼저 확인할 현재 상태
 
+- **2026-10-17 Work #5 원본 준비 구현:** 사용자 PR #33 머지 확인(main `2039eaa`). 새 브랜치 `codex/work5-source-preparation`. 사용자가 응답별 식별·누락 보존·비공개 정규화 적재를 승인했다. [원본 준비 계약](../design/source-preparation-contract.md)·ADR-0009·용어집에 반영. 별도 로컬 DB 전용 CLI preview/load/report, private schema migration0008, 합성 외부 CLI/PG 시험8개 PASS. 실제 원본 preview294행·기존checksum일치. 실제 적재·전체 회귀·독립 검토·PR/CI는 진행 중. 앱 계정/거래/동의 생성·운영 적재는 승인 범위 밖이다. 사용자 AGENTS.md·개인 설정/스크립트는 보존한다.
+
 - **2026-10-17 자율 구현 검토 준비:** 통합 브랜치 `codex/overnight-matching-progress`, [PR #33](https://github.com/InryeolChoi/SerenTable/pull/33)(Refs #5/#6, main 사용자 머지 전). 시작 `39dd3d0`은 PR #32 기록을 포함한다. [범위·검증·Blaybus 복사 문구](../design/overnight-implementation-2026-10-17.md)가 최신이다. 확정 시 1회권 USED/used_at, 본인 NO_MATCH 대체 일정 읽기 조회·UI, 원본 무관 100명 DB/worker, 확정 저장 오류 롤백·재시도를 보완했다. 로컬 PG17 API/오라클129·브라우저10 PASS, 100명/18테이블 위반0·worker0.566초(한 사례 실측·SLA 아님). 고정 `39dd3d0...505da29` 독립 Standards P3 문구1건 정정, Spec 결함0. 최종 CI는 PR checks 확인. 운영 배포·실기기는 이번 미실행, Work #5/#6/아젠다는 진행 중 유지. 연장/이동/보관/환불·점수·제외 관계 입력·원본 시드 정책은 미정. 사용자 AGENTS.md·미추적 설정/스크립트는 보존했다.
 
 - **2026-10-17 PR #31 배포·신청/모의 결제 인수 완료:** main `93195f6`, CI38937665767 SUCCESS. API/worker 배포 SUCCESS·replica 각1, 공개 버전 일치·readiness/worker 정상. 컨테이너 환경의 비밀번호를 내보내지 않고 공개 HTTPS로 운영자/참가자 로그인·회차·신청·실패/성공 모의 결제·멱등 재전송·조회·취소 검증23 PASS. [배포 검증 기록](../operations/application-deployment-verification.md) 참조. 현재 모의 MVP 범위에서 Work #4/신청·이용권·결제 Agenda 완료 가능. 실제 Blaybus 변경은 사용자 수동이며 반영 확인 전이다. 임시 정책의 CEO 승인·Work #6 완료로 확대하지 않는다. 배포 브라우저 전체 흐름/실기기는 최종 통합 검증에 남긴다. 검증용 회차1·취소된 합성 신청1·실패/성공 모의 결제·보유1회권1이 남으며 실제 청구는 없다. 사용자 AGENTS.md/설정 변경을 보존한다.
