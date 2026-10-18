@@ -67,7 +67,17 @@ def applications_json(connection, rows, now, with_participant=False):
             )
     history = {}
     refund_events = {}
+    refund_attempts = {}
     if ids:
+        from serentable.mock_refunds import attempt_json
+
+        for attempt in connection.execute(
+            text("""SELECT f.* FROM mock_refund_attempt f
+            JOIN match_resolution r ON r.id=f.resolution_id WHERE r.application_id=ANY(:ids)
+            ORDER BY f.attempt_number"""),
+            {"ids": ids},
+        ).mappings():
+            refund_attempts.setdefault(attempt["resolution_id"], []).append(attempt_json(attempt))
         for event in connection.execute(
             text("""SELECT f.* FROM mock_refund_event f
                 JOIN match_resolution r ON r.id=f.resolution_id
@@ -89,8 +99,11 @@ def applications_json(connection, rows, now, with_participant=False):
             {"ids": ids},
         ).mappings():
             history.setdefault(resolution["application_id"], []).append(
-                resolution_json(resolution)
-                | {"refund_events": refund_events.get(resolution["id"], [])}
+                resolution_json(resolution, connection)
+                | {
+                    "refund_events": refund_events.get(resolution["id"], []),
+                    "refund_attempts": refund_attempts.get(resolution["id"], []),
+                }
             )
     payments = payment_details(connection, rows, now)
     eligible = eligible_slot_ids(connection, ids, now)
@@ -174,7 +187,7 @@ def offers_alternatives(matching_state, reason_code):
 
     A NO_MATCH for overlapping_confirmation means the user is already seated at that time.
     """
-    if reason_code in ("pass_held", "mock_refunded", "membership_held"):
+    if reason_code in ("pass_held", "mock_refunded", "mock_refund_failed", "membership_held"):
         return False
     if matching_state == "ALTERNATIVE_OFFERED":
         return True
