@@ -1,6 +1,6 @@
 # Work #9 운영자 예외·안전 종합 관리 계약
 
-Issue #9가 기준이다. 근거 요구는 [구현 명세](mvp-implementation-spec.md) 운영자 스토리 44~54와 PRD §11·§16이다. 통합 브랜치는 `claude/work9-operator-console`이고 기반은 Work #8 통합 브랜치다. 스키마는 `0013_operator_audit`(T0)다.
+Issue #9가 기준이다. 근거 요구는 [구현 명세](mvp-implementation-spec.md) 운영자 스토리 44~54와 PRD §11·§16이다. 최초 통합은 `claude/work9-operator-console`(PR43), 2026-10-19 후속 복구 통합은 `codex/w9-resolution-integration`([PR44](https://github.com/InryeolChoi/SerenTable/pull/44))이다. 후속 기반은 PR42·43이 병합된 Work7 통합66eaeb6이며 스키마는 기존0013과 추가0014다. 운영 반영 상태는 별도다.
 
 ## 원칙 (PRD에서 그대로 옴)
 
@@ -85,3 +85,11 @@ Issue #9가 기준이다. 근거 요구는 [구현 명세](mvp-implementation-sp
 ## 2026-10-19 승인된 복구 범위
 
 [ADR-0015](../adr/0015-operator-failure-recovery.md)에 따라 모의 환불 실패 기록과 운영자 멱등 재시도를 추가한다. 원결제 전액·미사용 1회권 범위를 유지하며 실제 PG·임의 실패 버튼·멤버십 금액 환불은 추가하지 않는다. 실패한 환불에 예약된 권리는 보존하고 다른 신청이나 매칭에 중복 사용하지 못하게 한다. DB 전체 장애는 실패 기록이 가능하다고 가정하지 않으며 전체 롤백과 오류로 응답한다. 감사 보관·운영자 역할 분리·기존 조치 전반의 사유 필수화는 계속 미정이다.
+
+### 후속 모의 환불 API 계약
+
+- `GET /api/admin/mock-refunds?state=FAILED|SUCCEEDED` (기본FAILED): 운영자 전용, `{refunds:[{id, application_id, event_slot_id, amount_krw, state, error_code, attempt_number, created_at, mock:true}]}`. id는 해결 선택 UUID이고 오류는 고정 코드만 반환한다.
+- `POST /api/admin/mock-refunds/{resolution_id}/retry` `{request_key:UUID}`: 운영자·CSRF 필수, 금액 등 추가 필드는422. `{refund:{id, attempt_number, state, error_code, created_at}}`를 반환한다. 여기의 id는 시도 이력 ID다. 같은 운영자·키 재전송은 해당 시도를 재실행하지 않고 반환하며 다른 해결 선택에 키를 재사용하면409다. 완료 후 새 키의 재시도도409다.
+- `/api/admin/exceptions`에 `kind=mock_refund`, `category=MOCK_REFUND`, 최신 실패 `OPEN`, 과거 실패 후 성공 `RESOLVED`를 추가한다. `retryable`, `amount_krw`는 추가 필드다. 처음부터 정상 완료된 환불을 예외로 만들지 않는다. 기존 `/resolve`를 환불 실행 경로로 바꾸지 않는다.
+- 참가자 해결 응답에 `refund_status=FAILED|SUCCEEDED`, 신청 이력에 `refund_attempts`를 추가한다. 기존 `state=REFUND`, 원금·기존 완료 이벤트를 유지한다. 참가자 화면은 FAILED를 완료로 표시하지 않는다.
+- 예외 목록은 종류별200건 제한이며 대시보드는 전체 건수다. 200건 초과 시 동일 개수라고 해석하지 않는다. 페이지 처리 개선은 후속 범위다.
