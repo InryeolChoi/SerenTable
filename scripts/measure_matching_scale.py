@@ -9,8 +9,9 @@ score compliance (``tests/oracle/scoring.validate_allocation``), duplicate seats
 participants, and determinism (two runs give the same tables).
 
 No ``data/`` file is read and no personal data exists: every pool is generated from a seed.
-Only aggregates are printed. The ADR-0011 5 second target is flagged, not turned into a
-new acceptance number; the policy for inputs above 100 (U19) is not decided here.
+Only aggregates are printed. The planner's ``SEARCH_SECONDS`` guard (ADR-0011) is
+flagged, not turned into a new acceptance number; the policy for inputs above 100
+(U19) is not decided here.
 
 What this does not measure: HTTP, the separate worker process, PostgreSQL work and the
 deployed environment (see ``tests/test_matching_scale.py`` for the end-to-end path).
@@ -41,12 +42,12 @@ for extra in (ROOT / "backend", ROOT / "tests"):
 
 from oracle import hard_constraints as hard  # noqa: E402
 from oracle import scoring as oracle_scoring  # noqa: E402
-from serentable.matching import Participant, plan_allocation  # noqa: E402
+from serentable.matching import SEARCH_SECONDS, Participant, plan_allocation  # noqa: E402
 from serentable.matching_score import DEFAULT_POLICY  # noqa: E402
 
 SLOT = "synthetic-slot"
 POOL_SIZE = 100
-ADR_TARGET_SECONDS = 5.0  # ADR-0011 / U06 target, reported only.
+ADR_TARGET_SECONDS = SEARCH_SECONDS  # ADR-0011 / U06 guard, reported only.
 
 MBTIS = ("INTJ", "ENFP", "ISTJ", "ESFP", "INFP", "ENTJ", "ISFJ", "ESTP")
 INTERESTS = (
@@ -255,7 +256,7 @@ def measure(scenario, trace_memory=True):
 
     tracemalloc roughly doubles the planner's run time, so the traced run is used for the
     memory peak only; its seated count and completeness are kept as a slowdown signal,
-    because the planner's 5 second wall-clock guard can cut the search on a slower run.
+    because the planner's wall-clock guard can cut the search on a slower run.
     """
     started = time.perf_counter()
     plan = _run(scenario)
@@ -414,7 +415,7 @@ def summarize(results):
                 "duplicates": sum(r["duplicate_seats"] for r in group),
                 "missing": sum(r["missing"] for r in group),
                 "incomplete_search": sum(not r["search_complete"] for r in group),
-                "over_5s": sum(r["over_adr_target"] for r in group),
+                "over_guard": sum(r["over_adr_target"] for r in group),
                 "traced_cut": sum(not r["traced_search_complete"] for r in group),
                 "traced_seated_min": min(r["traced_seated"] for r in group),
             }
@@ -442,7 +443,7 @@ def environment():
 def markdown(results, env):
     lines = [
         "| shape | runs | clean | median s | max s | peak MiB | seated | reference | "
-        "max gap | violations | dup | missing | incomplete | >5s | traced cut (min seated) |",
+        "max gap | violations | dup | missing | incomplete | >guard | traced cut (min seated) |",
         "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for row in summarize(results):
@@ -457,7 +458,7 @@ def markdown(results, env):
             f"{row['seconds_median']:.3f} | {row['seconds_max']:.3f} | "
             f"{row['peak_mib_max']:.2f} | {seated} | {reference} ({row['reference_kind']}) | "
             f"{row['gap_max']} | {row['violations']} | {row['duplicates']} | "
-            f"{row['missing']} | {row['incomplete_search']} | {row['over_5s']} | "
+            f"{row['missing']} | {row['incomplete_search']} | {row['over_guard']} | "
             f"{row['traced_cut']} ({row['traced_seated_min']}) |"
         )
     total = len(results)

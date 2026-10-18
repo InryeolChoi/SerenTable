@@ -59,7 +59,9 @@ RULE_VERSION = "adr-0011-2026-10-17"
 # Deterministic bound on improvement passes; the wall clock only guards against a
 # pathological input and is reported when it stops the search.
 MAX_PASSES = 40
-SEARCH_SECONDS = 5.0
+# ADR-0011 amendment 2026-10-19: raised from 5 s so slower hosts finish the 100-person
+# search instead of cutting it (measured: one skewed pool 96 seated at 2.9 s, 76 when cut).
+SEARCH_SECONDS = 8.0
 
 # Why an application was left unseated; stored per member and shown to participants.
 NOT_ENOUGH_ELIGIBLE = "not_enough_eligible"
@@ -134,8 +136,9 @@ def plan_allocation(
         tuple(roster[searchable[index]].application_id for index in members) for members in grouped
     )
     seated = {application_id for table in tables for application_id in table}
+    roomy = _seatable_without_capacity(searchable, years, capacity)
     unseated = tuple(
-        (person.application_id, _reason(roster, years, searchable, index, capacity))
+        (person.application_id, _reason(roster, years, searchable, index, capacity, roomy))
         for index, person in enumerate(roster)
         if person.application_id not in seated
     )
@@ -185,13 +188,25 @@ def _ordered_allocation(years, capacity):
     return tables
 
 
-def _reason(roster, years, searchable, index, capacity):
-    """Why this application could not be seated, in a wording participants can read."""
+def _seatable_without_capacity(searchable, years, capacity):
+    """Roster indexes the age-only allocation seats when the slot capacity is no limit."""
+    if capacity >= len(searchable):
+        return frozenset()
+    grouped = _ordered_allocation(years, len(searchable))
+    return frozenset(searchable[member] for members in grouped for member in members)
+
+
+def _reason(roster, years, searchable, index, capacity, roomy=frozenset()):
+    """Why this application could not be seated, in a wording participants can read.
+
+    ``roomy`` holds the people a slot without a capacity limit would seat; when the full
+    slot is what left one of them out, the participant is told it is the capacity.
+    """
     if roster[index].birth_year is None:
         return UNKNOWN_AGE
     if len(searchable) < MIN_TABLE_SIZE:
         return NOT_ENOUGH_ELIGIBLE
-    if capacity < MIN_TABLE_SIZE:
+    if capacity < MIN_TABLE_SIZE or index in roomy:
         return CAPACITY
     position = searchable.index(index)
     others = [year for other, year in enumerate(years) if other != position]
@@ -386,10 +401,11 @@ def _policy_allocation(roster, capacity, policy, exclusions, met_pairs):
     scored = [search.score(table) for table in tables]
     seated = {index for table in tables for index in table}
     baseline = {index for table in start for index in table}
+    roomy = _seatable_without_capacity(searchable, years, capacity)
     unseated = tuple(
         (
             person.application_id,
-            _reason(roster, years, searchable, index, capacity)
+            _reason(roster, years, searchable, index, capacity, roomy)
             if index not in baseline
             else NO_QUALIFYING_TABLE,
         )

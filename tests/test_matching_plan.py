@@ -79,6 +79,23 @@ def test_a_lone_excluded_pair_that_cannot_be_split_leaves_people_out_with_the_re
     assert dict(plan.unseated)["app-01"] == "no_qualifying_table"
 
 
+def test_people_left_out_only_by_a_full_slot_are_told_it_is_the_capacity():
+    # Ten compatible applicants, capacity 6: one table of six, the last four would have
+    # formed a second table if the slot had room. A wrong age/table reason misleads them.
+    people = [alike(n) for n in range(1, 11)]
+    for plan in (plan_allocation(people, 6), plan_allocation(people, 6, policy=policy(0))):
+        assert plan.seated_count == 6
+        assert {reason for _, reason in plan.unseated} == {"capacity"}
+
+
+def test_an_unseatable_age_outlier_keeps_its_own_reason_when_the_slot_is_also_full():
+    people = [alike(n) for n in range(1, 9)] + [person(9, 1970)]
+    plan = plan_allocation(people, 6, policy=policy(0))
+    reasons = dict(plan.unseated)
+    assert reasons["app-09"] == "age_gap"
+    assert {reasons[f"app-0{n}"] for n in (7, 8)} == {"capacity"}
+
+
 def test_swaps_group_shared_interests_when_the_seat_count_is_equal():
     # Same age; odd applicants like music, even ones travel; 01..04 are men. The DP seats
     # 01..04 and 05..08: one gender per table and mixed interests. Grouping by interest
