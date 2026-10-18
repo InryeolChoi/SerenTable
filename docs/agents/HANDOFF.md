@@ -266,3 +266,9 @@ PR42 `claude/work8-feedback`에 미병합 T4 f31f04b를 반영했다. 추천 자
 [검증·12단계 증거·Blaybus Task별 수행/검증/남은 항목](../design/work8-work9-verification-2026-10-18.md)에 기록했다. 기존 Issue8/9에도 진행 댓글 반영. Blaybus는 사용자가 수동으로 갱신하며 Work/Agenda는 운영·미정정책 인수 전 진행중 유지한다. 선행 PR39는 main 문서 충돌 상태이며 임의 main병합 금지. 감사 보관·역할 분리·모의 환불 실패·대안 미응답 기준·운영자 사유 정책은 추가구현/확정하지 않았다.
 
 **운영migration/deploy/매칭재실행/기존데이터 변경·main병합 없음.** 실제 휴대폰 푸시·공개 데모 인수는 남았다. 사용자 AGENTS.md의30줄 미커밋변경 및 .claude/.codex/scripts/claude-*.sh를 커밋하지 않고 보존했다. 이번 세 managed 구현작업트리는 archive 요청했으며 앱 처리 전 남아 있을 수 있다. 사용자 Claude 작업트리와 기존 보존 DB는 유지한다. 다음 행동은 최신 CI 확인→PR42/43 Ready 여부 정리→운영 승인 전 공개 인수 계획 확인이다.
+
+## 2026-10-19 Work9 복구 후속 구현 진행
+
+사용자가 대안 미응답 표시 기준(원래 실패 회차 시작, 참가자 권한 만료 없음)과 모의 환불 실패 기록·운영자 멱등 재시도를 승인했다. 별도 통합 브랜치 codex/w9-resolution-integration, /private/tmp/serentable-w9-resolution, 기반66eaeb6(PR42·43 병합 후)에서 기존 Task ‘기능별 예외·조치 연결’을 진행한다. Draft PR44는 Work7 통합 브랜치 대상이며 main/운영은 변경하지 않는다.
+
+푸시 예외 회차 누락 수정22e3572를7849165로 통합했다. 실제PG RED→GREEN, 관련11통과. 모의환불은 별도작업트리 /private/tmp/serentable-w9-refund에서 구현·검증 중, 부모는 승인정책 ADR0015·문서·참가자/운영자화면·브라우저시험을 준비 중이다. 저장장애가 환불완료나 이용권 재사용으로 이어지지 않게 한다. 전체회귀/브라우저/최종CI는 아직 실행 전이다. Docker Desktop과 테스트전용foundationPG만 재시작, 신규격리DB만 생성했다. 사용자 미커밋 AGENTS/.claude/.codex/claude스크립트는 루트에 보존했다. 감사보관·역할분리·기존조치 사유정책은 미정 유지.

@@ -16,6 +16,7 @@ from serentable.audit import record_audit
 from serentable.auth import Principal, private_response, require_csrf_operator, require_operator
 from serentable.clock import iso
 from serentable.database import database_engine
+from serentable.mock_refunds import list_refund_exceptions
 
 router = APIRouter()
 
@@ -48,7 +49,7 @@ def gathering_json(row):
 
 # An offered alternative left unanswered after its failed slot has started. There is no
 # resolution store for it, so it is listed read-only and stays open until the participant
-# chooses (ADR-0012). The start-time threshold is the conservative reading of the contract.
+# chooses. ADR-0015 approves this display threshold without expiring participant rights.
 ALTERNATIVE_SELECT = """SELECT a.id, mp.reason_code, mp.updated_at, r.event_slot_id
     FROM match_participation mp JOIN application a ON a.id=mp.application_id
     JOIN match_run r ON r.id=mp.match_run_id JOIN event_slot s ON s.id=r.event_slot_id
@@ -89,6 +90,7 @@ def list_exceptions(
                 {"state": state},
             ).mappings()
         ]
+        items += list_refund_exceptions(connection, state)
         if state != "RESOLVED":
             items += [
                 alternative_json(row)
