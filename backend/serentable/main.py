@@ -23,6 +23,7 @@ from serentable.feedback import router as feedback_router
 from serentable.gatherings import router as gatherings_router
 from serentable.match_resolution import router as resolution_router
 from serentable.matching import router as matching_router
+from serentable.mock_refunds import router as mock_refunds_router
 from serentable.notifications import router as notifications_router
 from serentable.payments import router as payments_router
 from serentable.profile import router as profile_router
@@ -46,6 +47,7 @@ app.include_router(safety_router)
 app.include_router(recommendations_router)
 app.include_router(dashboard_router)
 app.include_router(exceptions_router)
+app.include_router(mock_refunds_router)
 app.include_router(audit_router)
 app.include_router(exports_router)
 
