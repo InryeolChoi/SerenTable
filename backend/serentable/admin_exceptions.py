@@ -19,10 +19,15 @@ from serentable.database import database_engine
 
 router = APIRouter()
 
-# Venue exceptions reach their slot through the table; push exceptions carry no table.
+# Venue exceptions name a table; push exceptions reach it through their notification.
 GATHERING_SELECT = """SELECT g.id, g.kind AS category, g.reason_code, g.state, g.created_at,
-    g.updated_at, g.dining_table_id, t.event_slot_id, g.resolution_note, g.resolved_by
-    FROM gathering_exception g LEFT JOIN dining_table t ON t.id=g.dining_table_id """
+    g.updated_at, g.dining_table_id, COALESCE(t.event_slot_id,nt.event_slot_id) AS event_slot_id,
+    g.resolution_note, g.resolved_by
+    FROM gathering_exception g LEFT JOIN dining_table t ON t.id=g.dining_table_id
+    LEFT JOIN push_delivery d ON g.event_key='push:'||d.id::text
+    LEFT JOIN app_notification n ON n.id=d.notification_id
+    LEFT JOIN dining_table nt ON nt.id::text=split_part(n.event_key,':',2)
+      AND (n.event_key LIKE 'table:%' OR n.event_key LIKE 'feedback-reminder:%') """
 
 
 def gathering_json(row):
