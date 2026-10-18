@@ -23,6 +23,7 @@ import { AdminVenuesPage, GatheringsPage } from "./gatherings";
 import { RoomsPage } from "./chat";
 import { HistoryPage } from "./history";
 import { AdminSafetyPage } from "./safety";
+import { AdminConsolePage } from "./console";
 import { NotificationsPanel } from "./notifications";
 import {
   AdminApplicationsPage,
@@ -893,6 +894,7 @@ function App() {
             </a>
             <a href={user.role === "operator" ? "/admin/venues" : "/participant/gatherings"} onClick={e => {e.preventDefault(); navigate(user.role === "operator" ? "/admin/venues" : "/participant/gatherings");}}>{user.role === "operator" ? "식당 배정" : "모임 안내"}</a>
             {user.role === "participant" && <a href="/participant/rooms" onClick={e => {e.preventDefault(); navigate("/participant/rooms");}}>단체방</a>}
+            {user.role === "operator" && <a href="/admin/console" onClick={e => {e.preventDefault(); navigate("/admin/console");}}>운영 현황</a>}
             <a href={user.role === "operator" ? "/admin/safety" : "/participant/history"} onClick={e => {e.preventDefault(); navigate(user.role === "operator" ? "/admin/safety" : "/participant/history");}}>{user.role === "operator" ? "안전·노쇼" : "참가 이력"}</a>
             {user.role === "operator" && (
               <a
@@ -979,7 +981,9 @@ function App() {
               </button>
             </section>
           ) : user.role === "operator" ? (
-            path === "/admin/safety" ? (
+            path === "/admin/console" ? (
+              <AdminConsolePage />
+            ) : path === "/admin/safety" ? (
               <AdminSafetyPage />
             ) : path === "/admin/venues" ? (
               <AdminVenuesPage />

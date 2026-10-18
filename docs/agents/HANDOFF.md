@@ -1,6 +1,6 @@
 # 도구 간 작업 인계
 
-마지막 기록: 2026-10-17 (Asia/Seoul). Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
+마지막 기록: 2026-10-18 (Asia/Seoul). Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
 
 ## 먼저 확인할 현재 상태
 
@@ -209,6 +209,41 @@ Work: 모임 안내·피드백·재방문 → 식당·채팅·알림. Task 추�
 - **병렬 진행:** T1 체크인·노쇼, T2 평가·선호·리마인드, T3 신고·차단·제재, B 브랜드 적용을 각자 `claude/work8-t1|t2|t3|brand` 별도 작업 트리에서 진행 중이다. T4 이력·추천·매칭 반영은 T1~T3 이후다. 티켓 그래프는 [계약](../design/feedback-contract.md)에 있다.
 - **격리 DB:** `serentable_w8_t0..t3`, `serentable_minscore_test`, `serentable_work7_regression_test`를 사용한다. 운영 쓰기는 없다.
 
+## 2026-10-18 Claude Code 중단 체크포인트 (사용 한도, Codex 인계)
+
+- **최소 점수:** 60 확정. PR #39 `1044bd4`에 반영됐고 운영 반영은 아직이다.
+- **PR #35·#29:** main에 머지됐다.
+- **Work #8:** 통합 브랜치 `claude/work8-feedback`([PR #42](https://github.com/InryeolChoi/SerenTable/pull/42), base #41). 기준은 ADR-0014(U08·U09·U15 승인)와 [계약](../design/feedback-contract.md)이다.
+  - 병합 완료: T0, T1 체크인·노쇼, T2 평가·선호·리마인드, T3 신고·차단·제재, B 브랜드 적용(Work #7 Task), 리마인드 링크·참가 제한 문구 수정
+  - T4 이력·추천·MET_SQL 상호 재만남 면제: 로컬 브랜치 `claude/work8-t4`에서 진행 중이거나 미병합이다. 별도 작업 트리는 `.claude/worktrees/` 아래에 있다.
+- **Work #9:** 통합 브랜치 `claude/work9-operator-console`([PR #43](https://github.com/InryeolChoi/SerenTable/pull/43), base #42). 기준은 [계약](../design/operator-console-contract.md)이다.
+  - 병합 완료: T0 감사 스키마 0013, D CSV, B 예외 처리, C 감사 연결·조회(`bb31927`).
+  - **주의:** C 병합 후 관련 7개 파일 재실행이 34 PASS·1 FAIL이다. 실패 시험 이름은 출력에 남지 않았고 원인은 미확인이다. 먼저 다시 실행해 확인한다.
+  - A 대시보드: 로컬 브랜치 `claude/work9-a`이며 미병합이다.
+- **사용자 승인 기본값:** 리마인드 7일 소급 제한, 확정 신고만 제재에 연결, 신고 사유 5종
+- **재확인 필요(구현 안 함):**
+  - 감사 보관(U16)
+  - 운영자 역할 분리
+  - 모의 환불 실패 경로가 없음
+  - 대안 미응답 기준 시각
+  - 운영자 사유 입력
+- **리뷰에서 고칠 것:**
+  - CSV 인원 열을 현재 배정 기준으로 바꾸고, 탭·CR 수식 방지를 추가한다.
+  - 차단 목록 영구 표시는 스키마 변경이 필요하다.
+- **남은 검증:** T4·A 병합 → 전체 pytest → 코드 리뷰 → Playwright E2E(포트 8000 확인) → PR #42·#43 CI 확인.
+- **격리 DB만 사용:** `serentable_w8_*`, `serentable_w9_*`. 운영 migration·deploy는 금지다.
+- **산출물:** [매칭 점수·제외 조건 기준 확정 산출물](https://claude.ai/code/artifact/5d45ce5b-9d80-4a34-940a-83e431e94659)
+## 2026-10-18 Codex 재개·통합 검증 진행
+
+- 사용자가 지정한 Claude 중단 체크포인트에서 재개했다. 운영 migration/deploy/data 변경·main 병합 금지 유지.
+- 원래 #43 a7ad9f6의 지정7파일을 serentable_w9_t0에서 재현: **34 PASS·1 FAIL (145.50초)**. CSV 시험의 전체 감사 빈목록 기대가 회차 생성 감사와 충돌했다. 제품 감사는 유지하고 export행위만 검증하도록 수정했다.
+- CSV 082093d: 현재 유효 확정 배정의 인원/명단, 탭·CR 수식방지. 신규 RED→GREEN, 최종 CSV6 PASS. 별도 serentable_w9_csv_codex 사용.
+- T4 원구현 f4e9ca7·f31f04b 검토. 41364eb에서 시간 중복 확정/활성 참가 제한 추천을 거르고 E2E 최소 점수 기대를 승인60으로 정렬했다. T4 5 PASS, 신고제외 강화1 PASS. 별도 serentable_w8_t4_codex 사용.
+- 대시보드 afe361c 읽기 검토 후 codex/w9-integration에 병합: 읽기전용·개인정보 미노출·승인관문 없음. 신청/결제는 후보별 기록 건수이므로 회차 간 단순 합계는 고유 참가자 수가 아니다.
+- 현재 열린 예외 집계는 식당/푸시를 대상으로 한다. 기존 목록의 대안 미응답 시작시각 임계값은 승인되지 않았으며 이번에 구현/확정하지 않는다. 감사 보관·역할 분리·모의 환불 실패·운영자 사유 입력도 미확정 그대로다.
+- 새 참가자 체크인→평가 저장→운영 예외 처리→감사/CSV 브라우저 시험을 추가했다. 아직 실행 전이며 테스트 통과로 해석하지 않는다.
+- 전체 pytest·독립 리뷰·포트8000 선확인 후 E2E·PR42/43 최신 CI가 남았다. 초기 PR42 CI39047558293는 최소50 기대 vs 승인60의 브라우저 실패9PASS/1FAIL였다.
+- 사용자 AGENTS.md/.claude/.codex/scripts/claude-*.sh는 보존하며 커밋하지 않는다. Blaybus Task는 최종 증거 전 진행중 유지.
 ## 2026-10-18 Codex Work8 T4·안전 경합 검증 인계
 
 PR42 `claude/work8-feedback`에 미병합 T4 f31f04b를 반영했다. 추천 자격/시간 중복을 41364eb로 보완하고, 독립 리뷰의 신고·차단·선호 변경/매칭 경합은 2a2b53e에서 기존 공용 잠금→사용자·선호 행 잠금 순서로 수정했다. 신규 PG 두 연결 경합5개 RED→GREEN, 안전·평가·추천26 PASS(160.56초), T4 신규포함5 PASS. 상호 재만남은 점수 면제만이며 신고/차단/비선호 H5는 유지한다. 최소 점수는 사용자 승인60이며 기존 E2E50 기대를 정렬했다. 브랜드 CSS 경계색#d7c6af복원. U16 등 미정정책은 추가구현하지 않았다.
@@ -216,3 +251,18 @@ PR42 `claude/work8-feedback`에 미병합 T4 f31f04b를 반영했다. 추천 자
 후속 PR43 통합에서 로컬Node22 모바일 E2E11 PASS(49.3초), 체크인→평가→운영예외·감사/CSV까지 확인했다. 신규 운영콘솔1개는 PR43에 있으며 PR42 단독 시험 결과로 확장하지 않는다. 공통 시험의 영속 안전/선호 상태를 테스트마다 초기화하고 CI검사시간예산25분만 적용했다. 최종 전체 회귀·CI 결과는 PR43 최신 HANDOFF와 docs/design/work8-work9-verification-2026-10-18.md를 확인한다.
 
 현재 Work8/7 브랜드 Task는 구현·격리 검증 결과를 Blaybus에 기록할 수 있으나 Work/Agenda는 운영 인수·미정정책 때문에 진행중을 유지한다. 운영 migration/deploy/data 변경·main 병합 금지, 사용자 AGENTS/.claude/.codex/scripts 보존.
+
+## 2026-10-18 Codex Work8·9 구현·로컬 검증 완료 (운영 미반영)
+
+최신 통합은 `codex/w9-integration`이며 기존 PR42(`claude/work8-feedback`)의 T4·추천 자격·안전 경합·브랜드 수정을 PR43(`claude/work9-operator-console`)에 반영했다. 대시보드 A·CSV 현재 인원·탭/CR 방어·감사 시험 범위 수정 완료. 신고/차단/선호는 공용 매칭 잠금→행 잠금이며 기존 확정·MBTI가중치·승인 최소60을 변경하지 않는다. 후속 브라우저 연결 검토에서 파비콘/서비스 워커404를 RED로 확인해 명시 정적 경로를 추가했다.
+
+- 원래 지정7파일 재현34 PASS/1 FAIL은 정상 회차 생성 감사와 CSV 시험 충돌이며 수정했다. 첫 통합 실행의3FAIL·6ERROR는 시험 사이 제외관계 누출로, 제품의 영속 안전 관계를 바꾸지 않고 공통 fixture를 격리했다. 같은순서17 PASS.
+- 새 로컬PG17 `serentable_w89_final_test`: **전체295 PASS(733.14초)**. 후속 정적 경로3 PASS. 코드/명령/중간실패는 검증 문서 참조.
+- 안전·평가·추천26 PASS, 신규 두PG연결 경합5개 RED→GREEN. 0012 전용 Work8 checkout+빈DB `serentable_w8_only_test` 인증19 PASS.
+- 포트8000 선확인·전용 `serentable_w89_e2e_test`, Node22 모바일 Chromium **11 PASS(52.2초)**. 새 단체방 게시/재접속→체크인→평가→운영예외→감사/CSV·권한 거절 포함.
+- Ruff·형식·타입·빌드·diff 검사 통과. 독립 Spec P1경합1건/Standards CSS·설계기록2건 수정 후 재검토 해결. 물리 스키마SVG·모바일 브랜드 화면 육안 확인.
+- PR42 최종코드7ec27b4 CI39051243303 진행 중. PR43 최신 기록 포함 후 CI 확인이 남아 있다. 이전 코드CI 취소는 성공이 아니다.
+
+[검증·12단계 증거·Blaybus Task별 수행/검증/남은 항목](../design/work8-work9-verification-2026-10-18.md)에 기록했다. 기존 Issue8/9에도 진행 댓글 반영. Blaybus는 사용자가 수동으로 갱신하며 Work/Agenda는 운영·미정정책 인수 전 진행중 유지한다. 선행 PR39는 main 문서 충돌 상태이며 임의 main병합 금지. 감사 보관·역할 분리·모의 환불 실패·대안 미응답 기준·운영자 사유 정책은 추가구현/확정하지 않았다.
+
+**운영migration/deploy/매칭재실행/기존데이터 변경·main병합 없음.** 실제 휴대폰 푸시·공개 데모 인수는 남았다. 사용자 AGENTS.md의30줄 미커밋변경 및 .claude/.codex/scripts/claude-*.sh를 커밋하지 않고 보존했다. 이번 세 managed 구현작업트리는 archive 요청했으며 앱 처리 전 남아 있을 수 있다. 사용자 Claude 작업트리와 기존 보존 DB는 유지한다. 다음 행동은 최신 CI 확인→PR42/43 Ready 여부 정리→운영 승인 전 공개 인수 계획 확인이다.

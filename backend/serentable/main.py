@@ -9,12 +9,16 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from serentable.admin_dashboard import router as dashboard_router
+from serentable.admin_exceptions import router as exceptions_router
 from serentable.applications import router as applications_router
 from serentable.attendance import router as attendance_router
+from serentable.audit import router as audit_router
 from serentable.auth import router as auth_router
 from serentable.chat import router as chat_router
 from serentable.database import database_engine
 from serentable.events import router as events_router
+from serentable.exports import router as exports_router
 from serentable.feedback import router as feedback_router
 from serentable.gatherings import router as gatherings_router
 from serentable.match_resolution import router as resolution_router
@@ -40,6 +44,10 @@ app.include_router(attendance_router)
 app.include_router(feedback_router)
 app.include_router(safety_router)
 app.include_router(recommendations_router)
+app.include_router(dashboard_router)
+app.include_router(exceptions_router)
+app.include_router(audit_router)
+app.include_router(exports_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -142,6 +150,7 @@ def push_service_worker():
 @app.get("/participant/rooms", include_in_schema=False)
 @app.get("/participant/history", include_in_schema=False)
 @app.get("/admin/safety", include_in_schema=False)
+@app.get("/admin/console", include_in_schema=False)
 @app.get("/admin/events", include_in_schema=False)
 @app.get("/participant/events", include_in_schema=False)
 @app.get("/participant/apply", include_in_schema=False)

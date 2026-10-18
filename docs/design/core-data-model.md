@@ -1,5 +1,18 @@
 # 핵심 ERD·상태·무결성 제약 설계
 
+## 2026-10-18 물리 스키마와 승인 상태 (0012·0013, 운영 미반영)
+
+이 절과 ADR-0014가 아래 초기 설계안의 U08/U09/U15 미결정 표기보다 우선한다. U08은 규칙 기반 반영, U09는 신고 즉시 분리·기각 후 유지, U15는 시작30분 전~종료 체크인·운영자 노쇼 확인으로 승인됐다. U16 감사/개인정보 보관 기간은 미정이다.
+
+- `attendance_check_in`: (테이블, 사용자) 유일, 본인 체크인 시각. 종료 미체크인은 파생 후보이며 확정 노쇼가 아니다.
+- `no_show_review`: 같은 복합키에 운영자·시각·CONFIRMED_NO_SHOW/EXCUSED를 보존한다.
+- `table_feedback`: 같은 복합키에 5개1~5 평점·제출시각. `person_preference`는 테이블·평가자·대상 복합키, 자기 선호 금지다.
+- `safety_report`: 신고자·대상·선택 테이블·사유·상태·검토자. `participant_sanction`은 사용자·근거 신고·운영자·종류·기간을 분리한다. 접수 source `report`를 제외 관계에 추가했다.
+- 상호 MEET_AGAIN은 이전 만남의 점수만 면제한다. AVOID/block/report의 필수 제외는 유지한다. 제외/선호 쓰기와 매칭 확정은 기존 공용 잠금 순서를 따른다(리뷰 수정·시험 결과는 최신 HANDOFF 참조).
+- `operator_audit`: 행위자·행동·대상 종류/ID·원인·전후 상태·DB시각. 업무 변경과 같은 트랜잭션이다. `gathering_exception`에 처리 메모·처리자 FK를 추가한다.
+
+현재 관계 원문: [물리 ERD Mermaid](erd/feedback-audit-physical.mmd), [물리 스키마 SVG](erd/feedback-audit-physical.svg). SVG는 `python3 scripts/render_feedback_audit_erd.py`로 재생성한다. 그림은 격리 검증 대상 스키마이며 운영 적용 완료를 의미하지 않는다. 아래 3개 개념 ERD는 초기 설계 참고용이다.
+
 ## Work #6 실패 해결의 추가 물리 스키마 (0010)
 
 2026-10-17 사용자 승인 정책과 [ADR-0012](../adr/0012-matching-failure-resolution.md)를 구현한다. **격리 시험 DB에만 적용했으며 운영에는 적용하지 않았다.** 기존 전체 ERD는 논리 설계이고 아래 표가 이번 물리 변경이다. [추가 ERD SVG](./erd/matching-resolution.svg)·[PNG](./erd/matching-resolution.png)는 주요 참조 관계를 보여주는 별도 그림이다(외부 user/run/slot 관계 일부 생략).
@@ -84,7 +97,7 @@
 
 바로 보는 자료: [확대·스크롤 뷰어](./erd/erd.html), [신청·결제 SVG](./erd/application-payment.svg), [매칭·모임 SVG](./erd/matching-gathering.svg), [피드백·운영 SVG](./erd/feedback-operations.svg). 같은 이름의 PNG도 제공하므로 Blaybus 중간 산출물에 올릴 수 있다. SVG는 확대해도 선명한 그림 파일이다. 그림은 아래 Mermaid 원문에서 생성하며 실제 DB에 적용된 스키마를 나타내지 않는다.
 
-재생성: Mermaid CLI를 준비한 환경에서 `python3 scripts/render_erd.py`를 실행한다. 별도 Chromium을 쓰면 `--puppeteer-config /path/to/config.json`, CLI가 PATH에 없으면 `--renderer /path/to/mmdc`를 지정한다. 원문 3개가 SVG·PNG 3개씩으로 출력된다.
+재생성: Mermaid CLI를 준비한 환경에서 `python3 scripts/render_erd.py`를 실행한다. 별도 Chromium을 쓰면 `--puppeteer-config /path/to/config.json`, CLI가 PATH에 없으면 `--renderer /path/to/mmdc`를 지정한다. 원문4개(초기 개념3개·Work7 물리1개)가 SVG·PNG4개씩으로 출력된다. 0012/0013 물리 요약은 별도 생성 스크립트를 사용한다.
 
 그림은 관계와 최소 키를 설명하며 전체 필드·SQL 타입·삭제 연쇄를 고정하지 않는다. 그림 사이 같은 이름은 동일 개념이다. 모든 보조 개념을 독립 테이블로 구현할 의무는 없다.
 
