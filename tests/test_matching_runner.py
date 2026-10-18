@@ -204,7 +204,8 @@ def test_the_planner_keeps_the_tables_within_the_slot_capacity():
     participants = [Participant(application_id=f"a{index}", birth_year=1995) for index in range(8)]
     plan = plan_allocation(participants, capacity=6)
     assert plan.seated_count == 6
-    assert [reason for _, reason in plan.unseated] == ["no_valid_table", "no_valid_table"]
+    # Without the limit all eight would sit (4 + 4), so the full slot is the reason.
+    assert [reason for _, reason in plan.unseated] == ["capacity", "capacity"]
 
 
 @pytest.mark.parametrize("capacity, expected", [(24, 13), (8, 8)])
