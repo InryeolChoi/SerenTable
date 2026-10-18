@@ -309,3 +309,62 @@ def test_deferred_commit_failure_does_not_report_or_persist_a_refund():
             ]
             == "SUCCEEDED"
         )
+
+
+def test_different_retry_keys_and_separate_worker_only_refund_once():
+    import subprocess
+    import sys
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    with TestClient(app) as operator, TestClient(app) as owner:
+        login(operator, "operator")
+        prepare(owner, "participant-01")
+        application = failure(owner, operator)
+        with refund_storage_fault():
+            resolution = choose(owner, application, "REFUND").json()["resolution"]
+        path = f"/api/admin/mock-refunds/{resolution['id']}/retry"
+        ready = threading.Barrier(3)
+
+        def retry(key):
+            ready.wait(timeout=10)
+            return send(operator, "POST", path, {"request_key": key})
+
+        def worker():
+            ready.wait(timeout=10)
+            return subprocess.run(
+                [sys.executable, "-m", "serentable.worker", "--once"],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            attempts = [pool.submit(retry, str(uuid.uuid4())) for _ in range(2)]
+            background = pool.submit(worker)
+            results = [attempt.result(timeout=30) for attempt in attempts]
+            worker_result = background.result(timeout=35)
+            assert worker_result.returncode == 0
+            assert "worker_heartbeat_ok" in worker_result.stderr
+            assert "unavailable" not in worker_result.stderr
+        assert sorted(result.status_code for result in results) == [200, 409]
+        successful = next(result for result in results if result.status_code == 200)
+        assert successful.json()["refund"]["state"] == "SUCCEEDED"
+        assert successful.json()["refund"]["attempt_number"] == 2
+        mine = owner.get("/api/me/applications").json()["applications"][0]
+        assert mine["payments"][0]["state"] == "REFUNDED"
+        assert mine["matching"]["state"] == "NO_MATCH"
+        assert mine["matching_eligible_slot_ids"] == []
+        assert len(mine["resolutions"][0]["refund_attempts"]) == 2
+        assert [event["state"] for event in mine["resolutions"][0]["refund_events"]] == [
+            "REFUND_REQUESTED",
+            "REFUND_PROCESSING",
+            "REFUNDED",
+        ]
+        audits = operator.get(
+            "/api/admin/audit",
+            params={"target_type": "match_resolution", "target_id": resolution["id"]},
+        ).json()["audit"]
+        assert len(audits) == 1
+        assert operator.get("/api/admin/mock-refunds").json()["refunds"] == []
