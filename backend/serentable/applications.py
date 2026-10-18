@@ -22,6 +22,7 @@ from serentable.match_resolution import resolution_json, single_right, target_al
 from serentable.matching import participation_details
 from serentable.payments import payment_details
 from serentable.profile import consent_state, profile_state, read_profile
+from serentable.safety import participation_restricted
 
 router = APIRouter()
 
@@ -66,7 +67,17 @@ def applications_json(connection, rows, now, with_participant=False):
             )
     history = {}
     refund_events = {}
+    refund_attempts = {}
     if ids:
+        from serentable.mock_refunds import attempt_json
+
+        for attempt in connection.execute(
+            text("""SELECT f.* FROM mock_refund_attempt f
+            JOIN match_resolution r ON r.id=f.resolution_id WHERE r.application_id=ANY(:ids)
+            ORDER BY f.attempt_number"""),
+            {"ids": ids},
+        ).mappings():
+            refund_attempts.setdefault(attempt["resolution_id"], []).append(attempt_json(attempt))
         for event in connection.execute(
             text("""SELECT f.* FROM mock_refund_event f
                 JOIN match_resolution r ON r.id=f.resolution_id
@@ -88,8 +99,11 @@ def applications_json(connection, rows, now, with_participant=False):
             {"ids": ids},
         ).mappings():
             history.setdefault(resolution["application_id"], []).append(
-                resolution_json(resolution)
-                | {"refund_events": refund_events.get(resolution["id"], [])}
+                resolution_json(resolution, connection)
+                | {
+                    "refund_events": refund_events.get(resolution["id"], []),
+                    "refund_attempts": refund_attempts.get(resolution["id"], []),
+                }
             )
     payments = payment_details(connection, rows, now)
     eligible = eligible_slot_ids(connection, ids, now)
@@ -173,7 +187,7 @@ def offers_alternatives(matching_state, reason_code):
 
     A NO_MATCH for overlapping_confirmation means the user is already seated at that time.
     """
-    if reason_code in ("pass_held", "mock_refunded", "membership_held"):
+    if reason_code in ("pass_held", "mock_refunded", "mock_refund_failed", "membership_held"):
         return False
     if matching_state == "ALTERNATIVE_OFFERED":
         return True
@@ -310,6 +324,9 @@ def submit_application(
                     connection, "WHERE a.id = :id", {"id": prior}, now
                 )
                 return private_response({"application": application})
+            # SAF-02: an active suspension or a permanent ban refuses new applications.
+            if participation_restricted(connection, user.id, now):
+                raise HTTPException(403, "participation_restricted")
             if not profile_state(read_profile(connection, user.id))["complete"]:
                 raise HTTPException(409, "profile_incomplete")
             if not consent_state(connection, user.id)["complete"]:

@@ -9,6 +9,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from serentable.audit import record_audit
 from serentable.auth import (
     Principal,
     private_response,
@@ -102,6 +103,14 @@ def create_event_slot(
                 )
                 .mappings()
                 .one()
+            )
+            record_audit(
+                connection,
+                operator.id,
+                "event_slot.create",
+                "event_slot",
+                slot_id,
+                after=payload.model_dump(mode="json"),
             )
     except IntegrityError as error:
         # The unique (region, start) constraint also settles concurrent duplicate submits.

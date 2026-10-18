@@ -1,6 +1,6 @@
 # 도구 간 작업 인계
 
-마지막 기록: 2026-10-17 (Asia/Seoul). Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
+마지막 기록: 2026-10-19 (Asia/Seoul). Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
 
 ## 먼저 확인할 현재 상태
 
@@ -183,3 +183,104 @@ docs/agents/record-maintenance.md에 따라 작업 결과·검증·중단 시 �
 기록 갱신 기준은 [공통 기록 갱신 절차](record-maintenance.md)에 모았다. 이번 변경은 기존 Work #1의 기술 결정 및 미결정 항목 정리 결과에 대한 운영 지침 보강이며 새 제품 Task를 만들지 않는다. 커밋/PR 링크를 남기고, 두 도구가 같은 checkout을 동시에 수정하는 상태는 해소한 뒤 넘긴다. 별도 작업 트리에는 공통 미커밋 변경이 자동 복사되지 않는다.
 
 공식 근거: [OpenAI AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md), [Claude 프로젝트 메모리](https://code.claude.com/docs/en/memory), [Claude 설정](https://code.claude.com/docs/en/settings), [Claude MCP](https://code.claude.com/docs/en/mcp). [Gemini 지침·파일 가져오기](https://geminicli.com/docs/cli/gemini-md/), [Cursor AGENTS.md](https://cursor.com/docs/rules), [GitHub Copilot 저장소 지침](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions). 사용자 도구·모델·계정 설정은 해당 세션의 실제 상태를 우선한다.
+
+## 2026-10-17 Work #7 구현 진행 체크포인트
+
+최신 작업은 `codex/work7-gathering-integration`(시작 e3d4240, 선행 PR #40)과 [Draft PR #41](https://github.com/InryeolChoi/SerenTable/pull/41)이다.
+Work: 모임 안내·피드백·재방문 → 식당·채팅·알림. Task 추가 없음.
+[승인 계약](../design/gathering-contract.md)·ADR-0013: U10 확인된 음식/예산만 배정, U12 푸시 최대3회·1/5분, 미지원/미설정 구분.
+식당 API 신규2 PASS, 채팅 별도 작업트리 실PG4 PASS·390px Chromium 영속/재연결/XSS PASS.
+채팅·알림 병합 완료. Claude Code 통합 검증: 새 격리 DB `serentable_work7_regression_test`에서 전체 pytest 242 PASS(476초), ruff·프런트 빌드 PASS.
+첫 전체 실행의 100명 규모 시험 정리 단계 FK 오류(worker가 만든 `app_notification`)는 시험 정리 범위를 넓혀 수정했다.
+로컬 Playwright는 포트 해제 후 `db33ded`에서 재실행해 모바일 Chromium 10 PASS(37.5초, 격리 DB `serentable_work7_notifications_test`). 또한 `5dda339` CI [39034779407](https://github.com/InryeolChoi/SerenTable/actions/runs/39034779407)이 SUCCESS다(pytest 242, 브라우저 10, PG18 복구). 모임·단체방 전용 E2E 스펙은 아직 없다.
+`serentable_work7_gathering_test`에는 실패 정리로 남은 합성 계정이 있다. `serentable_work7_notifications_test`는 E2E 시작 시 초기화됐다. 둘 다 격리 시험 DB다. 이 중간 기록은 Work 완료 증거가 아니다.
+신규 로컬 DB `serentable_work7_gathering_test` 등만 사용하며 운영 migration/deploy/매칭/기존 데이터 변경 금지 유지.
+사용자 AGENTS.md와 .claude/.codex/claude 스크립트 미커밋 변경 보존.
+
+## 2026-10-18 Work #8 병렬 구현 체크포인트 (Claude Code)
+
+- **최소 점수 확정:** 사용자가 운영 최소 매칭 점수 **60**을 승인했다(ADR-0011 §4). PR #39 브랜치 `1044bd4`에 반영했고 관련 시험 225 PASS다. 운영 반영은 별도 승인이다.
+- **머지 상태:** PR #35·#29는 main에 머지됐다(사용자). #40은 #39 브랜치에 머지됐다.
+- **정책 승인(ADR-0014):** 사용자가 U15·U09·U08을 승인했다.
+  - U15: 시작 30분 전~종료 체크인, 미체크인은 노쇼 후보, 운영자 확인 후 확정 노쇼
+  - U09: 신고 접수 즉시 분리, 기각돼도 분리 유지
+  - U08: 규칙 기반 최소 반영
+- **통합 브랜치:** `claude/work8-feedback`([Draft PR #42](https://github.com/InryeolChoi/SerenTable/pull/42), base #41)이다. T0 `6df26c7`에 스키마 0012·계약·모듈 골격을 넣었다.
+- **병렬 진행:** T1 체크인·노쇼, T2 평가·선호·리마인드, T3 신고·차단·제재, B 브랜드 적용을 각자 `claude/work8-t1|t2|t3|brand` 별도 작업 트리에서 진행 중이다. T4 이력·추천·매칭 반영은 T1~T3 이후다. 티켓 그래프는 [계약](../design/feedback-contract.md)에 있다.
+- **격리 DB:** `serentable_w8_t0..t3`, `serentable_minscore_test`, `serentable_work7_regression_test`를 사용한다. 운영 쓰기는 없다.
+
+## 2026-10-18 Claude Code 중단 체크포인트 (사용 한도, Codex 인계)
+
+- **최소 점수:** 60 확정. PR #39 `1044bd4`에 반영됐고 운영 반영은 아직이다.
+- **PR #35·#29:** main에 머지됐다.
+- **Work #8:** 통합 브랜치 `claude/work8-feedback`([PR #42](https://github.com/InryeolChoi/SerenTable/pull/42), base #41). 기준은 ADR-0014(U08·U09·U15 승인)와 [계약](../design/feedback-contract.md)이다.
+  - 병합 완료: T0, T1 체크인·노쇼, T2 평가·선호·리마인드, T3 신고·차단·제재, B 브랜드 적용(Work #7 Task), 리마인드 링크·참가 제한 문구 수정
+  - T4 이력·추천·MET_SQL 상호 재만남 면제: 로컬 브랜치 `claude/work8-t4`에서 진행 중이거나 미병합이다. 별도 작업 트리는 `.claude/worktrees/` 아래에 있다.
+- **Work #9:** 통합 브랜치 `claude/work9-operator-console`([PR #43](https://github.com/InryeolChoi/SerenTable/pull/43), base #42). 기준은 [계약](../design/operator-console-contract.md)이다.
+  - 병합 완료: T0 감사 스키마 0013, D CSV, B 예외 처리, C 감사 연결·조회(`bb31927`).
+  - **주의:** C 병합 후 관련 7개 파일 재실행이 34 PASS·1 FAIL이다. 실패 시험 이름은 출력에 남지 않았고 원인은 미확인이다. 먼저 다시 실행해 확인한다.
+  - A 대시보드: 로컬 브랜치 `claude/work9-a`이며 미병합이다.
+- **사용자 승인 기본값:** 리마인드 7일 소급 제한, 확정 신고만 제재에 연결, 신고 사유 5종
+- **재확인 필요(구현 안 함):**
+  - 감사 보관(U16)
+  - 운영자 역할 분리
+  - 모의 환불 실패 경로가 없음
+  - 대안 미응답 기준 시각
+  - 운영자 사유 입력
+- **리뷰에서 고칠 것:**
+  - CSV 인원 열을 현재 배정 기준으로 바꾸고, 탭·CR 수식 방지를 추가한다.
+  - 차단 목록 영구 표시는 스키마 변경이 필요하다.
+- **남은 검증:** T4·A 병합 → 전체 pytest → 코드 리뷰 → Playwright E2E(포트 8000 확인) → PR #42·#43 CI 확인.
+- **격리 DB만 사용:** `serentable_w8_*`, `serentable_w9_*`. 운영 migration·deploy는 금지다.
+- **산출물:** [매칭 점수·제외 조건 기준 확정 산출물](https://claude.ai/code/artifact/5d45ce5b-9d80-4a34-940a-83e431e94659)
+## 2026-10-18 Codex 재개·통합 검증 진행
+
+- 사용자가 지정한 Claude 중단 체크포인트에서 재개했다. 운영 migration/deploy/data 변경·main 병합 금지 유지.
+- 원래 #43 a7ad9f6의 지정7파일을 serentable_w9_t0에서 재현: **34 PASS·1 FAIL (145.50초)**. CSV 시험의 전체 감사 빈목록 기대가 회차 생성 감사와 충돌했다. 제품 감사는 유지하고 export행위만 검증하도록 수정했다.
+- CSV 082093d: 현재 유효 확정 배정의 인원/명단, 탭·CR 수식방지. 신규 RED→GREEN, 최종 CSV6 PASS. 별도 serentable_w9_csv_codex 사용.
+- T4 원구현 f4e9ca7·f31f04b 검토. 41364eb에서 시간 중복 확정/활성 참가 제한 추천을 거르고 E2E 최소 점수 기대를 승인60으로 정렬했다. T4 5 PASS, 신고제외 강화1 PASS. 별도 serentable_w8_t4_codex 사용.
+- 대시보드 afe361c 읽기 검토 후 codex/w9-integration에 병합: 읽기전용·개인정보 미노출·승인관문 없음. 신청/결제는 후보별 기록 건수이므로 회차 간 단순 합계는 고유 참가자 수가 아니다.
+- 현재 열린 예외 집계는 식당/푸시를 대상으로 한다. 기존 목록의 대안 미응답 시작시각 임계값은 승인되지 않았으며 이번에 구현/확정하지 않는다. 감사 보관·역할 분리·모의 환불 실패·운영자 사유 입력도 미확정 그대로다.
+- 새 참가자 체크인→평가 저장→운영 예외 처리→감사/CSV 브라우저 시험을 추가했다. 아직 실행 전이며 테스트 통과로 해석하지 않는다.
+- 전체 pytest·독립 리뷰·포트8000 선확인 후 E2E·PR42/43 최신 CI가 남았다. 초기 PR42 CI39047558293는 최소50 기대 vs 승인60의 브라우저 실패9PASS/1FAIL였다.
+- 사용자 AGENTS.md/.claude/.codex/scripts/claude-*.sh는 보존하며 커밋하지 않는다. Blaybus Task는 최종 증거 전 진행중 유지.
+## 2026-10-18 Codex Work8 T4·안전 경합 검증 인계
+
+PR42 `claude/work8-feedback`에 미병합 T4 f31f04b를 반영했다. 추천 자격/시간 중복을 41364eb로 보완하고, 독립 리뷰의 신고·차단·선호 변경/매칭 경합은 2a2b53e에서 기존 공용 잠금→사용자·선호 행 잠금 순서로 수정했다. 신규 PG 두 연결 경합5개 RED→GREEN, 안전·평가·추천26 PASS(160.56초), T4 신규포함5 PASS. 상호 재만남은 점수 면제만이며 신고/차단/비선호 H5는 유지한다. 최소 점수는 사용자 승인60이며 기존 E2E50 기대를 정렬했다. 브랜드 CSS 경계색#d7c6af복원. U16 등 미정정책은 추가구현하지 않았다.
+
+후속 PR43 통합에서 로컬Node22 모바일 E2E11 PASS(49.3초), 체크인→평가→운영예외·감사/CSV까지 확인했다. 신규 운영콘솔1개는 PR43에 있으며 PR42 단독 시험 결과로 확장하지 않는다. 공통 시험의 영속 안전/선호 상태를 테스트마다 초기화하고 CI검사시간예산25분만 적용했다. 최종 전체 회귀·CI 결과는 PR43 최신 HANDOFF와 docs/design/work8-work9-verification-2026-10-18.md를 확인한다.
+
+현재 Work8/7 브랜드 Task는 구현·격리 검증 결과를 Blaybus에 기록할 수 있으나 Work/Agenda는 운영 인수·미정정책 때문에 진행중을 유지한다. 운영 migration/deploy/data 변경·main 병합 금지, 사용자 AGENTS/.claude/.codex/scripts 보존.
+
+## 2026-10-18 Codex Work8·9 구현·로컬 검증 완료 (운영 미반영)
+
+최신 통합은 `codex/w9-integration`이며 기존 PR42(`claude/work8-feedback`)의 T4·추천 자격·안전 경합·브랜드 수정을 PR43(`claude/work9-operator-console`)에 반영했다. 대시보드 A·CSV 현재 인원·탭/CR 방어·감사 시험 범위 수정 완료. 신고/차단/선호는 공용 매칭 잠금→행 잠금이며 기존 확정·MBTI가중치·승인 최소60을 변경하지 않는다. 후속 브라우저 연결 검토에서 파비콘/서비스 워커404를 RED로 확인해 명시 정적 경로를 추가했다.
+
+- 원래 지정7파일 재현34 PASS/1 FAIL은 정상 회차 생성 감사와 CSV 시험 충돌이며 수정했다. 첫 통합 실행의3FAIL·6ERROR는 시험 사이 제외관계 누출로, 제품의 영속 안전 관계를 바꾸지 않고 공통 fixture를 격리했다. 같은순서17 PASS.
+- 새 로컬PG17 `serentable_w89_final_test`: **전체295 PASS(733.14초)**. 후속 정적 경로3 PASS. 코드/명령/중간실패는 검증 문서 참조.
+- 안전·평가·추천26 PASS, 신규 두PG연결 경합5개 RED→GREEN. 0012 전용 Work8 checkout+빈DB `serentable_w8_only_test` 인증19 PASS.
+- 포트8000 선확인·전용 `serentable_w89_e2e_test`, Node22 모바일 Chromium **11 PASS(52.2초)**. 새 단체방 게시/재접속→체크인→평가→운영예외→감사/CSV·권한 거절 포함.
+- Ruff·형식·타입·빌드·diff 검사 통과. 독립 Spec P1경합1건/Standards CSS·설계기록2건 수정 후 재검토 해결. 물리 스키마SVG·모바일 브랜드 화면 육안 확인.
+- PR42 최종코드7ec27b4 CI39051243303 진행 중. PR43 최신 기록 포함 후 CI 확인이 남아 있다. 이전 코드CI 취소는 성공이 아니다.
+
+[검증·12단계 증거·Blaybus Task별 수행/검증/남은 항목](../design/work8-work9-verification-2026-10-18.md)에 기록했다. 기존 Issue8/9에도 진행 댓글 반영. Blaybus는 사용자가 수동으로 갱신하며 Work/Agenda는 운영·미정정책 인수 전 진행중 유지한다. 선행 PR39는 main 문서 충돌 상태이며 임의 main병합 금지. 감사 보관·역할 분리·모의 환불 실패·대안 미응답 기준·운영자 사유 정책은 추가구현/확정하지 않았다.
+
+**운영migration/deploy/매칭재실행/기존데이터 변경·main병합 없음.** 실제 휴대폰 푸시·공개 데모 인수는 남았다. 사용자 AGENTS.md의30줄 미커밋변경 및 .claude/.codex/scripts/claude-*.sh를 커밋하지 않고 보존했다. 이번 세 managed 구현작업트리는 archive 요청했으며 앱 처리 전 남아 있을 수 있다. 사용자 Claude 작업트리와 기존 보존 DB는 유지한다. 다음 행동은 최신 CI 확인→PR42/43 Ready 여부 정리→운영 승인 전 공개 인수 계획 확인이다.
+
+## 2026-10-19 Work9 복구 후속 구현 진행
+
+사용자가 대안 미응답 표시 기준(원래 실패 회차 시작, 참가자 권한 만료 없음)과 모의 환불 실패 기록·운영자 멱등 재시도를 승인했다. 별도 통합 브랜치 codex/w9-resolution-integration, /private/tmp/serentable-w9-resolution, 기반66eaeb6(PR42·43 병합 후)에서 기존 Task ‘기능별 예외·조치 연결’을 진행한다. Draft PR44는 Work7 통합 브랜치 대상이며 main/운영은 변경하지 않는다.
+
+푸시 예외 회차 누락 수정22e3572를7849165로 통합했다. 실제PG RED→GREEN, 관련11통과. 모의환불은 별도작업트리 /private/tmp/serentable-w9-refund에서 구현·검증 중, 부모는 승인정책 ADR0015·문서·참가자/운영자화면·브라우저시험을 준비 중이다. 저장장애가 환불완료나 이용권 재사용으로 이어지지 않게 한다. 전체회귀/브라우저/최종CI는 아직 실행 전이다. Docker Desktop과 테스트전용foundationPG만 재시작, 신규격리DB만 생성했다. 사용자 미커밋 AGENTS/.claude/.codex/claude스크립트는 루트에 보존했다. 감사보관·역할분리·기존조치 사유정책은 미정 유지.
+
+## 2026-10-19 Work9 모의 환불 복구 구현·검증 완료 (운영 미반영)
+
+현재 작업은 `/private/tmp/serentable-w9-resolution`의 `codex/w9-resolution-integration`, [PR44](https://github.com/InryeolChoi/SerenTable/pull/44)다. 기반66eaeb6(PR42·43 병합 후 Work7 통합). 기존 Agenda → Work9 → ‘기능별 예외·조치 연결’ 안에서 진행했으며 새 Work/Task는 없다. 사용자 승인 두 정책은 ADR0015: 대안 미응답은 원래 실패 회차 시작 이후 표시만 하고 참가자 권한은 유지, 모의 환불 실패 이력·운영자 멱등 재시도 허용이다.
+
+푸시 예외 회차 연결22e3572, 환불 저장실패·재시도 ac80dbf, 참가자 실패 표시/예외 목록/대시보드 통합0354372, 보안 문서·다른키+별도Worker 경합 보완eb1635e를 통합했다. 제품 기준5ba8b6f. 0014는 새시도 테이블만 추가하고 과거 성공 환불을 보존한다. 실패 시PAID/권리예약 유지·후보종료, 재시도 성공 시기존3단계/REFUNDED/예약종료를 함께 반영한다. 실패기록·감사·최종commit장애는 전체롤백한다. 실제PG·멤버십금액환불·임의실패버튼 없음.
+
+실제PG 전체307 PASS(758.67초), 추가 경합 포함 환불9 PASS 및 로그강화신규1 PASS, 모바일 전체12 PASS(58.4초), Ruff/형식/타입/빌드/diff 통과. 전체수집 뒤 추가시험1개가 있어 최신CI수집은308이다. 전체 실행중 제품코드는 변경하지 않았다. Spec 차단결함 없음, Standards 보안문서1건 수정·재검토 해소, N+1은 비차단 후속. 목록종류별200제한/대시보드전체집계를 구분하며 강제Worker잠금동기화·강제종료시험으로 확대하지 않는다.
+
+[정책·API·검증·Blaybus 문구](../design/operator-recovery-verification-2026-10-19.md)를 확인한다. 문서 커밋 당시 최신CI는 대기/진행 상태이며 최종 결과는 PR44 Checks와 Issue9 최종댓글을 기준으로 한다. 처음0354372 CI39140929157을 최신코드 통과로 계산하지 않는다. 다음은 최신CI 확인→PR44 검토 가능 상태 정리→사용자 검토다.
+
+Work9·상위Agenda는 감사보관U16·역할분리·기존조치사유정책·공개인수 전 진행중 유지. 실제휴대폰푸시·공개12단계·제출준비 남음. PR41은 Draft/CI성공39085601873, PR39는 main과충돌이므로 main병합·운영반영 전에 별도정리/승인 필요. 운영migration/deploy/matching재실행/기존데이터 쓰기·main병합 없음. 사용자루트 AGENTS/.claude/.codex/scripts 미커밋파일 보존. 이번구현작업트리3개는 clean·통합확인후 제거했고 통합작업트리/사용자Claude트리는 유지했다. Blaybus는 사용자수동갱신, 실제시간추정없음.

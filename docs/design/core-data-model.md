@@ -1,5 +1,18 @@
 # 핵심 ERD·상태·무결성 제약 설계
 
+## 2026-10-18 물리 스키마와 승인 상태 (0012·0013, 운영 미반영)
+
+이 절과 ADR-0014가 아래 초기 설계안의 U08/U09/U15 미결정 표기보다 우선한다. U08은 규칙 기반 반영, U09는 신고 즉시 분리·기각 후 유지, U15는 시작30분 전~종료 체크인·운영자 노쇼 확인으로 승인됐다. U16 감사/개인정보 보관 기간은 미정이다.
+
+- `attendance_check_in`: (테이블, 사용자) 유일, 본인 체크인 시각. 종료 미체크인은 파생 후보이며 확정 노쇼가 아니다.
+- `no_show_review`: 같은 복합키에 운영자·시각·CONFIRMED_NO_SHOW/EXCUSED를 보존한다.
+- `table_feedback`: 같은 복합키에 5개1~5 평점·제출시각. `person_preference`는 테이블·평가자·대상 복합키, 자기 선호 금지다.
+- `safety_report`: 신고자·대상·선택 테이블·사유·상태·검토자. `participant_sanction`은 사용자·근거 신고·운영자·종류·기간을 분리한다. 접수 source `report`를 제외 관계에 추가했다.
+- 상호 MEET_AGAIN은 이전 만남의 점수만 면제한다. AVOID/block/report의 필수 제외는 유지한다. 제외/선호 쓰기와 매칭 확정은 기존 공용 잠금 순서를 따른다(리뷰 수정·시험 결과는 최신 HANDOFF 참조).
+- `operator_audit`: 행위자·행동·대상 종류/ID·원인·전후 상태·DB시각. 업무 변경과 같은 트랜잭션이다. `gathering_exception`에 처리 메모·처리자 FK를 추가한다.
+
+현재 관계 원문: [물리 ERD Mermaid](erd/feedback-audit-physical.mmd), [물리 스키마 SVG](erd/feedback-audit-physical.svg). SVG는 `python3 scripts/render_feedback_audit_erd.py`로 재생성한다. 그림은 격리 검증 대상 스키마이며 운영 적용 완료를 의미하지 않는다. 아래 3개 개념 ERD는 초기 설계 참고용이다.
+
 ## Work #6 실패 해결의 추가 물리 스키마 (0010)
 
 2026-10-17 사용자 승인 정책과 [ADR-0012](../adr/0012-matching-failure-resolution.md)를 구현한다. **격리 시험 DB에만 적용했으며 운영에는 적용하지 않았다.** 기존 전체 ERD는 논리 설계이고 아래 표가 이번 물리 변경이다. [추가 ERD SVG](./erd/matching-resolution.svg)·[PNG](./erd/matching-resolution.png)는 주요 참조 관계를 보여주는 별도 그림이다(외부 user/run/slot 관계 일부 생략).
@@ -84,7 +97,7 @@
 
 바로 보는 자료: [확대·스크롤 뷰어](./erd/erd.html), [신청·결제 SVG](./erd/application-payment.svg), [매칭·모임 SVG](./erd/matching-gathering.svg), [피드백·운영 SVG](./erd/feedback-operations.svg). 같은 이름의 PNG도 제공하므로 Blaybus 중간 산출물에 올릴 수 있다. SVG는 확대해도 선명한 그림 파일이다. 그림은 아래 Mermaid 원문에서 생성하며 실제 DB에 적용된 스키마를 나타내지 않는다.
 
-재생성: Mermaid CLI를 준비한 환경에서 `python3 scripts/render_erd.py`를 실행한다. 별도 Chromium을 쓰면 `--puppeteer-config /path/to/config.json`, CLI가 PATH에 없으면 `--renderer /path/to/mmdc`를 지정한다. 원문 3개가 SVG·PNG 3개씩으로 출력된다.
+재생성: Mermaid CLI를 준비한 환경에서 `python3 scripts/render_erd.py`를 실행한다. 별도 Chromium을 쓰면 `--puppeteer-config /path/to/config.json`, CLI가 PATH에 없으면 `--renderer /path/to/mmdc`를 지정한다. 원문4개(초기 개념3개·Work7 물리1개)가 SVG·PNG4개씩으로 출력된다. 0012/0013 물리 요약은 별도 생성 스크립트를 사용한다.
 
 그림은 관계와 최소 키를 설명하며 전체 필드·SQL 타입·삭제 연쇄를 고정하지 않는다. 그림 사이 같은 이름은 동일 개념이다. 모든 보조 개념을 독립 테이블로 구현할 의무는 없다.
 
@@ -382,3 +395,57 @@ ScheduledJob은 시각·대상·논리 효과 키·처리 결과·다음 시도 
 | A5-W1 운영자 예외·안전 종합 관리 | U09/U16 검토/처분·CSV·개인정보/감사 보관 | 일괄 수정·전체 열 공개 전 |
 
 CSV는 원본 테이블 전체 덤프가 아니라 역할별 허용 필드 출력이다. U18/U20 배포·백업·원격 검증은 A1-W2 별도 Task가 담당한다. 새로운 Work/Task를 추가하지 않는다. 데이터 감사의 결측을 사실로 보완하지 않았고 제품 구현·마이그레이션·원본 변경은 없다. PR 생성만으로 부모 Work나 후속 구현을 완료 처리하지 않는다.
+
+## Work #7 물리 스키마 0011 (운영 미반영)
+
+[확정 후 안내 계약](gathering-contract.md)·[ADR-0013](../adr/0013-gathering-delivery.md)을 기준으로
+회차별 한 테이블 단위 `venue_inventory`와 `venue_allocation`을 도입한다.
+참가 테이블·재고 각각 UNIQUE로 중복 소비를 막고 `venue_food_approval`은 해당 테이블의 현재 음식 조건 해시에 묶인다.
+`chat_room`은 참가 테이블당 하나이며 `chat_message`는 사용자 요청 키/시스템 이벤트 키로 멱등 저장한다.
+모든 게시자는 room 잠금 후 메시지 순번을 할당한다.
+`app_notification`은 수신자·이벤트당 하나, `push_delivery`는 알림·구독당 하나다.
+`gathering_exception`은 식당 부족/발송 반복 실패를 안전한 사유 코드로 기록한다.
+방 게시·식당 배정·앱 알림은 테이블 트랜잭션에서 함께 커밋한다. 외부 푸시 전송은 별도이며 정확히 한 번 수신을 보장하지 않는다.
+기존 설계 ERD 그림은 개념 설계이며, 다음 물리 스키마 관계도가 0011 추가분이다.
+
+```mermaid
+erDiagram
+  dining_table ||--o| venue_allocation : receives
+  venue_inventory ||--o| venue_allocation : consumed_once
+  dining_table ||--o{ venue_food_approval : verified_snapshot
+  venue_inventory ||--o{ venue_food_approval : suitability
+  dining_table ||--o| chat_room : owns
+  chat_room ||--o{ chat_message : persists
+  app_user ||--o{ app_notification : receives
+  app_user ||--o{ push_subscription : owns
+  app_notification ||--o{ push_delivery : queues
+  push_subscription ||--o{ push_delivery : destination
+  dining_table ||--o{ gathering_exception : unresolved
+```
+
+## 2026-10-19 모의 환불 실패·재시도 (0014, 운영 미반영)
+
+[ADR-0015](../adr/0015-operator-failure-recovery.md)에 따른 추가 전용 테이블 `mock_refund_attempt`는 원본 해결 선택·결제·전액·시도 순서·요청 키·운영자(최초 참가자 요청은 NULL)·고정 오류 코드·결과·시각을 기록한다. 기존 `mock_refund_event`의 요청→처리→완료 3단계와 과거 성공 기록은 재작성하지 않는다.
+
+```mermaid
+erDiagram
+    match_resolution ||--o{ mock_refund_attempt : retries
+    payment ||--o{ mock_refund_attempt : original_payment
+    app_user o|--o{ mock_refund_attempt : operator
+    mock_refund_attempt {
+        bigint id PK
+        uuid resolution_id FK
+        uuid payment_id FK
+        uuid operator_id FK
+        uuid request_key
+        integer amount_krw
+        integer attempt_number
+        string state
+        string error_code
+        timestamptz created_at
+    }
+```
+
+해결 선택·요청 키와 해결 선택·시도 번호는 각각 UNIQUE, 운영자·요청 키도 UNIQUE다. 결과는 FAILED/SUCCEEDED이며 FAILED일 때만 고정 오류 코드가 필요하다. 실패한 환불은 결제 PAID와 활성 이용권 예약을 유지하되 모든 신청 후보를 종료한다. 참가자는 같은 요청을 조회할 수 있지만 보관/이동으로 선택을 바꾸거나 예약 권리를 새 신청에 재사용할 수 없다. 성공 시에만 원결제 REFUNDED·예약 종료·기존 3개 이벤트를 함께 확정한다.
+
+금융 변경은 savepoint로 묶고, 실패 이력·운영자 감사·참가 상태 변경은 바깥 트랜잭션에서 함께 커밋한다. DB 전체/최종 커밋 장애는 부분 성공으로 기록하지 않는다. 원래 회차 시작 이후의 대안 미응답은 운영자 표시 기준일 뿐 참가자 해결 권한을 종료하지 않는다. 기존 0012/0013 SVG는 해당 스키마만 표현하며 위 도식이 0014 추가 관계다.

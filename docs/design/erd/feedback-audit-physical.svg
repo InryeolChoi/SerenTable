@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1140" height="950" viewBox="0 0 1140 950">
+<rect width="1140" height="950" fill="#fff9ed"/>
+<g font-family="Arial,sans-serif" fill="#422817">
+<text x="40" y="45" font-size="26" font-weight="bold">SerenTable: schema 0012 / 0013</text>
+<text x="40" y="77" font-size="16">Local only; production not migrated. ? = nullable FK.</text>
+<rect x="40" y="105" width="510" height="58" rx="8" fill="#8b4e27"/>
+<text x="58" y="141" font-size="20" fill="white">dining_table (confirmed context)</text>
+<rect x="590" y="105" width="510" height="58" rx="8" fill="#8b4e27"/>
+<text x="608" y="141" font-size="20" fill="white">app_user (participant / operator)</text>
+<rect x="40" y="200" width="510" height="135" rx="8" fill="white" stroke="#d7c6af"/>
+<rect x="40" y="200" width="510" height="37" rx="8" fill="#f4eadb"/>
+<text x="56" y="226" font-size="20">attendance_check_in</text>
+<text x="56" y="267" font-size="16">PK/FK table + user</text>
+<text x="56" y="301" font-size="16">checked_in_at</text>
+<rect x="590" y="200" width="510" height="135" rx="8" fill="white" stroke="#d7c6af"/>
+<rect x="590" y="200" width="510" height="37" rx="8" fill="#f4eadb"/>
+<text x="606" y="226" font-size="20">no_show_review</text>
+<text x="606" y="267" font-size="16">PK/FK table + user; FK reviewed_by</text>
+<text x="606" y="301" font-size="16">CONFIRMED_NO_SHOW / EXCUSED</text>
+<rect x="40" y="370" width="510" height="135" rx="8" fill="white" stroke="#d7c6af"/>
+<rect x="40" y="370" width="510" height="37" rx="8" fill="#f4eadb"/>
+<text x="56" y="396" font-size="20">table_feedback</text>
+<text x="56" y="437" font-size="16">PK/FK table + user</text>
+<text x="56" y="471" font-size="16">5 ratings (1..5), submitted_at</text>
+<rect x="590" y="370" width="510" height="135" rx="8" fill="white" stroke="#d7c6af"/>
+<rect x="590" y="370" width="510" height="37" rx="8" fill="#f4eadb"/>
+<text x="606" y="396" font-size="20">person_preference</text>
+<text x="606" y="437" font-size="16">PK/FK table + rater + target</text>
+<text x="606" y="471" font-size="16">MEET_AGAIN / AVOID; rater != target</text>
+<rect x="40" y="540" width="510" height="135" rx="8" fill="white" stroke="#d7c6af"/>
+<rect x="40" y="540" width="510" height="37" rx="8" fill="#f4eadb"/>
+<text x="56" y="566" font-size="20">safety_report</text>
+<text x="56" y="607" font-size="16">PK id; FK reporter, reported, table?</text>
+<text x="56" y="641" font-size="16">OPEN / CONFIRMED / DISMISSED</text>
+<rect x="590" y="540" width="510" height="135" rx="8" fill="white" stroke="#d7c6af"/>
+<rect x="590" y="540" width="510" height="37" rx="8" fill="#f4eadb"/>
+<text x="606" y="566" font-size="20">participant_sanction</text>
+<text x="606" y="607" font-size="16">PK id; FK user, report?, created_by</text>
+<text x="606" y="641" font-size="16">WARNING / SUSPENSION / PERMANENT_BAN</text>
+<rect x="40" y="710" width="510" height="135" rx="8" fill="white" stroke="#d7c6af"/>
+<rect x="40" y="710" width="510" height="37" rx="8" fill="#f4eadb"/>
+<text x="56" y="736" font-size="20">operator_audit</text>
+<text x="56" y="777" font-size="16">PK bigint id; FK actor?</text>
+<text x="56" y="811" font-size="16">action, target, reason, before/after, time</text>
+<rect x="590" y="710" width="510" height="135" rx="8" fill="white" stroke="#d7c6af"/>
+<rect x="590" y="710" width="510" height="37" rx="8" fill="#f4eadb"/>
+<text x="606" y="736" font-size="20">gathering_exception (+0013)</text>
+<text x="606" y="777" font-size="16">PK id; FK table?, resolved_by?</text>
+<text x="606" y="811" font-size="16">resolution_note; OPEN / RESOLVED</text>
+<text x="40" y="918" font-size="16">FK table = dining_table; user / actor / reviewer = app_user. Full relationships: .mmd.</text>
+</g></svg>

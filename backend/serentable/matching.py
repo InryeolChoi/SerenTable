@@ -662,14 +662,19 @@ def _execute(connection, slot_id):
 
 
 # Excluded pairs among this slot's applicants (MAT-05), and pairs who already shared a
-# confirmed table in an earlier successful run (MAT-06).
+# confirmed table in an earlier successful run (MAT-06). A pair who each chose MEET_AGAIN
+# for the other (at any shared table) is not counted as previously met (ADR-0014 U08).
 EXCLUSION_SQL = """SELECT DISTINCT user_low, user_high FROM participant_exclusion
     WHERE user_low = ANY(:users) AND user_high = ANY(:users)"""
 MET_SQL = """SELECT DISTINCT a.user_id, b.user_id FROM table_assignment a
     JOIN table_assignment b ON b.dining_table_id = a.dining_table_id AND b.user_id <> a.user_id
     JOIN dining_table t ON t.id = a.dining_table_id
     JOIN match_run m ON m.id = t.match_run_id AND m.state = 'SUCCEEDED'
-    WHERE a.user_id = ANY(:users) AND b.user_id = ANY(:users) AND t.event_slot_id <> :slot"""
+    WHERE a.user_id = ANY(:users) AND b.user_id = ANY(:users) AND t.event_slot_id <> :slot
+      AND NOT (EXISTS (SELECT 1 FROM person_preference p WHERE p.rater_id = a.user_id
+                       AND p.target_id = b.user_id AND p.choice = 'MEET_AGAIN')
+               AND EXISTS (SELECT 1 FROM person_preference p WHERE p.rater_id = b.user_id
+                           AND p.target_id = a.user_id AND p.choice = 'MEET_AGAIN'))"""
 
 
 def _pairs(connection, sql, users, slot_id=None):

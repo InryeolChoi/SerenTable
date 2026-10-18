@@ -9,23 +9,47 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from serentable.admin_dashboard import router as dashboard_router
+from serentable.admin_exceptions import router as exceptions_router
 from serentable.applications import router as applications_router
+from serentable.attendance import router as attendance_router
+from serentable.audit import router as audit_router
 from serentable.auth import router as auth_router
+from serentable.chat import router as chat_router
 from serentable.database import database_engine
 from serentable.events import router as events_router
+from serentable.exports import router as exports_router
+from serentable.feedback import router as feedback_router
+from serentable.gatherings import router as gatherings_router
 from serentable.match_resolution import router as resolution_router
 from serentable.matching import router as matching_router
+from serentable.mock_refunds import router as mock_refunds_router
+from serentable.notifications import router as notifications_router
 from serentable.payments import router as payments_router
 from serentable.profile import router as profile_router
+from serentable.recommendations import router as recommendations_router
+from serentable.safety import router as safety_router
 
 app = FastAPI(title="SerenTable", docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(events_router)
+app.include_router(gatherings_router)
 app.include_router(applications_router)
 app.include_router(payments_router)
 app.include_router(matching_router)
+app.include_router(chat_router)
+app.include_router(notifications_router)
 app.include_router(resolution_router)
+app.include_router(attendance_router)
+app.include_router(feedback_router)
+app.include_router(safety_router)
+app.include_router(recommendations_router)
+app.include_router(dashboard_router)
+app.include_router(exceptions_router)
+app.include_router(mock_refunds_router)
+app.include_router(audit_router)
+app.include_router(exports_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -98,6 +122,24 @@ if (WEB_ROOT / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=WEB_ROOT / "assets"), name="assets")
 
 
+@app.get("/favicon.svg", include_in_schema=False)
+def brand_icon():
+    if not (WEB_ROOT / "favicon.svg").is_file():
+        raise HTTPException(503, "web_build_unavailable")
+    return FileResponse(WEB_ROOT / "favicon.svg", media_type="image/svg+xml")
+
+
+@app.get("/sw.js", include_in_schema=False)
+def push_service_worker():
+    if not (WEB_ROOT / "sw.js").is_file():
+        raise HTTPException(503, "web_build_unavailable")
+    return FileResponse(
+        WEB_ROOT / "sw.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"},
+    )
+
+
 @app.get("/login", include_in_schema=False)
 @app.get("/participant/profile", include_in_schema=False)
 @app.get("/participant/consent", include_in_schema=False)
@@ -105,6 +147,12 @@ if (WEB_ROOT / "assets").is_dir():
 @app.get("/", include_in_schema=False)
 @app.get("/participant", include_in_schema=False)
 @app.get("/admin", include_in_schema=False)
+@app.get("/admin/venues", include_in_schema=False)
+@app.get("/participant/gatherings", include_in_schema=False)
+@app.get("/participant/rooms", include_in_schema=False)
+@app.get("/participant/history", include_in_schema=False)
+@app.get("/admin/safety", include_in_schema=False)
+@app.get("/admin/console", include_in_schema=False)
 @app.get("/admin/events", include_in_schema=False)
 @app.get("/participant/events", include_in_schema=False)
 @app.get("/participant/apply", include_in_schema=False)
