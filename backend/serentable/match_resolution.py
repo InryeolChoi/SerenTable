@@ -62,7 +62,13 @@ def failed_application(connection, application_id, user_id):
         row["state"] != "SUBMITTED"
         or row["matching_state"] not in ("ALTERNATIVE_OFFERED", "NO_MATCH")
         or row["reason_code"]
-        in ("overlapping_confirmation", "pass_held", "mock_refunded", "membership_held")
+        in (
+            "overlapping_confirmation",
+            "pass_held",
+            "mock_refunded",
+            "mock_refund_failed",
+            "membership_held",
+        )
         or row["match_run_id"] is None
     ):
         raise HTTPException(409, "resolution_not_available")
@@ -167,8 +173,8 @@ def target_allowed(connection, user_id, slot_id, now):
     )
 
 
-def resolution_json(row):
-    return {
+def resolution_json(row, connection=None):
+    result = {
         "id": str(row["id"]),
         "application_id": str(row["application_id"]),
         "failure_run_id": str(row["failure_run_id"]),
@@ -179,6 +185,12 @@ def resolution_json(row):
         "created_at": iso(row["created_at"]),
         "policy_version": row["policy_version"],
     }
+
+    if row["action"] == "REFUND" and connection is not None:
+        from serentable.mock_refunds import refund_status
+
+        result["refund_status"] = refund_status(connection, row["id"])
+    return result
 
 
 @router.post("/api/me/applications/{application_id}/resolutions")
@@ -214,7 +226,7 @@ def resolve(
                     payload.event_slot_id,
                 ):
                     raise HTTPException(409, "request_key_reused")
-                return private_response({"resolution": resolution_json(prior)})
+                return private_response({"resolution": resolution_json(prior, connection)})
             application = failed_application(connection, application_id, user.id)
             now = locked_now(connection)
             if application["match_run_id"] != payload.failure_run_id or pending_candidates(
@@ -307,7 +319,7 @@ def resolve(
                     {"app": application_id, "slot": payload.event_slot_id, "now": now},
                 )
             else:
-                if single:
+                if single and payload.action != "REFUND":
                     connection.execute(
                         text("""UPDATE entitlement_binding SET ended_at=:now
                         WHERE entitlement_id=:id AND ended_at IS NULL"""),
@@ -315,30 +327,20 @@ def resolve(
                     )
                 reason = "pass_held" if single else "membership_held"
                 if payload.action == "REFUND":
-                    reason = "mock_refunded"
-                    for state in ("REFUND_REQUESTED", "REFUND_PROCESSING", "REFUNDED"):
-                        connection.execute(
-                            text("""INSERT INTO mock_refund_event
-                            (resolution_id,payment_id,state,amount_krw,created_at)
-                            VALUES (:res,:payment,:state,:amount,:now)"""),
-                            {
-                                "res": resolution_id,
-                                "payment": single["payment_id"],
-                                "state": state,
-                                "amount": single["amount_krw"],
-                                "now": now,
-                            },
-                        )
-                    connection.execute(
-                        text("UPDATE payment SET state='REFUNDED' WHERE id=:id AND state='PAID'"),
-                        {"id": single["payment_id"]},
+                    from serentable.mock_refunds import perform_refund
+
+                    attempt = perform_refund(
+                        connection, resolution_id, single, payload.request_key, now
+                    )
+                    reason = (
+                        "mock_refunded" if attempt["state"] == "SUCCEEDED" else "mock_refund_failed"
                     )
                 connection.execute(
                     text("""UPDATE match_participation SET state='NO_MATCH',
                     reason_code=:reason, updated_at=:now WHERE application_id=:app"""),
                     {"app": application_id, "reason": reason, "now": now},
                 )
-            return private_response({"resolution": resolution_json(row)})
+            return private_response({"resolution": resolution_json(row, connection)})
     except IntegrityError:
         raise HTTPException(409, "resolution_conflict") from None
     except SQLAlchemyError:

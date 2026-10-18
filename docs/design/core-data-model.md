@@ -422,3 +422,30 @@ erDiagram
   push_subscription ||--o{ push_delivery : destination
   dining_table ||--o{ gathering_exception : unresolved
 ```
+
+## 2026-10-19 모의 환불 실패·재시도 (0014, 운영 미반영)
+
+[ADR-0015](../adr/0015-operator-failure-recovery.md)에 따른 추가 전용 테이블 `mock_refund_attempt`는 원본 해결 선택·결제·전액·시도 순서·요청 키·운영자(최초 참가자 요청은 NULL)·고정 오류 코드·결과·시각을 기록한다. 기존 `mock_refund_event`의 요청→처리→완료 3단계와 과거 성공 기록은 재작성하지 않는다.
+
+```mermaid
+erDiagram
+    match_resolution ||--o{ mock_refund_attempt : retries
+    payment ||--o{ mock_refund_attempt : original_payment
+    app_user o|--o{ mock_refund_attempt : operator
+    mock_refund_attempt {
+        bigint id PK
+        uuid resolution_id FK
+        uuid payment_id FK
+        uuid operator_id FK
+        uuid request_key
+        integer amount_krw
+        integer attempt_number
+        string state
+        string error_code
+        timestamptz created_at
+    }
+```
+
+해결 선택·요청 키와 해결 선택·시도 번호는 각각 UNIQUE, 운영자·요청 키도 UNIQUE다. 결과는 FAILED/SUCCEEDED이며 FAILED일 때만 고정 오류 코드가 필요하다. 실패한 환불은 결제 PAID와 활성 이용권 예약을 유지하되 모든 신청 후보를 종료한다. 참가자는 같은 요청을 조회할 수 있지만 보관/이동으로 선택을 바꾸거나 예약 권리를 새 신청에 재사용할 수 없다. 성공 시에만 원결제 REFUNDED·예약 종료·기존 3개 이벤트를 함께 확정한다.
+
+금융 변경은 savepoint로 묶고, 실패 이력·운영자 감사·참가 상태 변경은 바깥 트랜잭션에서 함께 커밋한다. DB 전체/최종 커밋 장애는 부분 성공으로 기록하지 않는다. 원래 회차 시작 이후의 대안 미응답은 운영자 표시 기준일 뿐 참가자 해결 권한을 종료하지 않는다. 기존 0012/0013 SVG는 해당 스키마만 표현하며 위 도식이 0014 추가 관계다.

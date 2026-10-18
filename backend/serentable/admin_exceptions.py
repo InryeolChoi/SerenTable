@@ -16,13 +16,19 @@ from serentable.audit import record_audit
 from serentable.auth import Principal, private_response, require_csrf_operator, require_operator
 from serentable.clock import iso
 from serentable.database import database_engine
+from serentable.mock_refunds import list_refund_exceptions
 
 router = APIRouter()
 
-# Venue exceptions reach their slot through the table; push exceptions carry no table.
+# Venue exceptions name a table; push exceptions reach it through their notification.
 GATHERING_SELECT = """SELECT g.id, g.kind AS category, g.reason_code, g.state, g.created_at,
-    g.updated_at, g.dining_table_id, t.event_slot_id, g.resolution_note, g.resolved_by
-    FROM gathering_exception g LEFT JOIN dining_table t ON t.id=g.dining_table_id """
+    g.updated_at, g.dining_table_id, COALESCE(t.event_slot_id,nt.event_slot_id) AS event_slot_id,
+    g.resolution_note, g.resolved_by
+    FROM gathering_exception g LEFT JOIN dining_table t ON t.id=g.dining_table_id
+    LEFT JOIN push_delivery d ON g.event_key='push:'||d.id::text
+    LEFT JOIN app_notification n ON n.id=d.notification_id
+    LEFT JOIN dining_table nt ON nt.id::text=split_part(n.event_key,':',2)
+      AND (n.event_key LIKE 'table:%' OR n.event_key LIKE 'feedback-reminder:%') """
 
 
 def gathering_json(row):
@@ -43,7 +49,7 @@ def gathering_json(row):
 
 # An offered alternative left unanswered after its failed slot has started. There is no
 # resolution store for it, so it is listed read-only and stays open until the participant
-# chooses (ADR-0012). The start-time threshold is the conservative reading of the contract.
+# chooses. ADR-0015 approves this display threshold without expiring participant rights.
 ALTERNATIVE_SELECT = """SELECT a.id, mp.reason_code, mp.updated_at, r.event_slot_id
     FROM match_participation mp JOIN application a ON a.id=mp.application_id
     JOIN match_run r ON r.id=mp.match_run_id JOIN event_slot s ON s.id=r.event_slot_id
@@ -84,6 +90,7 @@ def list_exceptions(
                 {"state": state},
             ).mappings()
         ]
+        items += list_refund_exceptions(connection, state)
         if state != "RESOLVED":
             items += [
                 alternative_json(row)

@@ -127,6 +127,23 @@ COUNT_QUERIES = {
         JOIN dining_table t ON t.id=r.dining_table_id WHERE r.state='OPEN' AND {0} GROUP BY 1""",
     ),
     # Venue exceptions name their table; push exceptions are keyed 'push:<delivery id>'.
+    "failed_refund_count": (
+        "m.event_slot_id",
+        """SELECT m.event_slot_id,count(*) FROM match_resolution r
+        JOIN match_run m ON m.id=r.failure_run_id
+        JOIN mock_refund_attempt a ON a.resolution_id=r.id
+        WHERE r.action='REFUND' AND a.state='FAILED'
+        AND a.attempt_number=(SELECT max(last.attempt_number) FROM mock_refund_attempt last
+            WHERE last.resolution_id=r.id) AND {0} GROUP BY 1""",
+    ),
+    "alternative_overdue_count": (
+        "m.event_slot_id",
+        """SELECT m.event_slot_id,count(*) FROM match_participation mp
+        JOIN application a ON a.id=mp.application_id JOIN match_run m ON m.id=mp.match_run_id
+        JOIN event_slot s ON s.id=m.event_slot_id
+        WHERE mp.state='ALTERNATIVE_OFFERED' AND a.state='SUBMITTED'
+        AND s.starts_at<=clock_timestamp() AND {0} GROUP BY 1""",
+    ),
     "open_exception_count": (
         "COALESCE(t.event_slot_id,ns.event_slot_id)",
         f"""SELECT COALESCE(t.event_slot_id,ns.event_slot_id),count(*)
@@ -203,7 +220,11 @@ def slot_summary(slot, now, sections, counts, run):
             "feedback_rate": round(submitted / eligible, 4) if eligible else None,
         },
         "open_report_count": count["open_report_count"],
-        "open_exception_count": count["open_exception_count"],
+        "open_exception_count": (
+            count["open_exception_count"]
+            + count["failed_refund_count"]
+            + count["alternative_overdue_count"]
+        ),
     }
 
 

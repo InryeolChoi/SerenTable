@@ -1,6 +1,6 @@
 # 도구 간 작업 인계
 
-마지막 기록: 2026-10-18 (Asia/Seoul). Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
+마지막 기록: 2026-10-19 (Asia/Seoul). Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
 
 ## 먼저 확인할 현재 상태
 
@@ -266,3 +266,21 @@ PR42 `claude/work8-feedback`에 미병합 T4 f31f04b를 반영했다. 추천 자
 [검증·12단계 증거·Blaybus Task별 수행/검증/남은 항목](../design/work8-work9-verification-2026-10-18.md)에 기록했다. 기존 Issue8/9에도 진행 댓글 반영. Blaybus는 사용자가 수동으로 갱신하며 Work/Agenda는 운영·미정정책 인수 전 진행중 유지한다. 선행 PR39는 main 문서 충돌 상태이며 임의 main병합 금지. 감사 보관·역할 분리·모의 환불 실패·대안 미응답 기준·운영자 사유 정책은 추가구현/확정하지 않았다.
 
 **운영migration/deploy/매칭재실행/기존데이터 변경·main병합 없음.** 실제 휴대폰 푸시·공개 데모 인수는 남았다. 사용자 AGENTS.md의30줄 미커밋변경 및 .claude/.codex/scripts/claude-*.sh를 커밋하지 않고 보존했다. 이번 세 managed 구현작업트리는 archive 요청했으며 앱 처리 전 남아 있을 수 있다. 사용자 Claude 작업트리와 기존 보존 DB는 유지한다. 다음 행동은 최신 CI 확인→PR42/43 Ready 여부 정리→운영 승인 전 공개 인수 계획 확인이다.
+
+## 2026-10-19 Work9 복구 후속 구현 진행
+
+사용자가 대안 미응답 표시 기준(원래 실패 회차 시작, 참가자 권한 만료 없음)과 모의 환불 실패 기록·운영자 멱등 재시도를 승인했다. 별도 통합 브랜치 codex/w9-resolution-integration, /private/tmp/serentable-w9-resolution, 기반66eaeb6(PR42·43 병합 후)에서 기존 Task ‘기능별 예외·조치 연결’을 진행한다. Draft PR44는 Work7 통합 브랜치 대상이며 main/운영은 변경하지 않는다.
+
+푸시 예외 회차 누락 수정22e3572를7849165로 통합했다. 실제PG RED→GREEN, 관련11통과. 모의환불은 별도작업트리 /private/tmp/serentable-w9-refund에서 구현·검증 중, 부모는 승인정책 ADR0015·문서·참가자/운영자화면·브라우저시험을 준비 중이다. 저장장애가 환불완료나 이용권 재사용으로 이어지지 않게 한다. 전체회귀/브라우저/최종CI는 아직 실행 전이다. Docker Desktop과 테스트전용foundationPG만 재시작, 신규격리DB만 생성했다. 사용자 미커밋 AGENTS/.claude/.codex/claude스크립트는 루트에 보존했다. 감사보관·역할분리·기존조치 사유정책은 미정 유지.
+
+## 2026-10-19 Work9 모의 환불 복구 구현·검증 완료 (운영 미반영)
+
+현재 작업은 `/private/tmp/serentable-w9-resolution`의 `codex/w9-resolution-integration`, [PR44](https://github.com/InryeolChoi/SerenTable/pull/44)다. 기반66eaeb6(PR42·43 병합 후 Work7 통합). 기존 Agenda → Work9 → ‘기능별 예외·조치 연결’ 안에서 진행했으며 새 Work/Task는 없다. 사용자 승인 두 정책은 ADR0015: 대안 미응답은 원래 실패 회차 시작 이후 표시만 하고 참가자 권한은 유지, 모의 환불 실패 이력·운영자 멱등 재시도 허용이다.
+
+푸시 예외 회차 연결22e3572, 환불 저장실패·재시도 ac80dbf, 참가자 실패 표시/예외 목록/대시보드 통합0354372, 보안 문서·다른키+별도Worker 경합 보완eb1635e를 통합했다. 제품 기준5ba8b6f. 0014는 새시도 테이블만 추가하고 과거 성공 환불을 보존한다. 실패 시PAID/권리예약 유지·후보종료, 재시도 성공 시기존3단계/REFUNDED/예약종료를 함께 반영한다. 실패기록·감사·최종commit장애는 전체롤백한다. 실제PG·멤버십금액환불·임의실패버튼 없음.
+
+실제PG 전체307 PASS(758.67초), 추가 경합 포함 환불9 PASS 및 로그강화신규1 PASS, 모바일 전체12 PASS(58.4초), Ruff/형식/타입/빌드/diff 통과. 전체수집 뒤 추가시험1개가 있어 최신CI수집은308이다. 전체 실행중 제품코드는 변경하지 않았다. Spec 차단결함 없음, Standards 보안문서1건 수정·재검토 해소, N+1은 비차단 후속. 목록종류별200제한/대시보드전체집계를 구분하며 강제Worker잠금동기화·강제종료시험으로 확대하지 않는다.
+
+[정책·API·검증·Blaybus 문구](../design/operator-recovery-verification-2026-10-19.md)를 확인한다. 문서 커밋 당시 최신CI는 대기/진행 상태이며 최종 결과는 PR44 Checks와 Issue9 최종댓글을 기준으로 한다. 처음0354372 CI39140929157을 최신코드 통과로 계산하지 않는다. 다음은 최신CI 확인→PR44 검토 가능 상태 정리→사용자 검토다.
+
+Work9·상위Agenda는 감사보관U16·역할분리·기존조치사유정책·공개인수 전 진행중 유지. 실제휴대폰푸시·공개12단계·제출준비 남음. PR41은 Draft/CI성공39085601873, PR39는 main과충돌이므로 main병합·운영반영 전에 별도정리/승인 필요. 운영migration/deploy/matching재실행/기존데이터 쓰기·main병합 없음. 사용자루트 AGENTS/.claude/.codex/scripts 미커밋파일 보존. 이번구현작업트리3개는 clean·통합확인후 제거했고 통합작업트리/사용자Claude트리는 유지했다. Blaybus는 사용자수동갱신, 실제시간추정없음.

@@ -266,6 +266,7 @@ const matchingReasons: Record<string, string> = {
   no_qualifying_table: "조건과 최소 매칭 점수를 함께 만족하는 테이블을 찾지 못했습니다",
   pass_held: "미사용 1회권 보관 완료 · 새 신청에서 재사용할 수 있습니다",
   mock_refunded: "원결제 금액 전액 모의 환불 완료",
+  mock_refund_failed: "모의 환불 실패 · 운영자 재시도 대기(이용권 예약 유지)",
   membership_held: "이번 신청 종료 · 멤버십 기간은 유지됩니다",
   runner_error: "자동 매칭 오류로 운영자 확인이 필요합니다",
   stale_generation: "중단된 실행을 정리했습니다",
@@ -333,7 +334,8 @@ function ApplicationItem({
         <summary>실패 해결 이력</summary>
         <ul>{application.resolutions.map(item => <li key={item.id}>
           {show(item.created_at)} · {item.action === "TRANSFER" ? "일정 이동 동의·처리 완료"
-            : item.action === "HOLD" ? "이용권 보관·신청 종료" : "전액 모의 환불 완료"}
+            : item.action === "HOLD" ? "이용권 보관·신청 종료"
+            : item.refund_status === "FAILED" ? "모의 환불 실패 · 운영자 재시도 대기(이용권 예약 유지)" : "전액 모의 환불 완료"}
           {!!item.refund_events?.length && <ol aria-label="모의 환불 처리 이력">
             {item.refund_events.map(event => <li key={event.state}>
               {event.state === "REFUND_REQUESTED" ? "환불 요청" : event.state === "REFUND_PROCESSING" ? "환불 처리 중" : "환불 완료"}
@@ -375,12 +377,14 @@ function AlternativeSlots({ application, onResolved }: {
     const key = attempt?.choice === choice ? attempt.key : crypto.randomUUID();
     setAttempt({ choice, key }); setLoading(true); setError("");
     try {
-      await request(`/api/me/applications/${application.id}/resolutions`, {
+      const response = await request<{ resolution: { refund_status?: "FAILED" | "SUCCEEDED" | null } }>(`/api/me/applications/${application.id}/resolutions`, {
         method: "POST", body: JSON.stringify({ request_key: key, action,
           event_slot_id: slot, failure_run_id: result.failure_run_id }),
       });
       setSuccess(action === "TRANSFER" ? "선택한 일정으로 이동했습니다. 자동 매칭을 기다려 주세요."
-        : action === "REFUND" ? "전액 모의 환불이 완료되었습니다. 실제 입출금은 없습니다."
+        : action === "REFUND" ? (response.resolution.refund_status === "FAILED"
+          ? "모의 환불을 완료하지 못했습니다. 이용권은 예약 상태로 보존되며 운영자가 재시도합니다. 실제 입출금은 없습니다."
+          : "전액 모의 환불이 완료되었습니다. 실제 입출금은 없습니다.")
         : "이번 신청을 종료하고 이용권을 보관했습니다.");
       setResult(null); await onResolved();
     } catch (error) {
@@ -500,7 +504,7 @@ export function MyApplications({
                     )}
                   {(application.matching?.state === "ALTERNATIVE_OFFERED" ||
                     (application.matching?.state === "NO_MATCH" &&
-                      !["overlapping_confirmation", "pass_held", "mock_refunded", "membership_held"].includes(application.matching.reason_code ?? ""))) && (
+                      !["overlapping_confirmation", "pass_held", "mock_refunded", "mock_refund_failed", "membership_held"].includes(application.matching.reason_code ?? ""))) && (
                     <AlternativeSlots application={application} onResolved={async () => { await load(); onChanged?.(); }} />
                   )}
                 </div>

@@ -9,7 +9,7 @@ import os
 from sqlalchemy import create_engine,text
 from sqlalchemy.engine import make_url
 url=make_url(os.environ['DATABASE_URL'])
-assert url.host in ('127.0.0.1','localhost') and url.database in ('serentable_test','serentable_w89_e2e_test')
+assert url.host in ('127.0.0.1','localhost') and url.database in ('serentable_test','serentable_w89_e2e_test','serentable_test_w9_recovery_e2e')
 with create_engine(url.set(drivername='postgresql+psycopg')).begin() as c:
  c.execute(text("UPDATE event_slot SET closes_at=now()-interval '4 hours', matches_at=now()-interval '3 hours', starts_at=now()-interval '2 hours', ends_at=now()+interval '${ended ? '-1' : '30'} minutes' WHERE id=:id"), {'id':'${slot}'})
 `], { cwd: "..", env: {...process.env, PYTHONPATH: "backend"} });
