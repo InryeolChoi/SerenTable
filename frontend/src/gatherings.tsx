@@ -17,7 +17,7 @@ export function GatheringsPage() {
     {!items.length && !error && <Notice>확정된 모임이 없습니다.</Notice>}
     {items.map(item => <article className="panel" key={item.id}>
       <h2>{show(item.starts_at)} · {item.region_name}</h2>
-      {item.venue ? <><h3>{item.venue.name}</h3><p>{item.venue.address}</p><p>예약명 {item.venue.reservation_name} · 예상 식비 {item.venue.price_krw.toLocaleString()}원</p><a href={item.venue.map_url} target="_blank" rel="noopener noreferrer">식당 지도</a></> : <Notice>식당 배정은 운영자 확인 중입니다.</Notice>}
+      {item.venue ? <><h3 className="venue-name">{item.venue.name}</h3><p>{item.venue.address}</p><p>예약명 {item.venue.reservation_name} · 예상 식비 {item.venue.price_krw.toLocaleString()}원</p><a className="venue-map" href={item.venue.map_url} target="_blank" rel="noopener noreferrer">식당 지도</a></> : <Notice>식당 배정은 운영자 확인 중입니다.</Notice>}
       <p>단체방에서 모임 안내와 대화 주제를 확인할 수 있습니다.</p>
     </article>)}
   </section>;

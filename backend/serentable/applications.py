@@ -22,6 +22,7 @@ from serentable.match_resolution import resolution_json, single_right, target_al
 from serentable.matching import participation_details
 from serentable.payments import payment_details
 from serentable.profile import consent_state, profile_state, read_profile
+from serentable.safety import participation_restricted
 
 router = APIRouter()
 
@@ -310,6 +311,9 @@ def submit_application(
                     connection, "WHERE a.id = :id", {"id": prior}, now
                 )
                 return private_response({"application": application})
+            # SAF-02: an active suspension or a permanent ban refuses new applications.
+            if participation_restricted(connection, user.id, now):
+                raise HTTPException(403, "participation_restricted")
             if not profile_state(read_profile(connection, user.id))["complete"]:
                 raise HTTPException(409, "profile_incomplete")
             if not consent_state(connection, user.id)["complete"]:
