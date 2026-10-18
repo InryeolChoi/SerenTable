@@ -284,3 +284,12 @@ PR42 `claude/work8-feedback`에 미병합 T4 f31f04b를 반영했다. 추천 자
 [정책·API·검증·Blaybus 문구](../design/operator-recovery-verification-2026-10-19.md)를 확인한다. 문서 커밋 당시 최신CI는 대기/진행 상태이며 최종 결과는 PR44 Checks와 Issue9 최종댓글을 기준으로 한다. 처음0354372 CI39140929157을 최신코드 통과로 계산하지 않는다. 다음은 최신CI 확인→PR44 검토 가능 상태 정리→사용자 검토다.
 
 Work9·상위Agenda는 감사보관U16·역할분리·기존조치사유정책·공개인수 전 진행중 유지. 실제휴대폰푸시·공개12단계·제출준비 남음. PR41은 Draft/CI성공39085601873, PR39는 main과충돌이므로 main병합·운영반영 전에 별도정리/승인 필요. 운영migration/deploy/matching재실행/기존데이터 쓰기·main병합 없음. 사용자루트 AGENTS/.claude/.codex/scripts 미커밋파일 보존. 이번구현작업트리3개는 clean·통합확인후 제거했고 통합작업트리/사용자Claude트리는 유지했다. Blaybus는 사용자수동갱신, 실제시간추정없음.
+
+## 2026-10-19 Claude Code Work10 로컬 근거 추가 (운영 미반영)
+
+- 브랜치 `claude/w10-acceptance`(기준 `codex/work7-gathering-integration` b5f1525, PR #44 병합 이후), 작업 트리 `/private/tmp/claude-501/-Users-inchoi-SerenTable/8087d9ee-c704-46f2-8a3d-ac550e365d68/scratchpad/w10`. **push·PR 생성 안 함.** 사용자 미커밋 루트 파일은 건드리지 않았다.
+- 추가: `tests/test_twelve_step_flow.py`(한 회차 1→12 정상 흐름 연결·마감 후 운영자 조작 0·미해결 예외 0, 최소 점수 미달 해제 별도 프로세스 시험), [12단계 근거 매트릭스](../design/twelve-step-acceptance-matrix.md), `scripts/measure_matching_scale.py`·`tests/test_scale_measurement.py`·[100명 측정 기록](../design/matching-scale-measurement-2026-10-19.md), [제출 준비 점검표](../operations/submission-readiness.md). 제품 코드 변경 없음.
+- 검증: 전체 pytest **320 PASS(815.99초)**, 전용 DB `serentable_w10_int`. Ruff check/format 통과. 브라우저 E2E **10 PASS / 2 미검증**(고정 장치 DB 이름 허용 목록 때문에 실행 중단, 기존 보존 DB 이름 변경은 권한 거부되어 수행하지 않음). 100명 측정 30회 위반·중복·누락 0, 최대 2.861초(5초 목표 초과 0), 최대 추적 메모리 20.24 MiB.
+- 결정 후보(구현 안 함): 정원 때문에 남은 신청의 미배정 이유가 `capacity`가 아니라 `no_valid_table`로 표시됨, 느린 기계에서 계획기 5초 보호로 배정 수가 줄 수 있음(같은 입력 96→76명). U19·U16·역할 분리·사유 입력은 미정 유지.
+- 격리 DB `serentable_w10_a`·`serentable_w10_b`·`serentable_w10_int` 생성(운영 쓰기 없음). 남은 일: 사용자 검토 후 push/PR(대상 `codex/work7-gathering-integration` 권장), CI에서 E2E 12개 확인, 배포 환경 12단계·실기기 푸시 인수.
+

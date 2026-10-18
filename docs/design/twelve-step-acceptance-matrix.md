@@ -37,6 +37,11 @@
 
 결과(2026-10-19, 로컬 PostgreSQL 컨테이너 `127.0.0.1:55432`, 전용 DB `serentable_w10_a`): `uv run pytest -q tests/test_twelve_step_flow.py` 2 passed(23.3초). 제품 결함은 발견되지 않았다. 이 결과는 로컬 격리 근거이며 배포 환경 통과가 아니다.
 
+통합 브랜치 `claude/w10-acceptance`(ccf1469, 리뷰 반영: 실제 마감 여유를 회차 생성 시점부터 10~15초로 넓히고 추가 합성 계정을 시험 후 삭제)에서 전용 DB `serentable_w10_int` 기준:
+
+- 전체 `uv run pytest -q`: **320 passed (815.99초)**. 잠자기 방지(`caffeinate`) 없이 돌린 첫 실행은 기계가 잠자기에 들어가 마감 시각 시험 40 FAIL·11 ERROR가 났고 frontend 빌드도 없었다. 원인이 환경이므로 제품 결함으로 세지 않으며, 같은 코드 재실행 320 PASS로 확인했다.
+- 브라우저 E2E(Node 26, 포트 8000 비어 있음 확인): **10 passed / 2 failed**. 실패 2개(`zz-feedback-console`, `zzz-refund-recovery`)는 시험 고정 장치의 DB 이름 허용 목록(`serentable_test` 등) 검사에서 멈췄고 제품 화면 단계까지 가지 않았다. 기존 보존 DB를 건드리지 않기 위해 허용된 이름으로 재실행하지 않았다. 이 두 시험은 **이번 브랜치에서 미검증**이며 CI 또는 허용된 전용 DB에서 재실행이 필요하다(이번 브랜치는 frontend·backend 제품 코드를 바꾸지 않았다).
+
 ## 남은 공백
 
 - **배포 환경 12단계 미완료**: Work7~9 migration·deploy가 승인 전이라 공개 URL에서 전 단계를 재현하지 못했다. 심사위원용 참가자·운영자 계정·링크 제공과 결과 안내까지 접속 유지도 미확인.
