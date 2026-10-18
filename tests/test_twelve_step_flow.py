@@ -41,10 +41,11 @@ NO_RESTRICTION = {
 
 @pytest.fixture(autouse=True)
 def flow_database(seeded_database):
-    truncate(
+    tables = (
         "event_slot, participant_profile, consent_record, app_notification, "
         "gathering_exception, operator_audit, participant_exclusion"
     )
+    truncate(tables)
     # One synthetic participant beyond the four seeded ones (same demo password hash).
     with database_engine().begin() as connection:
         connection.execute(
@@ -53,6 +54,21 @@ def flow_database(seeded_database):
             FROM app_user WHERE login_id='participant-01' ON CONFLICT(login_id) DO NOTHING"""),
             {"login": UNPAID},
         )
+    yield
+    # Remove the extra account so later tests still see only the four seeded participants.
+    truncate(tables)
+    with database_engine().begin() as connection:
+        connection.execute(
+            text("""DELETE FROM auth_session WHERE user_id IN
+            (SELECT id FROM app_user WHERE login_id=:login)"""),
+            {"login": UNPAID},
+        )
+        connection.execute(text("DELETE FROM app_user WHERE login_id=:login"), {"login": UNPAID})
+
+
+def wait_past_close(deadline):
+    """Sleep until just after a slot's real close, measured from its creation."""
+    time.sleep(max(0, deadline - time.monotonic()))
 
 
 def run_worker():
@@ -104,7 +120,8 @@ def test_one_slot_runs_all_twelve_steps_without_operator_action_after_the_deadli
         ids = [user_id(member) for member in members]
 
         # Operator pre-work before the deadline: one slot and its verified inventory.
-        slot = due_slot(operator, close_in=5)
+        slot = due_slot(operator, close_in=15)
+        deadline = time.monotonic() + 15.6
         register_inventory(operator, slot)
 
         # Step 1: different profiles choose the slot and apply. Four pay; one does not.
@@ -118,7 +135,7 @@ def test_one_slot_runs_all_twelve_steps_without_operator_action_after_the_deadli
         ]
 
         # Step 2: at the matching time the separate worker matches paid applications only.
-        time.sleep(5.6)
+        wait_past_close(deadline)
         run_worker()
         (run,) = operator.get("/api/admin/match-runs").json()["match_runs"]
         assert (run["state"], run["attempt"], run["seated_count"]) == ("SUCCEEDED", 1, 4)
@@ -198,11 +215,12 @@ def test_one_slot_runs_all_twelve_steps_without_operator_action_after_the_deadli
         assert len(members[0].get(room_path).json()["messages"]) == 4
 
         # Step 11: the next matching counts the previous meeting, minus the mutual pair.
-        next_slot = due_slot(operator, region="gangnam", close_in=6)
+        next_slot = due_slot(operator, region="gangnam", close_in=12)
+        deadline = time.monotonic() + 12.6
         register_inventory(operator, next_slot)
         for member in members:
             apply_and_pay(member, next_slot)
-        time.sleep(6.6)
+        wait_past_close(deadline)
         run_worker()
         for member in members:
             states = {
@@ -260,11 +278,12 @@ def test_the_worker_dissolves_a_table_below_the_minimum_score_into_alternative_o
                 "desired_traits": ["passionate"],
             }
             assert send(member, "PUT", "/api/me/profile", profile).status_code == 200
-        slot = due_slot(operator, close_in=4)
+        slot = due_slot(operator, close_in=10)
+        deadline = time.monotonic() + 10.6
         register_inventory(operator, slot)
         alternative = due_slot(operator, region="gangnam", days=9, close_in=3600)
         applications = [apply_and_pay(member, slot) for member in members]
-        time.sleep(4.6)
+        wait_past_close(deadline)
         run_worker()
         (run,) = operator.get("/api/admin/match-runs").json()["match_runs"]
         assert (run["state"], run["seated_count"], run["tables"]) == ("SUCCEEDED", 0, [])

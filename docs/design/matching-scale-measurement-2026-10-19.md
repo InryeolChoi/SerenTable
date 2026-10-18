@@ -6,7 +6,7 @@ Work #10의 "100명 측정" 부분이다. [구현 명세](mvp-implementation-spe
 
 | 항목 | 값 |
 |---|---|
-| 기준 커밋 | `b5f1525c7c02` (`origin/codex/work7-gathering-integration`) 위에 측정 스크립트만 추가, 제품 코드 변경 없음 |
+| 기준 커밋 | `b5f1525c7c02` (`codex/work7-gathering-integration` 브랜치의 PR #44 병합 커밋) 위에 측정 스크립트만 추가, 제품 코드 변경 없음 |
 | 기계 | `uname -m` = arm64 (macOS, 로컬 개발 기계) |
 | Python | 3.12.12 (`uv run`) |
 | 정책 | `DEFAULT_POLICY` (`prd-weighted-v1`, 최소 점수 60) — 작업기가 `MATCHING_MIN_SCORE` 미설정 시 쓰는 값과 같다 |
@@ -56,7 +56,7 @@ Work #10의 "100명 측정" 부분이다. [구현 명세](mvp-implementation-spe
 ## 관찰
 
 1. **실행 속도에 따른 결과 변화.** skewed_gender_age 시드 0은 일반 실행 2.85초에 96명이지만, `tracemalloc`으로 약 2배 느려진 실행은 계획기의 5초 벽시계 보호(`SEARCH_SECONDS`)에 걸려 탐색이 중단되고 76명만 배정했다(`search_complete=False`, 위반은 없음). 더 느린 배포 기계에서는 같은 입력도 결과가 달라지고 배정 수가 줄 수 있다는 뜻이다. 실행 기록에는 탐색 중단이 남지만 이 경우 정책(시간 상한·중단 처리)은 미정이다.
-2. **미배정 이유 표기.** capacity_limited에서 정원 때문에 남은 37~38명의 이유가 `capacity`가 아니라 `no_valid_table`로 기록된다. 현재 `_reason`은 정원이 4 미만일 때만 `capacity`를 쓴다. 필수조건 위반은 아니지만 참가자 설명 정확성(명세 6절 10항)과 관련 있어 결정이 필요한 항목으로 남긴다. 제품 코드는 바꾸지 않았다.
+2. **미배정 이유 표기.** capacity_limited에서 정원 때문에 남은 38명 중 37~38명의 이유가 `capacity`가 아니라 `no_valid_table`로 기록된다(시드 0~3은 나머지 1명이 `no_qualifying_table`). 현재 `_reason`은 정원이 4 미만일 때만 `capacity`를 쓴다. 필수조건 위반은 아니지만 참가자 설명 정확성(명세 6절 10항)과 관련 있어 결정이 필요한 항목으로 남긴다. 제품 코드는 바꾸지 않았다.
 
 ## 한계와 미측정
 

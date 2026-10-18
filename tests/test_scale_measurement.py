@@ -49,7 +49,8 @@ def test_100_person_pool_has_no_violation_duplicate_or_missing_participant(shape
     if result["known_optimum"] is not None:
         assert result["seated"] <= result["known_optimum"]
     assert set(result["table_sizes"]) <= {"4", "5", "6"}
-    assert result["deterministic"]
+    if result["search_complete"]:
+        assert result["deterministic"]
     assert measure_matching_scale.is_clean(result)
 
 
@@ -64,7 +65,13 @@ def test_generated_pools_are_deterministic_per_seed():
 def test_constructed_known_optimum_matches_the_independent_upper_bound():
     # A constructed shape's optimum is "a witness exists and the bound is tight": the
     # stated number must equal the planner-independent upper bound, never exceed it.
-    for name in ("two_age_groups", "dense_exclusions", "isolated_and_unknown_age"):
-        scenario = measure_matching_scale.SHAPES[name](0)
-        bound = measure_matching_scale.independent_upper_bound(scenario)
-        assert scenario.known_optimum == bound, name
+    for name in (
+        "two_age_groups",
+        "dense_exclusions",
+        "isolated_and_unknown_age",
+        "capacity_limited",
+    ):
+        for seed in (0, 1):
+            scenario = measure_matching_scale.SHAPES[name](seed)
+            bound = measure_matching_scale.independent_upper_bound(scenario)
+            assert scenario.known_optimum == bound, name

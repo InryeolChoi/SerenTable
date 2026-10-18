@@ -1,9 +1,10 @@
 """100-person matching planner measurement on deterministic synthetic pools, aggregates only.
 
 Work #10 "100명 측정": for each synthetic pool the real planner (``plan_allocation`` with
-the worker's default policy, minimum score 60) is run and measured for wall time, peak
-traced memory, seated count against a known optimum or an independent upper bound, hard
-constraint violations (``tests/oracle/hard_constraints.validate_assignment``), minimum
+the approved ``DEFAULT_POLICY``, minimum score 60; a deployment's ``MATCHING_MIN_SCORE``
+override is deliberately not read) is run and measured for wall time, peak traced memory,
+seated count against a known optimum or an independent upper bound, hard constraint
+violations (``tests/oracle/hard_constraints.validate_assignment``), minimum
 score compliance (``tests/oracle/scoring.validate_allocation``), duplicate seats, missing
 participants, and determinism (two runs give the same tables).
 
@@ -277,7 +278,8 @@ def measure(scenario, trace_memory=True):
     duplicate_seats = sum(n - 1 for n in Counter(seated_ids).values() if n > 1)
     missing = sum(1 for app_id in ids if app_id not in accounted)
     double_accounted = sum(1 for n in accounted.values() if n > 1)
-    unknown_output = sum(1 for app_id in accounted if app_id not in set(ids))
+    id_set = set(ids)
+    unknown_output = sum(1 for app_id in accounted if app_id not in id_set)
 
     known_age = [p for p in scenario.participants if p.birth_year is not None]
     oracle_roster = [
@@ -366,7 +368,9 @@ def is_clean(result):
         and result["double_accounted"] == 0
         and result["unknown_output"] == 0
         and result["seated_count_consistent"]
-        and result["deterministic"]
+        # The planner's wall-clock guard may cut a slow run at a different point, so
+        # identical repeats are required only when both searches completed.
+        and (result["deterministic"] or not result["search_complete"])
         and result["seated"] <= result["upper_bound"]
     )
 
@@ -387,13 +391,24 @@ def summarize(results):
                 "clean_runs": sum(is_clean(r) for r in group),
                 "seconds_median": statistics.median(seconds),
                 "seconds_max": max(seconds),
-                "peak_mib_max": max(r["peak_traced_bytes"] for r in group) / 2**20,
+                "peak_mib_max": max((r["peak_traced_bytes"] or 0 for r in group), default=0)
+                / 2**20,
                 "seated_min": min(r["seated"] for r in group),
                 "seated_max": max(r["seated"] for r in group),
-                "reference": sorted({r["known_optimum"] or r["upper_bound"] for r in group}),
-                "reference_kind": "known optimum"
-                if group[0]["known_optimum"] is not None
-                else "upper bound",
+                "reference": sorted(
+                    {
+                        r["upper_bound"] if r["known_optimum"] is None else r["known_optimum"]
+                        for r in group
+                    }
+                ),
+                "reference_kind": " / ".join(
+                    sorted(
+                        {
+                            "upper bound" if r["known_optimum"] is None else "known optimum"
+                            for r in group
+                        }
+                    )
+                ),
                 "gap_max": max(r["gap_to_reference"] for r in group),
                 "violations": sum(r["hard_violations"] + r["score_violations"] for r in group),
                 "duplicates": sum(r["duplicate_seats"] for r in group),
