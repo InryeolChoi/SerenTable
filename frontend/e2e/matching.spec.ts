@@ -125,9 +125,15 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
   await expect(confirmed).toContainText("같은 식탁 소개:");
   for (const suffix of ["01", "02", "03", "04"])
     await expect(confirmed).toContainText(`매칭 식탁 ${suffix}`);
+  // MAT-12: tablemates appear by display name only, never by contact or Instagram ID.
+  const statusText = await participants[0].locator("main").innerText();
+  expect(statusText).not.toContain("010-0000-0000");
+  for (const suffix of ["02", "03", "04"])
+    expect(statusText).not.toContain(`synthetic_match_${suffix}`);
+  await confirmed.screenshot({ path: testInfo.outputPath("matching-confirmed-mobile.png") });
   // A slot the runner left out says why, instead of staying "waiting" forever.
   await expect(mine.filter({ hasText: partial.name })).toContainText(
-    "매칭: 매칭 실패 (NO_MATCH) · 함께 앉을 인원이 부족합니다",
+    "매칭: 매칭 실패 · 대안 선택 대기 (ALTERNATIVE_OFFERED) · 함께 앉을 인원이 부족합니다",
   );
   const unseated = mine.filter({ hasText: partial.name });
   await unseated.getByRole("button", { name: "다른 일정 확인" }).click();
@@ -151,6 +157,11 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
     .locator(":scope > li");
   const run = history.filter({ hasText: full.name });
   await expect(run).toContainText("확정 4명");
+  // ADR-0011: years 1994..1997 (age 62.5), shared interest 100, "similar" to the same
+  // self trait 100, all new 100; gender and MBTI cannot be computed.
+  // (.25*62.5 + .15*100 + .10*100 + .15*100) / .65 = 85.58
+  await expect(run).toContainText("최소 점수 60");
+  await expect(run).toContainText("테이블 점수 85.58");
   await expect(run).toContainText("participant-01");
   await expect(history.filter({ hasText: partial.name })).toContainText(
     "확정 0명",
@@ -163,6 +174,50 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
       ),
     ).toBeTruthy();
   }
+  // Failed participants can complete their own resolution, without operator approval.
+  const originalConfirmed = (await (await participants[0].request.get("/api/me/applications")).json())
+    .applications.find((item: { matching: { state: string } }) => item.matching?.state === "CONFIRMED");
+  await suggestions.getByRole("list", { name: "모집 중인 다른 일정" })
+    .locator(":scope > li").filter({ hasText: alternative.name })
+    .getByRole("button", { name: "이 일정으로 이동" }).click();
+  await expect(mine.filter({ hasText: partial.name })).toContainText("매칭 대기 (WAITING)");
+  await expect(mine.filter({ hasText: partial.name }).getByText("이전 후보 · 종료됨")).toBeVisible();
+  const afterTransfer = (await (await participants[0].request.get("/api/me/applications")).json())
+    .applications.find((item: { id: string }) => item.id === originalConfirmed.id);
+  expect(afterTransfer).toEqual(originalConfirmed);
+
+  const holdRows = await openMyApplications(participants[1]);
+  const toHold = holdRows.filter({ hasText: partial.name });
+  await toHold.getByRole("button", { name: "다른 일정 확인" }).click();
+  await toHold.getByRole("button", { name: "1회권 보관", exact: true }).click();
+  await expect(toHold).toContainText("미사용 1회권 보관 완료");
+  const newApplication = await call(participants[1], "POST", "/api/me/applications", {
+    request_key: crypto.randomUUID(), event_slot_ids: [alternative.id],
+  });
+  await participants[1].goto(`/participant/payment/${newApplication.application.id}`);
+  await participants[1].getByRole("button", { name: "보관한 1회권 사용 1" }).click();
+  await expect(participants[1].getByRole("status").filter({ hasText: "보관한 1회권을 적용했습니다" })).toBeVisible();
+  await participants[1].getByRole("button", { name: "내 신청 보기", exact: true }).click();
+  await expect(participants[1].getByRole("list", { name: "내 신청" })).toContainText("보관한 1회권 재사용 · 추가 결제 없음");
+
+  const refundRows = await openMyApplications(participants[2]);
+  const toRefund = refundRows.filter({ hasText: partial.name });
+  await toRefund.getByRole("button", { name: "다른 일정 확인" }).click();
+  await expect(toRefund).toContainText("환불 가능 · 미사용 1회권 원금 전액");
+  await toRefund.getByRole("button", { name: "1회권 전액 모의 환불" }).click();
+  await expect(toRefund).toContainText("전액 모의 환불 완료");
+  await toRefund.getByText("실패 해결 이력", { exact: true }).click();
+  const refundHistory = toRefund.getByRole("list", { name: "모의 환불 처리 이력" });
+  await expect(refundHistory).toContainText("환불 요청");
+  await expect(refundHistory).toContainText("환불 처리 중");
+  await expect(refundHistory).toContainText("환불 완료");
+  await expect(participants[2].getByRole("list", { name: "내 이용권" })).toContainText("모의 환불 완료");
+  await expect(toRefund.getByRole("button", { name: "다른 일정 확인" })).toHaveCount(0);
+  for (const width of [360, 1440]) {
+    await participants[0].setViewportSize({ width, height: 900 });
+    expect(await participants[0].evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  }
+  await participants[0].screenshot({ path: testInfo.outputPath("matching-resolution-mobile.png") });
   for (const context of participantContexts) await context.close();
   await operatorContext.close();
 });

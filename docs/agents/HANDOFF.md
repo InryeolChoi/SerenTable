@@ -1,9 +1,12 @@
 # 도구 간 작업 인계
 
-마지막 기록: 2026-10-17 (Asia/Seoul). Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
+마지막 기록: 2026-10-19 (Asia/Seoul). Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
 
 ## 먼저 확인할 현재 상태
 
+- **2026-10-17 Codex 실패 해결 구현·격리 검증 완료(운영 미반영):** `codex/work6-match-resolution`, 기반 b9d7117 / Draft PR #39. 최신 사용자 지시는 **운영 migration/deploy/매칭 재실행/데이터 수정 금지**이며 과거 승인보다 우선한다. PR #38은 상태 재확인에서 이미 MERGED(이번 에이전트가 머지하지 않음), #39는 매칭 점수(OPEN Draft·CI39008494461 SUCCESS)이며 main과 CONFLICTING이다. 후속 [Draft PR #40](https://github.com/InryeolChoi/SerenTable/pull/40)은 base #39 브랜치다. PR #38의 기록과 #39의 구현 인계를 모두 보존하며 origin/main a9e289b를 이 후속 브랜치에 병합해 충돌을 해결했다. 검토/CI 후 #40을 #39 브랜치에 먼저 병합할 수 있으나, #39를 main에 머지하면 Railway 자동 배포가 시작될 수 있어 운영 승인 전 금지한다. 정책 3건 승인: 최종 실패 미사용 SINGLE 보관/재사용(만료 없음), 시간 제한 없는 전액 모의 환불, 멤버십 최종 실패 신청당 +7일1회(같은 신청 이동/재시도 중복 없음); 멤버십 금액 환불 보류. MBTI 가중치 유지·최소50 개발 후보. 사용자가 기존 매칭 시각순 유지와 PRD 날짜·지역 상대 우선순위 차이의 명시적 MVP 예외를 승인했다. [ADR-0012](../adr/0012-matching-failure-resolution.md)·[실패 해결 계약/계획/증거](../design/matching-resolution-contract.md)를 기준으로 한다. 동일 신청 이동, 별도 권리 예약·해결 이력, 모의 환불, 최종 실패 연장, 화면·다중 worker 공통 잠금 구현. 로컬PG17 신규17시험 PASS, 기존 매칭+경합21 PASS, legacy0009→0010 보존1 PASS, Node22 모바일 브라우저10 PASS. 전체 API/오라클 회귀224 PASS(425.53초), 추가 migration 보존1 PASS. 기본 구현 d4d9828 전체 회귀 기준이며, 후속 PAY-01 환불 가능/요청·처리·완료 이력 조회 보완 후 관련 API20 PASS·Node22 E2E10 PASS도 확인했다. 최종 head 전체 CI는 #40 checks를 확인한다. 최초 인수 전체203 PASS/4 FAIL은 같은 코드 집중4 PASS로 재확인했으나 원인 미확정. 새 0010은 격리 DB에만 적용. 로컬 보존 데모/원본 준비 DB·기존 사용자 미커밋 AGENTS.md/설정/스크립트 보존. 상세 남은 P0·Blaybus·PR 링크는 계약 최종 기록 확인. 새 Work/Task 추가 없음. 추가 대조에서 실제 worker 강제 종료 시험 PR #35가 아직 OPEN임을 확인했으며 현재 브랜치의 전체 회귀에는 포함되지 않는다. 저장 RUNNING fixture/DB 롤백 검증과 구별한다.
+
+- **2026-10-17 Claude Code PRD 정렬 매칭 개선 구현(Draft PR #39, `claude/work6-prd-matching-score`):** 사용자 조건부 승인에 따라 ADR-0011(6항목 가중합, 최소 점수 개발용 50·`MATCHING_MIN_SCORE`, 필수조건→최소 점수→인원→품질), `ALTERNATIVE_OFFERED` 전환, 시간 겹침 사용자 중복 금지(`NO_MATCH`/`overlapping_confirmation`), 제외 관계 저장·검사, 운영자 이력 점수 표시를 구현했다. 기존 worker·확정 트랜잭션·이용권 처리는 그대로이고 `age-ordered-dp-v2`는 시작점·회귀 기준선이다. 로컬 PG17 전체 pytest 207 PASS, Playwright 10 PASS, 독립 정답기(엔진 미열람 작성) 150입력 위반0·최적 일치142·인원 부족1·품질차 최대5.01%. 두 축 리뷰 지적(실패 사유 단정, 겹침 신청 상태, H6 문구) 반영. 가상데이터 294응답 실험 집계는 [기록](../design/matching-experiments-2026-10-17.md): 최소 50~60은 인원 손실 0~2, 70부터 급감; MBTI(M1) 실제 영향력 0.2~0.3점으로 PRD 3순위와 어긋나 사용자 결정 필요. **미실행/대기:** 마이그레이션 0009 운영 실행·배포(별도 승인), 최소 점수 운영값 재승인, MBTI 영향력 결정, 대안 선택·보관·환불과 회차 간 재배치(P0 후속), 운영 브라우저 E2E(Chrome 미연결). 병합 시 PR #38과 이 파일 상단이 충돌할 수 있다.
 - **머지 후 배포 환경 HTTP 검증(2026-10-17, OpenRouter DeepSeek 세션, Claude Code 도구):** Railway 공개 URL `https://chanceplate.up.railway.app`에서 확인했다. HTTP→HTTPS **301**, `/api/health` 200 `version=05287e2`(PR #27 머지 커밋. 검증 시점의 배포 버전이며 이후 PR #28 머지로 main은 `6d707cb`가 되었다. main 최신과 배포 버전은 다시 조회한다), `/api/readiness` 200 ready/database connected, `/api/worker-health` 200 alive. Work #4 라우트가 익명 요청에 **401 `authentication_required`**(`/api/event-slots`·`/api/admin/event-slots`·`/api/admin/regions`·`/api/me/applications`·`/api/me/entitlements`)로 응답해 배포되어 있음을 확인했다(404가 아님). `/api/auth/csrf`는 `__Host-serentable_csrf; HttpOnly; Path=/; SameSite=lax; Secure`와 `cache-control: no-store`를 보냈고, 출처가 다른 로그인 요청은 403 `csrf_rejected`, 존재하지 않는 계정은 401 `invalid_credentials`(500 아님 → 배포 DB 마이그레이션·연결 정상). SPA 경로 4개(`/`·`/participant/apply`·`/participant/payment/<uuid>`·`/admin/events`) 200, 배포된 번들에 Work #4 문구(`모의 결제 · 실제 결제가 발생하지 않습니다`, `임시 적용 · 확정 전`)가 있고 번들 해시(`index-_Wii6Ry5.js`)가 현재 main 소스의 로컬 빌드와 같다. **미검증:** 운영자 계정 로그인, 배포 환경 브라우저 E2E, 실제 기기(데모 계정 자격 증명이 이 세션에 없음). 이 검증은 HTTP 경계이며 제품 E2E를 대신하지 않는다.
 - **Work #4 Task ③ E2E 알림 단언 규약 정리(2026-10-17, OpenRouter DeepSeek 세션, Claude Code 도구):** PR [#27](https://github.com/InryeolChoi/SerenTable/pull/27)이 사용자에 의해 main에 **병합**되었고(merge `05287e2`, 2026-10-16T14:36:13Z, 원격 브랜치 삭제), main 기준 새 브랜치 `codex/work4-task3-notice-assertions`에서 남아 있던 같은 패턴을 정리해 PR [#28](https://github.com/InryeolChoi/SerenTable/pull/28)(**병합** `6d707cb`, 2026-10-16T15:12:48Z, Refs #4)을 올렸다. 화면 전역 `getByRole("status")`/`getByRole("alert")` 단언을 **문구나 알림을 담은 한 영역**으로 좁혔고(`applications`·`events`·`payments`·`shell` specs 적용, `payments`의 `.first()` 우회 제거), 규약은 `frontend/e2e/support.ts`에 기록했다. 부정 단언(`not.toContainText`)은 문구 filter로 좁히면 무의미해지므로 로그인 폼 영역으로 좁혔다. **테스트 전용 변경**이며 제품 화면·API·정책·마이그레이션은 바꾸지 않았다. 실측 근거: 세션 철회 뒤 로그인 화면에서 화면 전역 alert locator가 2개를 잡아 `toContainText`가 strict mode로 실패하고, 폼으로 좁힌 locator는 1개를 잡아 통과(임시 진단 스펙은 실행 후 삭제, 커밋하지 않음). 로컬 검증: 실제 PostgreSQL 17 테스트 전용 컨테이너(55432)에서 pytest 105 passed, ruff check/format(CI 범위 `backend tests migrations`) PASS, 프런트 빌드 PASS, Playwright 9/9 개별 실행 3회 PASS. CI [38920566640](https://github.com/InryeolChoi/SerenTable/actions/runs/38920566640) `916d376` **SUCCESS**(3m24s, PR #28 head). **로컬 실행 주의:** pytest는 `PYTHONPATH=backend`와 `TEST_DATABASE_URL`(`postgresql://serentable:localtest@127.0.0.1:55432/serentable_test`)이 필요하고 conftest가 alembic·시드를 하위 프로세스로 실행한다. 배포 환경 브라우저 E2E는 데모 계정 자격 증명이 이 세션에 없어 미완료.
 - **Work #6 실제 worker 강제 종료 시험:** main `2039eaa` 기반 `codex/work6-worker-crash-verification`, [PR #35](https://github.com/InryeolChoi/SerenTable/pull/35)(Refs #6). [중단 검증·Blaybus 문구](../operations/worker-crash-verification.md). 실 worker 확정 직전 SIGKILL → 전부 롤백 → 새 worker 4명·1테이블 확정 → 재실행 불변. PG17 전용 `serentable_worker_crash_test`에서 집중1 PASS·관련18 PASS(69.53초), Ruff PASS. Spec 리뷰 재실행 오류 미검출1건 보완, 최종 재실행/CI는 PR 확인. 실제 종료는 미커밋 RUNNING도 롤백하므로 attempt1이며 기존 저장된 RUNNING fixture와 구분. Work #6/Task는 진행 중. PR #33의 100명 사례 준비 Task만 완료 가능으로 문서 정정(Blaybus 사용자 반영 미확인). PR #34 CI SUCCESS·MERGEABLE 확인, 사용자 머지 필요. PR #29는 과거 HANDOFF 갱신만 남아 병합 보류 권장. 사용자 AGENTS/개인설정 보존.
@@ -19,7 +22,7 @@
 - **시드 운영 경로 보완:** 사용자 '이거 되면 운영db에도 데이터 넣을꺼지?'에 따라 로컬 검증→머지/배포→백업→Railway 명시 시드→공개 API 확인을 다음 운영 단계로 명시했다. `--target railway`와 `preflight`, 고정 프로젝트/환경/API service ID 일치·private DB·실행별 opt-in, query/libpq 우회 거부를 추가했다. 실제 SSH로 대상 metadata/연결형식/암호설정 여부 boolean 확인만 수행, 운영 쓰기 없음. 집중22 PASS(10.92초), 초기 코드00bfe94 전체154 PASS·CI38993123503 SUCCESS(API154/브라우저 수는 CI 확인). Railway 보완 후 최종 CI는 #36 checks 확인. 아래 로컬 전용 문구는 초기 범위이며 최신은 시드 계약의 운영 순서를 따른다.
 
 - **합성 데모 시드 승인·구현:** `codex/work5-synthetic-demo-seed`, 고정 구현 `00bfe94`, [PR #36](https://github.com/InryeolChoi/SerenTable/pull/36)(Refs #5, base는 PR #34의 `codex/work5-source-preparation`). #34 사용자 병합 후 base를 main으로 변경한다. [계약·실행·Blaybus 문구](../design/synthetic-demo-seed-contract.md), ADR-0010·명세 U05/U17을 따른다. 사용자 A/A 승인: 원본 비연결 합성 참가자100명 앱 시드, 인원 우선→테이블 내 모든 쌍 관심사 Jaccard 합→신청 순서 단계 점수. 이번 코드는 시드이며 점수 구현은 다음이다. 전용 로컬 PG17 DB `serentable_demo_hackathon_20261017`에100계정·100프로필 실제 적재, 재실행 신규0/0, 보존 필요. 원본 준비 DB·운영 DB는 사용하지 않았다. 이 데모 DB에 기본 운영자/참가자4명 시드는 아직 미실행. CLI/PG/HTTP12 PASS(8.71초), 독립 Standards/Spec 수정필요0. 전체 회귀·최종 CI는 PR 확인. 동의·신청·결제 자동 생성, 공개 배포 적재·자격 증명 전달은 미완료이며 Task/Work #5 진행 중. 사용자 AGENTS/개인설정/스크립트 보존.
-- **실제 worker 종료 검증 완료:** [PR #35](https://github.com/InryeolChoi/SerenTable/pull/35), head `2174283`, base main `2039eaa`, Ready for review. CI [38992717260](https://github.com/InryeolChoi/SerenTable/actions/runs/38992717260) SUCCESS(API/오라클130·브라우저10·이미지·PG18 격리 복원). 실제 worker 확정 직전 SIGKILL→트랜잭션 롤백→새 프로세스4명/1테이블/USED→재실행 불변. [기록·Blaybus 문구](../operations/worker-crash-verification.md)는 #35 브랜치/PR에서 확인(현재 시드 브랜치에 없음). 독립 Spec P2(재실행 오류의 성공 오판) 수정 후 집중1 PASS, 관련18 PASS. Standards 차단0, 기본3초 모집 창은 느린 환경의 시험 신뢰성 보완 후보. 저장된 RUNNING fixture와 실제 중단은 구분. Task/Work #6은 진행 중. #34와 독립 병합 가능. #29는 과거 HANDOFF 변경만 남아 병합 보류 권장.
+- **실제 worker 종료 검증 완료:** [PR #35](https://github.com/InryeolChoi/SerenTable/pull/35), head `2174283`, base main `2039eaa`, Ready for review. CI [38992717260](https://github.com/InryeolChoi/SerenTable/actions/runs/38992717260) SUCCESS(API/오라클130·브라우저10·이미지·PG18 격리 복원). 실제 worker 확정 직전 SIGKILL→트랜잭션 롤백→새 프로세스4명/1테이블/USED→재실행 불변. [기록·Blaybus 문구(PR #35)](https://github.com/InryeolChoi/SerenTable/pull/35)는 #35 브랜치/PR에서 확인(현재 시드 브랜치에 없음). 독립 Spec P2(재실행 오류의 성공 오판) 수정 후 집중1 PASS, 관련18 PASS. Standards 차단0, 기본3초 모집 창은 느린 환경의 시험 신뢰성 보완 후보. 저장된 RUNNING fixture와 실제 중단은 구분. Task/Work #6은 진행 중. #34와 독립 병합 가능. #29는 과거 HANDOFF 변경만 남아 병합 보류 권장.
 - **Task 상태 정정:** PR #33의 '100명 실행 사례와 작은 정답 사례 준비'는 사례 준비 범위에서 완료 가능하다. 나머지 '자동 실행·확정·대안·이동/환불 구현', '필수조건·중복·중단 복구 검증'과 Work #5/#6·Agenda는 진행 중. 사용자 Blaybus 반영은 미확인이다.
 
 - **2026-10-17 Work #5 원본 준비 검토 준비:** PR #33은 main `2039eaa`에 머지됨. `codex/work5-source-preparation`, [PR #34](https://github.com/InryeolChoi/SerenTable/pull/34)(Refs #5). 사용자 승인·정확한 Task별 Blaybus 복사 문구·실행·이슈는 [원본 준비 계약](../design/source-preparation-contract.md)·ADR-0009가 기준. 별도 로컬PG18 전용 CLI preview/load/report·private schema0008, 원본294응답 v2배치 적재·재실행 중복0·원본불변·앱계정/신청/결제/동의0. 초기v1도보존해총588개 변환 이력이지만 사람588명이 아님. 준비 컨테이너 `serentable-source-prep-pg18` loopback55440·named volume 유지, 런타임에 연결 제공 안함. CLI/실제PG 집중13 PASS·PG18 up/down/up PASS. 고정4d1db99 리뷰 P1(URL옵션우회)·P2(선택구분자)를 f9dbf67에서수정, 재검토 차단0. 첫로컬전체132PASS/마감5FAIL은코드변경없이집중5PASS,당시원인미확정. 최초CI38989574156 SUCCESS·최종은PRchecks확인. 앱데모시드/운영적재·Work전체완료 아님. 사용자 AGENTS.md·개인설정/스크립트 보존.
@@ -184,3 +187,113 @@ docs/agents/record-maintenance.md에 따라 작업 결과·검증·중단 시 �
 기록 갱신 기준은 [공통 기록 갱신 절차](record-maintenance.md)에 모았다. 이번 변경은 기존 Work #1의 기술 결정 및 미결정 항목 정리 결과에 대한 운영 지침 보강이며 새 제품 Task를 만들지 않는다. 커밋/PR 링크를 남기고, 두 도구가 같은 checkout을 동시에 수정하는 상태는 해소한 뒤 넘긴다. 별도 작업 트리에는 공통 미커밋 변경이 자동 복사되지 않는다.
 
 공식 근거: [OpenAI AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md), [Claude 프로젝트 메모리](https://code.claude.com/docs/en/memory), [Claude 설정](https://code.claude.com/docs/en/settings), [Claude MCP](https://code.claude.com/docs/en/mcp). [Gemini 지침·파일 가져오기](https://geminicli.com/docs/cli/gemini-md/), [Cursor AGENTS.md](https://cursor.com/docs/rules), [GitHub Copilot 저장소 지침](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions). 사용자 도구·모델·계정 설정은 해당 세션의 실제 상태를 우선한다.
+
+## 2026-10-17 Work #7 구현 진행 체크포인트
+
+최신 작업은 `codex/work7-gathering-integration`(시작 e3d4240, 선행 PR #40)과 [Draft PR #41](https://github.com/InryeolChoi/SerenTable/pull/41)이다.
+Work: 모임 안내·피드백·재방문 → 식당·채팅·알림. Task 추가 없음.
+[승인 계약](../design/gathering-contract.md)·ADR-0013: U10 확인된 음식/예산만 배정, U12 푸시 최대3회·1/5분, 미지원/미설정 구분.
+식당 API 신규2 PASS, 채팅 별도 작업트리 실PG4 PASS·390px Chromium 영속/재연결/XSS PASS.
+채팅·알림 병합 완료. Claude Code 통합 검증: 새 격리 DB `serentable_work7_regression_test`에서 전체 pytest 242 PASS(476초), ruff·프런트 빌드 PASS.
+첫 전체 실행의 100명 규모 시험 정리 단계 FK 오류(worker가 만든 `app_notification`)는 시험 정리 범위를 넓혀 수정했다.
+로컬 Playwright는 포트 해제 후 `db33ded`에서 재실행해 모바일 Chromium 10 PASS(37.5초, 격리 DB `serentable_work7_notifications_test`). 또한 `5dda339` CI [39034779407](https://github.com/InryeolChoi/SerenTable/actions/runs/39034779407)이 SUCCESS다(pytest 242, 브라우저 10, PG18 복구). 모임·단체방 전용 E2E 스펙은 아직 없다.
+`serentable_work7_gathering_test`에는 실패 정리로 남은 합성 계정이 있다. `serentable_work7_notifications_test`는 E2E 시작 시 초기화됐다. 둘 다 격리 시험 DB다. 이 중간 기록은 Work 완료 증거가 아니다.
+신규 로컬 DB `serentable_work7_gathering_test` 등만 사용하며 운영 migration/deploy/매칭/기존 데이터 변경 금지 유지.
+사용자 AGENTS.md와 .claude/.codex/claude 스크립트 미커밋 변경 보존.
+
+## 2026-10-18 Work #8 병렬 구현 체크포인트 (Claude Code)
+
+- **최소 점수 확정:** 사용자가 운영 최소 매칭 점수 **60**을 승인했다(ADR-0011 §4). PR #39 브랜치 `1044bd4`에 반영했고 관련 시험 225 PASS다. 운영 반영은 별도 승인이다.
+- **머지 상태:** PR #35·#29는 main에 머지됐다(사용자). #40은 #39 브랜치에 머지됐다.
+- **정책 승인(ADR-0014):** 사용자가 U15·U09·U08을 승인했다.
+  - U15: 시작 30분 전~종료 체크인, 미체크인은 노쇼 후보, 운영자 확인 후 확정 노쇼
+  - U09: 신고 접수 즉시 분리, 기각돼도 분리 유지
+  - U08: 규칙 기반 최소 반영
+- **통합 브랜치:** `claude/work8-feedback`([Draft PR #42](https://github.com/InryeolChoi/SerenTable/pull/42), base #41)이다. T0 `6df26c7`에 스키마 0012·계약·모듈 골격을 넣었다.
+- **병렬 진행:** T1 체크인·노쇼, T2 평가·선호·리마인드, T3 신고·차단·제재, B 브랜드 적용을 각자 `claude/work8-t1|t2|t3|brand` 별도 작업 트리에서 진행 중이다. T4 이력·추천·매칭 반영은 T1~T3 이후다. 티켓 그래프는 [계약](../design/feedback-contract.md)에 있다.
+- **격리 DB:** `serentable_w8_t0..t3`, `serentable_minscore_test`, `serentable_work7_regression_test`를 사용한다. 운영 쓰기는 없다.
+
+## 2026-10-18 Claude Code 중단 체크포인트 (사용 한도, Codex 인계)
+
+- **최소 점수:** 60 확정. PR #39 `1044bd4`에 반영됐고 운영 반영은 아직이다.
+- **PR #35·#29:** main에 머지됐다.
+- **Work #8:** 통합 브랜치 `claude/work8-feedback`([PR #42](https://github.com/InryeolChoi/SerenTable/pull/42), base #41). 기준은 ADR-0014(U08·U09·U15 승인)와 [계약](../design/feedback-contract.md)이다.
+  - 병합 완료: T0, T1 체크인·노쇼, T2 평가·선호·리마인드, T3 신고·차단·제재, B 브랜드 적용(Work #7 Task), 리마인드 링크·참가 제한 문구 수정
+  - T4 이력·추천·MET_SQL 상호 재만남 면제: 로컬 브랜치 `claude/work8-t4`에서 진행 중이거나 미병합이다. 별도 작업 트리는 `.claude/worktrees/` 아래에 있다.
+- **Work #9:** 통합 브랜치 `claude/work9-operator-console`([PR #43](https://github.com/InryeolChoi/SerenTable/pull/43), base #42). 기준은 [계약](../design/operator-console-contract.md)이다.
+  - 병합 완료: T0 감사 스키마 0013, D CSV, B 예외 처리, C 감사 연결·조회(`bb31927`).
+  - **주의:** C 병합 후 관련 7개 파일 재실행이 34 PASS·1 FAIL이다. 실패 시험 이름은 출력에 남지 않았고 원인은 미확인이다. 먼저 다시 실행해 확인한다.
+  - A 대시보드: 로컬 브랜치 `claude/work9-a`이며 미병합이다.
+- **사용자 승인 기본값:** 리마인드 7일 소급 제한, 확정 신고만 제재에 연결, 신고 사유 5종
+- **재확인 필요(구현 안 함):**
+  - 감사 보관(U16)
+  - 운영자 역할 분리
+  - 모의 환불 실패 경로가 없음
+  - 대안 미응답 기준 시각
+  - 운영자 사유 입력
+- **리뷰에서 고칠 것:**
+  - CSV 인원 열을 현재 배정 기준으로 바꾸고, 탭·CR 수식 방지를 추가한다.
+  - 차단 목록 영구 표시는 스키마 변경이 필요하다.
+- **남은 검증:** T4·A 병합 → 전체 pytest → 코드 리뷰 → Playwright E2E(포트 8000 확인) → PR #42·#43 CI 확인.
+- **격리 DB만 사용:** `serentable_w8_*`, `serentable_w9_*`. 운영 migration·deploy는 금지다.
+- **산출물:** [매칭 점수·제외 조건 기준 확정 산출물](https://claude.ai/code/artifact/5d45ce5b-9d80-4a34-940a-83e431e94659)
+## 2026-10-18 Codex 재개·통합 검증 진행
+
+- 사용자가 지정한 Claude 중단 체크포인트에서 재개했다. 운영 migration/deploy/data 변경·main 병합 금지 유지.
+- 원래 #43 a7ad9f6의 지정7파일을 serentable_w9_t0에서 재현: **34 PASS·1 FAIL (145.50초)**. CSV 시험의 전체 감사 빈목록 기대가 회차 생성 감사와 충돌했다. 제품 감사는 유지하고 export행위만 검증하도록 수정했다.
+- CSV 082093d: 현재 유효 확정 배정의 인원/명단, 탭·CR 수식방지. 신규 RED→GREEN, 최종 CSV6 PASS. 별도 serentable_w9_csv_codex 사용.
+- T4 원구현 f4e9ca7·f31f04b 검토. 41364eb에서 시간 중복 확정/활성 참가 제한 추천을 거르고 E2E 최소 점수 기대를 승인60으로 정렬했다. T4 5 PASS, 신고제외 강화1 PASS. 별도 serentable_w8_t4_codex 사용.
+- 대시보드 afe361c 읽기 검토 후 codex/w9-integration에 병합: 읽기전용·개인정보 미노출·승인관문 없음. 신청/결제는 후보별 기록 건수이므로 회차 간 단순 합계는 고유 참가자 수가 아니다.
+- 현재 열린 예외 집계는 식당/푸시를 대상으로 한다. 기존 목록의 대안 미응답 시작시각 임계값은 승인되지 않았으며 이번에 구현/확정하지 않는다. 감사 보관·역할 분리·모의 환불 실패·운영자 사유 입력도 미확정 그대로다.
+- 새 참가자 체크인→평가 저장→운영 예외 처리→감사/CSV 브라우저 시험을 추가했다. 아직 실행 전이며 테스트 통과로 해석하지 않는다.
+- 전체 pytest·독립 리뷰·포트8000 선확인 후 E2E·PR42/43 최신 CI가 남았다. 초기 PR42 CI39047558293는 최소50 기대 vs 승인60의 브라우저 실패9PASS/1FAIL였다.
+- 사용자 AGENTS.md/.claude/.codex/scripts/claude-*.sh는 보존하며 커밋하지 않는다. Blaybus Task는 최종 증거 전 진행중 유지.
+## 2026-10-18 Codex Work8 T4·안전 경합 검증 인계
+
+PR42 `claude/work8-feedback`에 미병합 T4 f31f04b를 반영했다. 추천 자격/시간 중복을 41364eb로 보완하고, 독립 리뷰의 신고·차단·선호 변경/매칭 경합은 2a2b53e에서 기존 공용 잠금→사용자·선호 행 잠금 순서로 수정했다. 신규 PG 두 연결 경합5개 RED→GREEN, 안전·평가·추천26 PASS(160.56초), T4 신규포함5 PASS. 상호 재만남은 점수 면제만이며 신고/차단/비선호 H5는 유지한다. 최소 점수는 사용자 승인60이며 기존 E2E50 기대를 정렬했다. 브랜드 CSS 경계색#d7c6af복원. U16 등 미정정책은 추가구현하지 않았다.
+
+후속 PR43 통합에서 로컬Node22 모바일 E2E11 PASS(49.3초), 체크인→평가→운영예외·감사/CSV까지 확인했다. 신규 운영콘솔1개는 PR43에 있으며 PR42 단독 시험 결과로 확장하지 않는다. 공통 시험의 영속 안전/선호 상태를 테스트마다 초기화하고 CI검사시간예산25분만 적용했다. 최종 전체 회귀·CI 결과는 PR43 최신 HANDOFF와 docs/design/work8-work9-verification-2026-10-18.md를 확인한다.
+
+현재 Work8/7 브랜드 Task는 구현·격리 검증 결과를 Blaybus에 기록할 수 있으나 Work/Agenda는 운영 인수·미정정책 때문에 진행중을 유지한다. 운영 migration/deploy/data 변경·main 병합 금지, 사용자 AGENTS/.claude/.codex/scripts 보존.
+
+## 2026-10-18 Codex Work8·9 구현·로컬 검증 완료 (운영 미반영)
+
+최신 통합은 `codex/w9-integration`이며 기존 PR42(`claude/work8-feedback`)의 T4·추천 자격·안전 경합·브랜드 수정을 PR43(`claude/work9-operator-console`)에 반영했다. 대시보드 A·CSV 현재 인원·탭/CR 방어·감사 시험 범위 수정 완료. 신고/차단/선호는 공용 매칭 잠금→행 잠금이며 기존 확정·MBTI가중치·승인 최소60을 변경하지 않는다. 후속 브라우저 연결 검토에서 파비콘/서비스 워커404를 RED로 확인해 명시 정적 경로를 추가했다.
+
+- 원래 지정7파일 재현34 PASS/1 FAIL은 정상 회차 생성 감사와 CSV 시험 충돌이며 수정했다. 첫 통합 실행의3FAIL·6ERROR는 시험 사이 제외관계 누출로, 제품의 영속 안전 관계를 바꾸지 않고 공통 fixture를 격리했다. 같은순서17 PASS.
+- 새 로컬PG17 `serentable_w89_final_test`: **전체295 PASS(733.14초)**. 후속 정적 경로3 PASS. 코드/명령/중간실패는 검증 문서 참조.
+- 안전·평가·추천26 PASS, 신규 두PG연결 경합5개 RED→GREEN. 0012 전용 Work8 checkout+빈DB `serentable_w8_only_test` 인증19 PASS.
+- 포트8000 선확인·전용 `serentable_w89_e2e_test`, Node22 모바일 Chromium **11 PASS(52.2초)**. 새 단체방 게시/재접속→체크인→평가→운영예외→감사/CSV·권한 거절 포함.
+- Ruff·형식·타입·빌드·diff 검사 통과. 독립 Spec P1경합1건/Standards CSS·설계기록2건 수정 후 재검토 해결. 물리 스키마SVG·모바일 브랜드 화면 육안 확인.
+- PR42 최종코드7ec27b4 CI39051243303 진행 중. PR43 최신 기록 포함 후 CI 확인이 남아 있다. 이전 코드CI 취소는 성공이 아니다.
+
+[검증·12단계 증거·Blaybus Task별 수행/검증/남은 항목](../design/work8-work9-verification-2026-10-18.md)에 기록했다. 기존 Issue8/9에도 진행 댓글 반영. Blaybus는 사용자가 수동으로 갱신하며 Work/Agenda는 운영·미정정책 인수 전 진행중 유지한다. 선행 PR39는 main 문서 충돌 상태이며 임의 main병합 금지. 감사 보관·역할 분리·모의 환불 실패·대안 미응답 기준·운영자 사유 정책은 추가구현/확정하지 않았다.
+
+**운영migration/deploy/매칭재실행/기존데이터 변경·main병합 없음.** 실제 휴대폰 푸시·공개 데모 인수는 남았다. 사용자 AGENTS.md의30줄 미커밋변경 및 .claude/.codex/scripts/claude-*.sh를 커밋하지 않고 보존했다. 이번 세 managed 구현작업트리는 archive 요청했으며 앱 처리 전 남아 있을 수 있다. 사용자 Claude 작업트리와 기존 보존 DB는 유지한다. 다음 행동은 최신 CI 확인→PR42/43 Ready 여부 정리→운영 승인 전 공개 인수 계획 확인이다.
+
+## 2026-10-19 Work9 복구 후속 구현 진행
+
+사용자가 대안 미응답 표시 기준(원래 실패 회차 시작, 참가자 권한 만료 없음)과 모의 환불 실패 기록·운영자 멱등 재시도를 승인했다. 별도 통합 브랜치 codex/w9-resolution-integration, /private/tmp/serentable-w9-resolution, 기반66eaeb6(PR42·43 병합 후)에서 기존 Task ‘기능별 예외·조치 연결’을 진행한다. Draft PR44는 Work7 통합 브랜치 대상이며 main/운영은 변경하지 않는다.
+
+푸시 예외 회차 누락 수정22e3572를7849165로 통합했다. 실제PG RED→GREEN, 관련11통과. 모의환불은 별도작업트리 /private/tmp/serentable-w9-refund에서 구현·검증 중, 부모는 승인정책 ADR0015·문서·참가자/운영자화면·브라우저시험을 준비 중이다. 저장장애가 환불완료나 이용권 재사용으로 이어지지 않게 한다. 전체회귀/브라우저/최종CI는 아직 실행 전이다. Docker Desktop과 테스트전용foundationPG만 재시작, 신규격리DB만 생성했다. 사용자 미커밋 AGENTS/.claude/.codex/claude스크립트는 루트에 보존했다. 감사보관·역할분리·기존조치 사유정책은 미정 유지.
+
+## 2026-10-19 Work9 모의 환불 복구 구현·검증 완료 (운영 미반영)
+
+현재 작업은 `/private/tmp/serentable-w9-resolution`의 `codex/w9-resolution-integration`, [PR44](https://github.com/InryeolChoi/SerenTable/pull/44)다. 기반66eaeb6(PR42·43 병합 후 Work7 통합). 기존 Agenda → Work9 → ‘기능별 예외·조치 연결’ 안에서 진행했으며 새 Work/Task는 없다. 사용자 승인 두 정책은 ADR0015: 대안 미응답은 원래 실패 회차 시작 이후 표시만 하고 참가자 권한은 유지, 모의 환불 실패 이력·운영자 멱등 재시도 허용이다.
+
+푸시 예외 회차 연결22e3572, 환불 저장실패·재시도 ac80dbf, 참가자 실패 표시/예외 목록/대시보드 통합0354372, 보안 문서·다른키+별도Worker 경합 보완eb1635e를 통합했다. 제품 기준5ba8b6f. 0014는 새시도 테이블만 추가하고 과거 성공 환불을 보존한다. 실패 시PAID/권리예약 유지·후보종료, 재시도 성공 시기존3단계/REFUNDED/예약종료를 함께 반영한다. 실패기록·감사·최종commit장애는 전체롤백한다. 실제PG·멤버십금액환불·임의실패버튼 없음.
+
+실제PG 전체307 PASS(758.67초), 추가 경합 포함 환불9 PASS 및 로그강화신규1 PASS, 모바일 전체12 PASS(58.4초), Ruff/형식/타입/빌드/diff 통과. 전체수집 뒤 추가시험1개가 있어 최신CI수집은308이다. 전체 실행중 제품코드는 변경하지 않았다. Spec 차단결함 없음, Standards 보안문서1건 수정·재검토 해소, N+1은 비차단 후속. 목록종류별200제한/대시보드전체집계를 구분하며 강제Worker잠금동기화·강제종료시험으로 확대하지 않는다.
+
+[정책·API·검증·Blaybus 문구](../design/operator-recovery-verification-2026-10-19.md)를 확인한다. 문서 커밋 당시 최신CI는 대기/진행 상태이며 최종 결과는 PR44 Checks와 Issue9 최종댓글을 기준으로 한다. 처음0354372 CI39140929157을 최신코드 통과로 계산하지 않는다. 다음은 최신CI 확인→PR44 검토 가능 상태 정리→사용자 검토다.
+
+Work9·상위Agenda는 감사보관U16·역할분리·기존조치사유정책·공개인수 전 진행중 유지. 실제휴대폰푸시·공개12단계·제출준비 남음. PR41은 Draft/CI성공39085601873, PR39는 main과충돌이므로 main병합·운영반영 전에 별도정리/승인 필요. 운영migration/deploy/matching재실행/기존데이터 쓰기·main병합 없음. 사용자루트 AGENTS/.claude/.codex/scripts 미커밋파일 보존. 이번구현작업트리3개는 clean·통합확인후 제거했고 통합작업트리/사용자Claude트리는 유지했다. Blaybus는 사용자수동갱신, 실제시간추정없음.
+
+## 2026-10-19 Claude Code Work10 로컬 근거 추가 (운영 미반영)
+
+- 브랜치 `claude/w10-acceptance`(기준 `codex/work7-gathering-integration` b5f1525, PR #44 병합 이후), 작업 트리 `/private/tmp/claude-501/-Users-inchoi-SerenTable/8087d9ee-c704-46f2-8a3d-ac550e365d68/scratchpad/w10`. **push·PR 생성 안 함.** 사용자 미커밋 루트 파일은 건드리지 않았다.
+- 추가: `tests/test_twelve_step_flow.py`(한 회차 1→12 정상 흐름 연결·마감 후 운영자 조작 0·미해결 예외 0, 최소 점수 미달 해제 별도 프로세스 시험), [12단계 근거 매트릭스](../design/twelve-step-acceptance-matrix.md), `scripts/measure_matching_scale.py`·`tests/test_scale_measurement.py`·[100명 측정 기록](../design/matching-scale-measurement-2026-10-19.md), [제출 준비 점검표](../operations/submission-readiness.md). 제품 코드 변경 없음.
+- 검증: 전체 pytest **320 PASS(815.99초)**, 전용 DB `serentable_w10_int`. Ruff check/format 통과. 브라우저 E2E **10 PASS / 2 미검증**(고정 장치 DB 이름 허용 목록 때문에 실행 중단, 기존 보존 DB 이름 변경은 권한 거부되어 수행하지 않음). 100명 측정 30회 위반·중복·누락 0, 최대 2.861초(5초 목표 초과 0), 최대 추적 메모리 20.24 MiB.
+- 결정 후보(구현 안 함): 정원 때문에 남은 신청의 미배정 이유가 `capacity`가 아니라 `no_valid_table`로 표시됨, 느린 기계에서 계획기 5초 보호로 배정 수가 줄 수 있음(같은 입력 96→76명). U19·U16·역할 분리·사유 입력은 미정 유지.
+- 격리 DB `serentable_w10_a`·`serentable_w10_b`·`serentable_w10_int` 생성(운영 쓰기 없음). 남은 일: 사용자 검토 후 push/PR(대상 `codex/work7-gathering-integration` 권장), CI에서 E2E 12개 확인, 배포 환경 12단계·실기기 푸시 인수.
+

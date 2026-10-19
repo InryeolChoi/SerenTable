@@ -18,9 +18,11 @@ from serentable.clock import iso, locked_now
 from serentable.database import database_engine
 from serentable.eligibility import eligible_slot_ids
 from serentable.events import SLOT_COLUMNS, field_error, slot_json
+from serentable.match_resolution import resolution_json, single_right, target_allowed
 from serentable.matching import participation_details
 from serentable.payments import payment_details
 from serentable.profile import consent_state, profile_state, read_profile
+from serentable.safety import participation_restricted
 
 router = APIRouter()
 
@@ -47,17 +49,92 @@ def applications_json(connection, rows, now, with_participant=False):
     candidates = {}
     if ids:
         for slot in connection.execute(
-            text(f"""SELECT c.application_id, {SLOT_COLUMNS}
+            text(f"""SELECT c.application_id, c.live, c.source_resolution_id, {SLOT_COLUMNS}
             FROM application_candidate c
             JOIN event_slot s ON s.id = c.event_slot_id
             JOIN region r ON r.code = s.region_code
             WHERE c.application_id = ANY(:ids) ORDER BY s.starts_at, r.sort_order"""),
             {"ids": ids},
         ).mappings():
-            candidates.setdefault(slot["application_id"], []).append(slot_json(slot, now))
+            candidates.setdefault(slot["application_id"], []).append(
+                slot_json(slot, now)
+                | {
+                    "live": slot["live"],
+                    "source_resolution_id": str(slot["source_resolution_id"])
+                    if slot["source_resolution_id"]
+                    else None,
+                }
+            )
+    history = {}
+    refund_events = {}
+    refund_attempts = {}
+    if ids:
+        from serentable.mock_refunds import attempt_json
+
+        for attempt in connection.execute(
+            text("""SELECT f.* FROM mock_refund_attempt f
+            JOIN match_resolution r ON r.id=f.resolution_id WHERE r.application_id=ANY(:ids)
+            ORDER BY f.attempt_number"""),
+            {"ids": ids},
+        ).mappings():
+            refund_attempts.setdefault(attempt["resolution_id"], []).append(attempt_json(attempt))
+        for event in connection.execute(
+            text("""SELECT f.* FROM mock_refund_event f
+                JOIN match_resolution r ON r.id=f.resolution_id
+                WHERE r.application_id=ANY(:ids)
+                ORDER BY f.created_at, CASE f.state WHEN 'REFUND_REQUESTED' THEN 1
+                    WHEN 'REFUND_PROCESSING' THEN 2 ELSE 3 END"""),
+            {"ids": ids},
+        ).mappings():
+            refund_events.setdefault(event["resolution_id"], []).append(
+                {
+                    "state": event["state"],
+                    "amount_krw": event["amount_krw"],
+                    "created_at": iso(event["created_at"]),
+                }
+            )
+        for resolution in connection.execute(
+            text("""SELECT * FROM match_resolution WHERE application_id=ANY(:ids)
+                ORDER BY created_at DESC, id"""),
+            {"ids": ids},
+        ).mappings():
+            history.setdefault(resolution["application_id"], []).append(
+                resolution_json(resolution, connection)
+                | {
+                    "refund_events": refund_events.get(resolution["id"], []),
+                    "refund_attempts": refund_attempts.get(resolution["id"], []),
+                }
+            )
     payments = payment_details(connection, rows, now)
     eligible = eligible_slot_ids(connection, ids, now)
     matching = participation_details(connection, ids)
+    eligible_ids = {uuid.UUID(slot) for choices in eligible.values() for slot in choices}
+    completed_slots = (
+        set(
+            str(slot)
+            for slot in connection.execute(
+                text("""SELECT event_slot_id FROM match_run WHERE state='SUCCEEDED'
+            AND event_slot_id=ANY(:ids)"""),
+                {"ids": list(eligible_ids)},
+            ).scalars()
+        )
+        if eligible_ids
+        else set()
+    )
+    refund_states = {}
+    for row in rows:
+        participation = matching[row["id"]]
+        coverage = payments[row["id"]]["coverage"]
+        available = (
+            row["state"] == "SUBMITTED"
+            and participation is not None
+            and offers_alternatives(participation["state"], participation["reason_code"])
+            and coverage is not None
+            and coverage["entitlement"]["kind"] == "SINGLE"
+            and coverage["entitlement"]["state"] == "HELD"
+            and all(slot in completed_slots for slot in eligible[row["id"]])
+        )
+        refund_states[row["id"]] = "REFUND_AVAILABLE" if available else None
     return [
         {
             "id": str(row["id"]),
@@ -69,6 +146,8 @@ def applications_json(connection, rows, now, with_participant=False):
             # The stored matching axis, or null when no run has reached this application
             # yet; the screen then derives "waiting" from eligibility as before.
             "matching": matching[row["id"]],
+            "resolutions": history.get(row["id"], []),
+            "refund_state": refund_states[row["id"]],
         }
         | payments[row["id"]]
         | (
@@ -103,13 +182,25 @@ def latest_consent_ids(connection, user_id):
     return {row["purpose"]: row["id"] for row in rows}
 
 
+def offers_alternatives(matching_state, reason_code):
+    """ALTERNATIVE_OFFERED, or a NO_MATCH written before ADR-0011 for the same outcome.
+
+    A NO_MATCH for overlapping_confirmation means the user is already seated at that time.
+    """
+    if reason_code in ("pass_held", "mock_refunded", "mock_refund_failed", "membership_held"):
+        return False
+    if matching_state == "ALTERNATIVE_OFFERED":
+        return True
+    return matching_state == "NO_MATCH" and reason_code != "overlapping_confirmation"
+
+
 @router.get("/api/me/applications/{application_id}/alternatives")
 def list_application_alternatives(
     application_id: uuid.UUID, user: Principal = Depends(require_participant)
 ):
     """STA-04: recruitment information only; never transfer a booking or its payment.
 
-    An earlier NO_MATCH is not final while a consented, paid candidate still awaits a
+    An earlier ALTERNATIVE_OFFERED is not final while a consented, paid candidate still awaits a
     successful run. Existing live choices on any of this user's applications are omitted
     from alternatives so the list does not suggest submitting a duplicate candidate.
     """
@@ -117,7 +208,9 @@ def list_application_alternatives(
         with database_engine().connect() as connection:
             application = (
                 connection.execute(
-                    text("""SELECT a.state, mp.state AS matching_state FROM application a
+                    text("""SELECT a.state, mp.state AS matching_state, mp.reason_code,
+                    mp.match_run_id
+                FROM application a
                 LEFT JOIN match_participation mp ON mp.application_id = a.id
                 WHERE a.id = :id AND a.user_id = :user"""),
                     {"id": application_id, "user": user.id},
@@ -127,7 +220,9 @@ def list_application_alternatives(
             )
             if application is None:
                 raise HTTPException(404, "application_not_found")
-            if application["state"] != "SUBMITTED" or application["matching_state"] != "NO_MATCH":
+            if application["state"] != "SUBMITTED" or not offers_alternatives(
+                application["matching_state"], application["reason_code"]
+            ):
                 raise HTTPException(409, "alternatives_not_available")
             now = locked_now(connection)
             eligible = eligible_slot_ids(connection, [application_id], now)[application_id]
@@ -159,8 +254,35 @@ def list_application_alternatives(
                     .mappings()
                     .all()
                 )
+            has_single = not pending and single_right(connection, application_id) is not None
+            if alternatives:
+                alternatives = [
+                    slot
+                    for slot in alternatives
+                    if target_allowed(connection, user.id, slot["id"], now)
+                    and (
+                        has_single
+                        or connection.execute(
+                            text("""SELECT 1 FROM entitlement e
+                            JOIN payment p ON p.id=e.payment_id
+                            WHERE e.user_id=:user AND e.kind='MEMBERSHIP' AND p.state='PAID'
+                            AND e.starts_at<=least(:now,:close) AND e.expires_at>:start
+                            LIMIT 1"""),
+                            {
+                                "user": user.id,
+                                "now": now,
+                                "close": slot["closes_at"],
+                                "start": slot["starts_at"],
+                            },
+                        ).scalar()
+                    )
+                ]
             return private_response(
                 {
+                    "refund_state": "REFUND_AVAILABLE" if has_single else None,
+                    "failure_run_id": str(application["match_run_id"])
+                    if application["match_run_id"]
+                    else None,
                     "pending_candidates": [slot_json(slot, now) for slot in pending],
                     "alternatives": [slot_json(slot, now) for slot in alternatives],
                 }
@@ -192,7 +314,7 @@ def submit_application(
                 chosen = set(
                     connection.execute(
                         text("""SELECT event_slot_id FROM application_candidate
-                        WHERE application_id = :id"""),
+                        WHERE application_id = :id AND source_resolution_id IS NULL"""),
                         {"id": prior},
                     ).scalars()
                 )
@@ -202,6 +324,9 @@ def submit_application(
                     connection, "WHERE a.id = :id", {"id": prior}, now
                 )
                 return private_response({"application": application})
+            # SAF-02: an active suspension or a permanent ban refuses new applications.
+            if participation_restricted(connection, user.id, now):
+                raise HTTPException(403, "participation_restricted")
             if not profile_state(read_profile(connection, user.id))["complete"]:
                 raise HTTPException(409, "profile_incomplete")
             if not consent_state(connection, user.id)["complete"]:
@@ -277,17 +402,17 @@ def cancel_application(
                 raise HTTPException(404, "application_not_found")
             now = locked_now(connection)
             if state == "SUBMITTED":
-                earliest_close = min(
+                closes = list(
                     connection.execute(
                         text("""SELECT s.closes_at FROM application_candidate c
                         JOIN event_slot s ON s.id = c.event_slot_id
-                        WHERE c.application_id = :id FOR SHARE OF s"""),
+                        WHERE c.application_id = :id AND c.live FOR SHARE OF s"""),
                         {"id": application_id},
                     ).scalars()
                 )
                 # Matching may have held this slot until after the deadline.
                 now = locked_now(connection)
-                if earliest_close <= now:
+                if not closes or min(closes) <= now:
                     raise HTTPException(409, "application_cancel_closed")
                 connection.execute(
                     text("""UPDATE application SET state = 'CANCELED', canceled_at = :now

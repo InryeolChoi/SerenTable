@@ -174,3 +174,15 @@ Work #3 구현 계약은 [계정·프로필 계약](../design/account-profile-co
 - 2026-10-16 사용자 결정(방안 A): Railway는 프록시 CIDR을 공개하지 않으므로 uvicorn 신뢰 목록(`FORWARDED_ALLOW_IPS`)은 기본값을 유지한다. 대신 production 인증 경계는 `request.url.scheme` 또는 Railway 엣지가 항상 설정하는 `X-Forwarded-Proto: https` 하나만 HTTPS 근거로 인정한다(`serentable.auth.served_over_https`). `X-Forwarded-For` 등 접속 주소 헤더는 계속 신뢰하지 않으며 로그인 제한은 계정 단위다. 실제 진입점 `python -m serentable.server`를 신뢰 목록 밖 프록시 조건으로 띄운 회귀 시험이 있다.
 - 배포 후 공개 URL 검증: `DEPLOY_ORIGIN=https://<공개 도메인>`과 `DEMO_PARTICIPANT_PASSWORD`를 셸 환경에만 두고 `uv run python scripts/verify_deployed_auth.py`를 실행한다. HTTP→HTTPS 전환, `__Host-` Secure/HttpOnly/SameSite=Lax 쿠키, 외부 출처 거절, 로그인·세션·권한 거절·로그아웃, no-store를 PASS/FAIL로만 출력하고 비밀번호는 출력하지 않는다.
 - 현재 코드 검증은 로컬의 합성 계정과 분리 DB에서 수행한다. 실제 개인정보 모집·장기 보관/폐기 운영을 승인하거나 구현한 결과가 아니다.
+
+## Work9 모의 환불 실패 재시도 (0014, 운영 미반영)
+
+2026-10-19 승인 정책은 ADR-0015를 따른다. 마이그레이션과 신규 API는 격리 테스트에서만 검증하며 운영 적용은 별도 승인이다.
+
+- 참가자가 선택한 전액 모의 환불이 저장 단계에서 실패하면 결제 완료 상태(PAID)와 이용권 예약을 보존하고, 해당 신청의 후보는 닫는다. 참가자 화면에는 환불 완료가 아닌 운영자 재시도 대기를 표시한다.
+- 운영자 예외 화면에서 실패한 환불을 조회하고 ‘모의 환불 재시도’를 실행한다. 실제 PG 호출·실제 입출금은 없으며 임의 실패 버튼도 제공하지 않는다.
+- `GET /api/admin/mock-refunds?state=FAILED`는 최신 실패 시도를 조회한다. `POST /api/admin/mock-refunds/{resolution_id}/retry`는 `request_key`만 받으며 운영자·CSRF 검증을 요구한다. 금액·소유자는 서버가 원본 기록에서 결정한다.
+- 통신 실패 뒤 같은 의도를 재전송할 때 요청 키를 유지한다. 이미 성공한 환불은 다시 실행하지 않는다. 실패 이력이나 감사·최종 커밋까지 저장할 수 없는 DB 장애는 요청 전체를 롤백하고 503으로 반환한다. 서비스 복구 후 상태를 조회하고 같은 키로 확인한다.
+- 실패한 원래 회차 시작 이후의 ‘대안 미응답’은 조회 표시 기준이다. 참가자의 이동·보관·환불 권한을 임의로 종료하거나 운영자가 대신 선택하지 않는다.
+
+실제 휴대폰 푸시·공개 데모·12단계 완주 확인은 여전히 별도다. API 재시도 성공을 실제 금융 환불이나 운영 반영으로 보고하지 않는다.

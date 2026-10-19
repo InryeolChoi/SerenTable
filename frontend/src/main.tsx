@@ -19,6 +19,12 @@ import {
   type ParticipantDetail,
 } from "./api";
 import { AdminEventsPage, ParticipantEventsPage } from "./events";
+import { AdminVenuesPage, GatheringsPage } from "./gatherings";
+import { RoomsPage } from "./chat";
+import { HistoryPage } from "./history";
+import { AdminSafetyPage } from "./safety";
+import { AdminConsolePage } from "./console";
+import { NotificationsPanel } from "./notifications";
 import {
   AdminApplicationsPage,
   ApplyPage,
@@ -524,6 +530,7 @@ function ConsentPage() {
 }
 function ParticipantHome({ navigate }: { navigate: (path: string) => void }) {
   const request = useScopedApi();
+  const [passRevision, setPassRevision] = useState(0);
   const [profile, setProfile] = useState<ProfileState | null>(null);
   const [consent, setConsent] = useState<ConsentState | null>(null);
   const [error, setError] = useState("");
@@ -569,8 +576,8 @@ function ParticipantHome({ navigate }: { navigate: (path: string) => void }) {
           동의 내용 확인
         </button>
       </div>
-      <MyApplications navigate={navigate} />
-      <MyEntitlements />
+      <MyApplications navigate={navigate} onChanged={() => setPassRevision(value => value + 1)} />
+      <MyEntitlements key={passRevision} />
       <p className="notice">
         신청 제출과 모의 결제 완료는 참가 확정이 아닙니다. 매칭 결과는 별도로
         안내합니다.
@@ -885,6 +892,10 @@ function App() {
             >
               {user.role === "operator" ? "참가자 관리" : "입력 상태"}
             </a>
+            <a href={user.role === "operator" ? "/admin/venues" : "/participant/gatherings"} onClick={e => {e.preventDefault(); navigate(user.role === "operator" ? "/admin/venues" : "/participant/gatherings");}}>{user.role === "operator" ? "식당 배정" : "모임 안내"}</a>
+            {user.role === "participant" && <a href="/participant/rooms" onClick={e => {e.preventDefault(); navigate("/participant/rooms");}}>단체방</a>}
+            {user.role === "operator" && <a href="/admin/console" onClick={e => {e.preventDefault(); navigate("/admin/console");}}>운영 현황</a>}
+            <a href={user.role === "operator" ? "/admin/safety" : "/participant/history"} onClick={e => {e.preventDefault(); navigate(user.role === "operator" ? "/admin/safety" : "/participant/history");}}>{user.role === "operator" ? "안전·노쇼" : "참가 이력"}</a>
             {user.role === "operator" && (
               <a
                 href="/admin/events"
@@ -951,6 +962,7 @@ function App() {
         )}
         <main id="main">
           {logoutError && <Notice error>{logoutError}</Notice>}
+          {user?.role === "participant" && <NotificationsPanel />}
           {loading ? (
             <Notice>로그인 상태를 확인하고 있습니다…</Notice>
           ) : initialError ? (
@@ -969,7 +981,13 @@ function App() {
               </button>
             </section>
           ) : user.role === "operator" ? (
-            path === "/admin/events" ? (
+            path === "/admin/console" ? (
+              <AdminConsolePage />
+            ) : path === "/admin/safety" ? (
+              <AdminSafetyPage />
+            ) : path === "/admin/venues" ? (
+              <AdminVenuesPage />
+            ) : path === "/admin/events" ? (
               <AdminEventsPage />
             ) : path === "/admin/applications" ? (
               <AdminApplicationsPage />
@@ -984,6 +1002,12 @@ function App() {
               applicationId={path.slice("/participant/payment/".length)}
               navigate={navigate}
             />
+          ) : path === "/participant/history" ? (
+            <HistoryPage />
+          ) : path === "/participant/rooms" ? (
+            <RoomsPage />
+          ) : path === "/participant/gatherings" ? (
+            <GatheringsPage />
           ) : path === "/participant/events" ? (
             <ParticipantEventsPage />
           ) : path === "/participant/profile" ? (

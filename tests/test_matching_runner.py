@@ -98,6 +98,74 @@ def stored_states():
         }
 
 
+def test_a_participant_is_never_confirmed_at_two_tables_at_the_same_time():
+    """PRD §7.4: separate applications for two simultaneous slots seat the user once."""
+    with ExitStack() as stack:
+        operator = stack.enter_context(TestClient(app))
+        members = [stack.enter_context(TestClient(app)) for _ in range(4)]
+        login(operator, "operator")
+        for index, participant in enumerate(members, start=1):
+            prepare(participant, f"participant-0{index}")
+        # Same evening, two regions: the duplicate-candidate rule does not cover this.
+        first = due_slot(operator, region="hongdae", close_in=6.0)
+        second = due_slot(operator, region="gangnam", close_in=6.0)
+        later = [apply_and_pay(participant, second) for participant in members]
+        earlier = [apply_and_pay(participant, first) for participant in members]
+        time.sleep(6.6)
+        summaries = run_due_matches()
+        assert sorted(summary["seated_count"] for summary in summaries) == [0, 4]
+        states = stored_states()
+        confirmed = [a for a in earlier + later if states.get(a) == "CONFIRMED"]
+        assert len(confirmed) == 4
+        # Already seated at that time: this application's matching ends, with no
+        # alternatives offered (it is not a failure to resolve).
+        ended = [a for a in earlier + later if states.get(a) == "NO_MATCH"]
+        assert len(ended) == 4
+        reasons = {item["reason_code"] for s in summaries for item in s["unseated"]}
+        assert reasons == {"overlapping_confirmation"}
+        for participant, application_id in zip(members, later, strict=True):
+            path = f"/api/me/applications/{application_id}/alternatives"
+            if application_id in ended:
+                assert participant.get(path).status_code == 409
+        for participant in members:
+            mine = participant.get("/api/me/applications").json()["applications"]
+            assert sum(a["matching"]["state"] == "CONFIRMED" for a in mine) == 1
+
+
+def test_the_run_records_policy_and_table_scores_for_the_operator_only():
+    """ADR-0011 / MAT-12: the operator history explains scores; participants never see them."""
+    with ExitStack() as stack:
+        operator = stack.enter_context(TestClient(app))
+        members = [stack.enter_context(TestClient(app)) for _ in range(4)]
+        login(operator, "operator")
+        for index, participant in enumerate(members, start=1):
+            prepare(participant, f"participant-0{index}")
+        slot_id = due_slot(operator)
+        for participant in members:
+            apply_and_pay(participant, slot_id)
+        time.sleep(3.6)
+        (summary,) = run_due_matches()
+        assert summary["seated_count"] == 4
+        (run,) = operator.get("/api/admin/match-runs").json()["match_runs"]
+        assert (run["algorithm_version"], run["rule_version"]) == (
+            "dp-repair-swap-v1",
+            "adr-0011-2026-10-17",
+        )
+        assert run["policy"]["version"] == "prd-weighted-v1"
+        assert run["policy"]["min_score"] == "60"
+        (table,) = run["tables"]
+        # Same profile for all four (COMPLETE_PROFILE): age 100, interest 100, trait
+        # "different" from an identical self trait 0, new 100; gender and MBTI cannot be
+        # computed. (.25*100 + .15*100 + .10*0 + .15*100) / .65 = 1100/13 = 84.62.
+        assert table["member_count"] == 4
+        assert table["score"] == "84.62"
+        assert table["components"]["gender"] is None
+        assert table["components"]["trait"] == "0.00"
+        for participant in members:
+            body = participant.get("/api/me/applications").text
+            assert "score" not in body and "components" not in body
+
+
 def test_the_planner_seats_as_many_as_the_oracle_and_never_breaks_a_hard_constraint():
     cases = [
         [1995, 1995, 1995, 1995],
@@ -136,7 +204,8 @@ def test_the_planner_keeps_the_tables_within_the_slot_capacity():
     participants = [Participant(application_id=f"a{index}", birth_year=1995) for index in range(8)]
     plan = plan_allocation(participants, capacity=6)
     assert plan.seated_count == 6
-    assert [reason for _, reason in plan.unseated] == ["no_valid_table", "no_valid_table"]
+    # Without the limit all eight would sit (4 + 4), so the full slot is the reason.
+    assert [reason for _, reason in plan.unseated] == ["capacity", "capacity"]
 
 
 @pytest.mark.parametrize("capacity, expected", [(24, 13), (8, 8)])
@@ -254,7 +323,7 @@ def test_unpaid_and_too_few_applications_are_left_out_with_a_reason():
         # The unpaid application is not a target at all; three are not enough for a table.
         assert (summary["state"], summary["seated_count"]) == ("SUCCEEDED", 0)
         assert {item["reason_code"] for item in summary["unseated"]} == {"not_enough_eligible"}
-        assert stored_states() == {application_id: "NO_MATCH" for application_id in paid}
+        assert stored_states() == {application_id: "ALTERNATIVE_OFFERED" for application_id in paid}
         # No run reached the unpaid application, so its stored axis stays empty.
         assert unpaid not in stored_states()
         listed = members[3].get("/api/me/applications").json()["applications"]
@@ -353,7 +422,7 @@ def test_an_age_gap_leaves_the_table_unbuilt_and_names_the_reason():
         reasons = {item["application_id"]: item["reason_code"] for item in summary["unseated"]}
         assert reasons[applications[0]] == "age_gap"
         assert set(reasons.values()) <= {"age_gap", "no_valid_table"}
-        assert set(stored_states().values()) == {"NO_MATCH"}
+        assert set(stored_states().values()) == {"ALTERNATIVE_OFFERED"}
 
 
 def test_a_multi_slot_application_is_seated_in_only_its_earliest_slot():
@@ -552,7 +621,7 @@ def test_late_failure_record_cannot_replace_a_successful_retry():
         assert [run["state"] for run in runs] == ["SUCCEEDED"]
         for participant in members:
             application = participant.get("/api/me/applications").json()["applications"][0]
-            assert application["matching"]["state"] == "NO_MATCH"
+            assert application["matching"]["state"] == "ALTERNATIVE_OFFERED"
 
 
 def test_cancel_and_matching_do_not_deadlock_on_the_assignment_foreign_key(monkeypatch):

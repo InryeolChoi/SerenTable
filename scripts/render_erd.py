@@ -1,4 +1,4 @@
-"""Render the three ERDs from the design document; requires Mermaid CLI."""
+"""Render the ERDs from the design document; requires Mermaid CLI."""
 
 import argparse
 import re
@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-NAMES = ("application-payment", "matching-gathering", "feedback-operations")
+NAMES = ("application-payment", "matching-gathering", "feedback-operations", "gathering-physical")
 
 
 def main():
@@ -21,7 +21,7 @@ def main():
     source = ROOT / "docs/design/core-data-model.md"
     blocks = re.findall(r"```mermaid\s*\n(erDiagram\b.*?)\n```", source.read_text(), re.S)
     if len(blocks) != len(NAMES):
-        parser.error("Expected exactly three erDiagram blocks in core-data-model.md")
+        parser.error(f"Expected exactly {len(NAMES)} erDiagram blocks in core-data-model.md")
     destination = ROOT / "docs/design/erd"
     destination.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="serentable-erd-") as temporary:
@@ -29,13 +29,23 @@ def main():
             diagram = Path(temporary) / (name + ".mmd")
             diagram.write_text(block + "\n")
             for extension in ("svg", "png"):
-                command = [args.renderer, "-i", str(diagram), "-o",
-                           str(destination / (name + "." + extension)),
-                           "-b", "white", "-t", "neutral", "-w", "1800"]
+                command = [
+                    args.renderer,
+                    "-i",
+                    str(diagram),
+                    "-o",
+                    str(destination / (name + "." + extension)),
+                    "-b",
+                    "white",
+                    "-t",
+                    "neutral",
+                    "-w",
+                    "1800",
+                ]
                 if args.puppeteer_config:
                     command.extend(["-p", str(args.puppeteer_config)])
                 subprocess.run(command, check=True)
-    print("Rendered three SVG and three PNG files in docs/design/erd")
+    print(f"Rendered {len(NAMES)} SVG and {len(NAMES)} PNG files in docs/design/erd")
 
 
 if __name__ == "__main__":
