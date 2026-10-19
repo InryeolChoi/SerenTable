@@ -6,6 +6,7 @@ import {
   type RefObject,
 } from "react";
 import type { User } from "./api";
+import { GUIDE_EVENT } from "./ui";
 
 type IconName =
   | "table"
@@ -317,6 +318,15 @@ export function AppNavigation({
               </a>
             ))}
           </nav>
+          <button
+            type="button"
+            onClick={() => {
+              setMoreOpen(false);
+              window.dispatchEvent(new Event(GUIDE_EVENT));
+            }}
+          >
+            처음 안내 다시 보기
+          </button>
         </AppDialog>
       )}
     </>

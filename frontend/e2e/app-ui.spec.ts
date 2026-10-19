@@ -252,6 +252,40 @@ test("목록과 달력을 전환해 가능한 날짜의 회차를 고르고 선�
   await adminContext.close();
 });
 
+test("처음 접속한 참가자는 안내 카드를 건너뛸 수 있고 더보기에서 다시 연다", async ({
+  page,
+}) => {
+  const { participantPassword } = await import("./support");
+  // 다른 테스트는 안내 카드를 본 상태로 시작한다(support.ts skipGuide). 여기서는 직접 로그인한다.
+  await page.goto("/login");
+  await page.getByLabel("계정 ID", { exact: true }).fill("participant-01");
+  await page.getByLabel("비밀번호", { exact: true }).fill(participantPassword);
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  const guide = page.getByRole("dialog", {
+    name: "우연한 식탁에 오신 것을 환영합니다",
+  });
+  await expect(guide).toBeVisible();
+  await expect(guide).toContainText("합성 계정으로 보는 심사용 화면입니다");
+  for (const name of ["프로필 작성하기", "건너뛰기"]) {
+    const box = await guide
+      .getByRole("button", { name, exact: true })
+      .boundingBox();
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+  }
+  await guide.getByRole("button", { name: "건너뛰기", exact: true }).click();
+  await expect(guide).not.toBeVisible();
+  await page.reload();
+  await expect(guide).not.toBeVisible();
+  await page.getByRole("button", { name: "더보기", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "더보기", exact: true })
+    .getByRole("button", { name: "처음 안내 다시 보기", exact: true })
+    .click();
+  await expect(guide).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(guide).not.toBeVisible();
+});
+
 test("운영자 회차 필터와 새로 고침은 작은 화면에서도 떨어져 배치된다", async ({
   page,
 }) => {

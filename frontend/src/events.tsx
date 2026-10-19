@@ -1,6 +1,7 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError, type EventSlot, type Region } from "./api";
 import { message, Notice, useScopedApi } from "./ui";
+import { AppDialog } from "./app-navigation";
 import { SlotBrowser } from "./slot-browser";
 
 // Operators enter Seoul wall-clock time; the API stores absolute instants.
@@ -45,6 +46,16 @@ const emptyForm = {
   matches_at: "",
   capacity: "24",
 };
+type FormField = keyof typeof emptyForm;
+type Problem = { field: FormField; message: string };
+const fieldLabels: Record<FormField, string> = {
+  region_code: "지역",
+  starts_at: "시작 시각",
+  ends_at: "종료 시각",
+  closes_at: "신청 마감",
+  matches_at: "매칭 예정",
+  capacity: "정원",
+};
 
 export function AdminEventsPage() {
   const request = useScopedApi();
@@ -55,6 +66,9 @@ export function AdminEventsPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
+  const [problems, setProblems] = useState<Problem[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const inputs = useRef<Partial<Record<FormField, HTMLElement | null>>>({});
   async function load() {
     setLoading(true);
     setError("");
@@ -74,24 +88,40 @@ export function AdminEventsPage() {
   useEffect(() => {
     void load();
   }, []);
+  // 제출을 막는 문제를 한 번에 모은다. 첫 문제만 알리면 나머지를 고친 뒤 다시 막힌다.
+  function collectProblems(): Problem[] {
+    const found: Problem[] = [];
+    for (const name of Object.keys(emptyForm) as FormField[]) {
+      if (!form[name]) found.push({ field: name, message: `${fieldLabels[name]}을 입력해 주세요.` });
+    }
+    if (found.length) return found;
+    const at = (name: FormField) => new Date(seoulInstant(form[name]));
+    if (!(at("starts_at") < at("ends_at")))
+      found.push({ field: "ends_at", message: "종료 시각은 시작 시각보다 늦어야 합니다." });
+    if (!(at("closes_at") <= at("matches_at") && at("matches_at") <= at("starts_at")))
+      found.push({
+        field: "matches_at",
+        message: "신청 마감 ≤ 매칭 예정 ≤ 시작 시각 순서여야 합니다.",
+      });
+    return found;
+  }
+  const problemFor = (name: FormField) =>
+    problems.find((problem) => problem.field === name)?.message;
+  function edit(name: FormField, value: string) {
+    setSaved("");
+    setProblems((previous) => previous.filter((problem) => problem.field !== name));
+    setForm({ ...form, [name]: value });
+  }
   async function create(event: FormEvent) {
     event.preventDefault();
     setSaved("");
-    if (Object.values(form).some((value) => !value)) {
-      setError("모든 항목을 입력해 주세요. 입력 내용은 유지됩니다.");
+    const found = collectProblems();
+    if (found.length) {
+      setProblems(found);
+      setDialogOpen(true);
       return;
     }
-    const at = (name: keyof typeof form) => new Date(seoulInstant(form[name]));
-    if (!(at("starts_at") < at("ends_at"))) {
-      setError("종료 시각은 시작 시각보다 늦어야 합니다.");
-      return;
-    }
-    if (!(
-      at("closes_at") <= at("matches_at") && at("matches_at") <= at("starts_at")
-    )) {
-      setError("신청 마감 ≤ 매칭 예정 ≤ 시작 시각 순서여야 합니다.");
-      return;
-    }
+    setProblems([]);
     setPending(true);
     setError("");
     try {
@@ -124,20 +154,26 @@ export function AdminEventsPage() {
       setPending(false);
     }
   }
-  const field = (name: keyof typeof form, title: string, hint: string) => (
+  const fieldError = (name: FormField) => {
+    const text = problemFor(name);
+    return text ? <span className="field-error">{text}</span> : null;
+  };
+  const field = (name: FormField, title: string, hint: string) => (
     <label>
       {title}
       <span className="small muted">{hint}</span>
       <input
+        ref={(element) => {
+          inputs.current[name] = element;
+        }}
         type="datetime-local"
         aria-label={title}
         aria-description={hint}
+        aria-invalid={problemFor(name) ? true : undefined}
         value={form[name]}
-        onChange={(e) => {
-          setSaved("");
-          setForm({ ...form, [name]: e.target.value });
-        }}
+        onChange={(e) => edit(name, e.target.value)}
       />
+      {fieldError(name)}
     </label>
   );
   return (
@@ -148,16 +184,34 @@ export function AdminEventsPage() {
       </p>
       {error && <Notice error>{error}</Notice>}
       {saved && <Notice>{saved}</Notice>}
+      {dialogOpen && (
+        <AppDialog
+          label="입력을 확인해 주세요"
+          onClose={() => {
+            setDialogOpen(false);
+            const first = problems[0]?.field;
+            if (first) inputs.current[first]?.focus();
+          }}
+        >
+          <ul>
+            {problems.map((problem) => (
+              <li key={problem.field}>{problem.message}</li>
+            ))}
+          </ul>
+        </AppDialog>
+      )}
       <div className="admin-grid">
         <form aria-label="회차 만들기" onSubmit={create}>
           <fieldset disabled={pending || loading} className="form-body">
             <label>
               지역
               <select
+                ref={(element) => {
+                  inputs.current.region_code = element;
+                }}
+                aria-invalid={problemFor("region_code") ? true : undefined}
                 value={form.region_code}
-                onChange={(e) =>
-                  setForm({ ...form, region_code: e.target.value })
-                }
+                onChange={(e) => edit("region_code", e.target.value)}
               >
                 <option value="">지역 선택</option>
                 {regions.map((region) => (
@@ -166,6 +220,7 @@ export function AdminEventsPage() {
                   </option>
                 ))}
               </select>
+              {fieldError("region_code")}
             </label>
             {field("starts_at", "시작 시각", "모임이 시작하는 시각")}
             {field("ends_at", "종료 시각", "시작보다 늦어야 합니다")}
@@ -175,12 +230,17 @@ export function AdminEventsPage() {
               정원
               <span className="small muted">4~100명</span>
               <input
+                ref={(element) => {
+                  inputs.current.capacity = element;
+                }}
                 type="number"
                 min={4}
                 max={100}
+                aria-invalid={problemFor("capacity") ? true : undefined}
                 value={form.capacity}
-                onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+                onChange={(e) => edit("capacity", e.target.value)}
               />
+              {fieldError("capacity")}
             </label>
             <button className="primary" type="submit">
               {pending ? "만드는 중…" : "회차 만들기"}
@@ -196,8 +256,8 @@ export function AdminEventsPage() {
               {slots.map((slot) => (
                 <li key={slot.id}>
                   <SlotSummary slot={slot} />
-                  <p className="small">
-                    {slot.recruiting ? "모집 중" : "신청 마감"}
+                  <p className="small muted">
+                    {slot.recruiting ? "모집 중" : "모집 종료"}
                   </p>
                 </li>
               ))}

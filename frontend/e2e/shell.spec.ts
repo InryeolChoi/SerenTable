@@ -4,6 +4,7 @@ import {
   login as signIn,
   operatorPassword,
   participantPassword,
+  skipGuide,
 } from "./support";
 
 async function login(
@@ -25,6 +26,8 @@ async function login(
 test("합성 참가자가 실제 로그인하고 권한 거절과 로그아웃을 확인한다", async ({
   page,
 }) => {
+  // 이 테스트는 로그인 화면을 직접 채운다. 안내 카드가 뜨면 로그아웃 버튼을 가리므로 먼저 본 상태로 둔다.
+  await skipGuide(page);
   await page.goto("/login");
   await page.getByLabel("계정 ID", { exact: true }).fill("participant-01");
   await page

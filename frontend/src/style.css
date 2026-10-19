@@ -73,6 +73,11 @@ button:disabled {
   outline: 3px solid var(--color-focus);
   outline-offset: 3px;
 }
+/* 화면 이동 때 스크린리더 안내를 위해 제목에 옮기는 focus다. tabindex=-1이라
+   Tab으로는 닿지 않으므로 테두리를 그리지 않는다. */
+main h1:focus {
+  outline: none;
+}
 a {
   color: var(--color-primary);
   text-underline-offset: 4px;
@@ -157,6 +162,10 @@ main {
 .narrow {
   max-width: 740px;
   margin: 0 auto;
+}
+/* 운영자 입력 폼은 넓은 화면에서도 한 줄에 읽히는 폭을 넘지 않게 한다. */
+.operator-form {
+  max-width: 34rem;
 }
 h1 {
   margin: 0 0 12px;
@@ -314,6 +323,20 @@ input[type="checkbox"] {
   flex-wrap: wrap;
   gap: 10px;
   margin: 24px 0;
+}
+.field-error {
+  color: var(--color-error);
+  font-size: 13px;
+  font-weight: 400;
+}
+.dialog ul,
+.app-dialog ul {
+  margin: 0;
+  padding-left: 20px;
+}
+.dialog li,
+.app-dialog li {
+  margin: 8px 0;
 }
 .policy-body {
   white-space: pre-wrap;
