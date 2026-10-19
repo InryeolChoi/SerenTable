@@ -302,6 +302,42 @@ def body_for(method, path, context):
     return bodies[action]
 
 
+# (status, detail) the owner receives for the fixture objects; detail None means a success
+# body. The fixture table has ended and its application is confirmed and paid, so some
+# writes return a documented domain refusal, which still proves the object was found.
+OWNER_CONTROL = {
+    ("GET", "/api/me/applications/{application_id}/alternatives"): (
+        409,
+        "alternatives_not_available",
+    ),
+    ("POST", "/api/me/applications/{application_id}/cancel"): (409, "application_cancel_closed"),
+    ("POST", "/api/me/applications/{application_id}/payments"): (409, "payment_closed"),
+    ("GET", "/api/me/rooms/{room_id}/messages"): (200, None),
+    ("POST", "/api/me/rooms/{room_id}/messages"): (201, None),
+    ("POST", "/api/me/notifications/{notification_id}/read"): (200, None),
+    ("DELETE", "/api/me/push-subscriptions/{subscription_id}"): (200, None),
+    ("POST", "/api/me/applications/{application_id}/resolutions"): (
+        409,
+        "resolution_not_available",
+    ),
+    ("POST", "/api/me/entitlements/{entitlement_id}/reuse"): (409, "entitlement_not_reusable"),
+    ("POST", "/api/me/tables/{table_id}/check-in"): (409, "check_in_closed"),
+    ("GET", "/api/me/tables/{table_id}/feedback"): (200, None),
+    ("PUT", "/api/me/tables/{table_id}/feedback"): (200, None),
+    ("PUT", "/api/me/tables/{table_id}/preferences"): (200, None),
+    ("GET", "/api/me/tables/{table_id}/safety"): (200, None),
+    ("POST", "/api/me/reports"): (201, None),
+    ("POST", "/api/me/blocks"): (200, None),
+}
+
+
+def table_body(path, field, table_id, target_id):
+    payload = {"dining_table_id": table_id, field: target_id}
+    if path.endswith("reports"):
+        payload["reason_code"] = "other"
+    return payload
+
+
 def owner_views(owner, owned):
     """What the owner can see; any successful foreign write would change one of these."""
     room, table = owned["room_id"], owned["table_id"]
@@ -328,16 +364,16 @@ def test_another_participants_objects_are_refused_exactly_like_missing_ones(two_
     before = owner_views(owner, owned)
     object_routes = [(m, p) for m, p in API_ROUTES if role_of(m, p) == "participant" and "{" in p]
     assert len(object_routes) >= 14
-    failures = []
+    body_routes = {("POST", "/api/me/reports"), ("POST", "/api/me/blocks")}
+    assert {*object_routes, *body_routes} == set(OWNER_CONTROL), "classify the owner control"
+    failures, controls = [], []
     for method, path in object_routes:
         foreign, missing = path, path
         for name in [part[1:-1] for part in path.split("/") if part.startswith("{")]:
             assert name in owned, f"no owned object for {{{name}}} in {path}: extend the fixture"
             foreign = foreign.replace(f"{{{name}}}", owned[name])
             missing = missing.replace(f"{{{name}}}", str(uuid.uuid4()))
-        if method == "GET":
-            # The fixture ids are real: their owner is not refused as "not found".
-            assert owner.get(foreign).status_code != 404, (path, owner.get(foreign).text)
+        controls.append((method, path, foreign))
         results = []
         for url in (foreign, missing):
             payload = body_for(method, path, two_owners)
@@ -352,15 +388,28 @@ def test_another_participants_objects_are_refused_exactly_like_missing_ones(two_
     for path, field in (("/api/me/reports", "reported_id"), ("/api/me/blocks", "blocked_id")):
         results = []
         for table in (owned["table_id"], str(uuid.uuid4())):
-            payload = {"dining_table_id": table, field: reported}
-            if path.endswith("reports"):
-                payload["reason_code"] = "other"
-            response = send(outsider, "POST", path, payload)
+            response = send(outsider, "POST", path, table_body(path, field, table, reported))
             results.append((response.status_code, response.json()))
         if results[0] != results[1] or results[0][0] != 404:
             failures.append(("POST", path, results))
+        controls.append(("POST", path, table_body(path, field, owned["table_id"], reported)))
     assert failures == []
     assert owner_views(owner, owned) == before
+    # Positive control: the same fixture ids, requested by their owner, reach the handler and
+    # return its own success or documented domain result, never the not-found refusal above.
+    # Writes run only after the unchanged-views check, in route order.
+    mismatched = []
+    for method, path, target in controls:
+        if isinstance(target, dict):  # a table named in the body
+            response = send(owner, method, path, target)
+        elif method == "GET":
+            response = owner.get(target)
+        else:
+            response = send(owner, method, target, body_for(method, path, two_owners))
+        actual = (response.status_code, response.json().get("detail"))
+        if actual != OWNER_CONTROL[(method, path)]:
+            mismatched.append((method, path, actual))
+    assert mismatched == []
 
 
 def test_a_participants_own_lists_never_contain_another_participants_objects(two_owners):
