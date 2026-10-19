@@ -18,7 +18,9 @@ Only fixed PASS/FAIL/WAIT/INFO labels, ids, timestamps and API error codes are p
 never response bodies, cookies or passwords. Exit codes: 0 pass, 1 fail, 2 refused
 configuration, 3 a later step is not reachable yet (re-run after the printed time).
 The synthetic slot, applications, mock payments, check-ins, feedback and one room
-message remain afterwards; nothing is refunded or deleted.
+message remain afterwards; nothing is refunded or deleted. Creating a slot on a
+non-loopback origin needs --confirm-public-slot: it is a real recruiting slot that any
+participant can see and join until it closes.
 """
 
 import argparse
@@ -74,6 +76,9 @@ DEFAULTS = {
     "meal_budget_bands": ["10000_20000"],
 }
 
+# Audit actions that only read (backend/serentable/exports.py records "export").
+READ_ONLY_AUDIT_ACTIONS = frozenset({"export"})
+
 EXIT_FAIL, EXIT_REFUSED, EXIT_WAIT = 1, 2, 3
 LABEL = re.compile(r"^[a-z0-9_]{1,64}$")
 SAFE_VALUE = re.compile(
@@ -105,15 +110,24 @@ def validate_origin(origin, allow_local_http=False):
     if parts.scheme == "https":
         return origin
     if parts.scheme == "http" and allow_local_http:
-        host = parts.hostname
-        try:
-            loopback = ipaddress.ip_address(host).is_loopback
-        except ValueError:
-            loopback = host == "localhost"
-        if loopback:
+        if is_loopback(origin):
             return origin
         raise ValueError("local_http_only_for_loopback")
     raise ValueError("https_required")
+
+
+def is_loopback(origin):
+    host = urlsplit(origin).hostname or ""
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host == "localhost"
+
+
+def public_slot_needs_confirmation(origin, creating, confirmed):
+    """A new slot on a non-loopback origin is a real recruiting slot every participant can
+    see and join while it is open, so creating one needs --confirm-public-slot."""
+    return creating and not confirmed and not is_loopback(origin)
 
 
 def safe_line(status, label, *values):
@@ -154,6 +168,40 @@ def food_clear(profile):
         (profile.get(key) or {}).get("status") == "none"
         for key in ("food_restrictions", "allergies")
     )
+
+
+def tablemates_display_name_only(members, expected_count):
+    """The whole table (self included) is listed, each by display name alone."""
+    return len(members) == expected_count > 0 and all(set(m) == {"display_name"} for m in members)
+
+
+def table_notices(notifications, table_id, kind=None):
+    """This table's notifications (optionally of one kind); others' never count."""
+    return [
+        n
+        for n in notifications
+        if n.get("table_id") == table_id and (kind is None or n["kind"] == kind)
+    ]
+
+
+def late_operator_actions(rows, closes):
+    """Audit rows at or after the close that changed state. Audited reads (the CSV export)
+    are not an intervention; any other action, including one added later, counts."""
+    return [
+        r
+        for r in rows
+        if r["action"] not in READ_ONLY_AUDIT_ACTIONS and parse_time(r["created_at"]) >= closes
+    ]
+
+
+def find_created_slot(slots, region, starts):
+    """The slot a lost create response committed: (region, start) is unique per slot."""
+    for slot in slots:
+        if (slot.get("region") or {}).get("code") == region and parse_time(
+            slot["starts_at"]
+        ) == starts:
+            return slot
+    return None
 
 
 def parse_time(value):
@@ -211,8 +259,13 @@ class Client:
     def __init__(self, origin, timeout=25):
         self.origin, self.timeout = origin, timeout
         self.opener = build_opener(HTTPCookieProcessor(CookieJar()))
+        self.csrf_token = None  # bound to the session cookie; cleared on login
 
-    def request(self, method, path, payload=None, headers=None):
+    def request(self, method, path, payload=None, headers=None, retry=None):
+        """Send once. A transient network error is retried only for reads, or for a write
+        the caller marks retry=True because the server replays it (request key, PUT,
+        check-in, logout). A create may have committed before the connection dropped."""
+        retry = method == "GET" if retry is None else retry
         body = None if payload is None else json.dumps(payload).encode()
         request = Request(
             self.origin + path,
@@ -220,7 +273,8 @@ class Client:
             method=method,
             headers={"Content-Type": "application/json", **(headers or {})},
         )
-        for attempt in range(3):
+        attempts = 3 if retry else 1
+        for attempt in range(attempts):
             try:
                 with self.opener.open(request, timeout=self.timeout) as response:
                     return Response(response.code, response.headers, response.read())
@@ -228,25 +282,33 @@ class Client:
                 with response:
                     return Response(response.code, response.headers, response.read())
             except (URLError, TimeoutError):
-                # Transient network errors only; every write below is idempotent.
-                if attempt == 2:
+                if attempt == attempts - 1:
                     raise
                 time.sleep(2)
 
     def get(self, path):
         return self.request("GET", path)
 
-    def change(self, method, path, payload=None):
-        token = self.get("/api/auth/csrf")
-        if token.status_code != 200:
-            say("FAIL", "csrf_bootstrap", f"status={token.status_code}")
-            raise Failed("csrf_bootstrap")
-        return self.request(
-            method,
-            path,
-            payload=payload,
-            headers={"Origin": self.origin, "X-CSRF-Token": token.json()["csrf_token"]},
-        )
+    def token(self, report=True):
+        if self.csrf_token is None:
+            response = self.get("/api/auth/csrf")
+            if response.status_code != 200:
+                if report:
+                    say("FAIL", "csrf_bootstrap", f"status={response.status_code}")
+                raise Failed("csrf_bootstrap")
+            self.csrf_token = response.json()["csrf_token"]
+        return self.csrf_token
+
+    def change(self, method, path, payload=None, retry=False, report=True):
+        """A CSRF-protected write. The token is reused until the server rejects it (expiry
+        or a new session); the rejected request did nothing, so it is sent once more."""
+        for fresh in (False, True):
+            headers = {"Origin": self.origin, "X-CSRF-Token": self.token(report)}
+            response = self.request(method, path, payload, headers, retry)
+            if fresh or response.status_code != 403 or detail_of(response) != "code=csrf_rejected":
+                return response
+            self.csrf_token = None
+        return response
 
     def data(self, label, path):
         response = self.get(path)
@@ -276,14 +338,23 @@ class Session:
                 "POST", "/api/auth/login", {"login_id": account, "password": password}
             )
             check(account.replace("-", "_") + "_login", response.status_code == 200)
+            client.csrf_token = None  # the token was bound to the anonymous session
         check(
             "private_no_store",
             self.operator.get("/api/auth/me").headers.get("cache-control") == "no-store",
         )
 
     def logout(self):
-        for client in (self.operator, *self.members.values()):
-            client.change("POST", "/api/auth/logout")
+        """Cleanup only: try every account, report a leftover session as INFO, and never
+        change the phase result (sessions also expire on their own)."""
+        for account, client in (("operator", self.operator), *self.members.items()):
+            try:
+                done = client.change("POST", "/api/auth/logout", retry=True, report=False)
+                ok = done.status_code == 200
+            except Exception:  # never print the message: it may contain response data
+                ok = False
+            if not ok:
+                say("INFO", "logout_incomplete", account.replace("-", "_"))
 
     def slot(self, slot_id):
         for slot in self.operator.data("admin_slots", "/api/admin/event-slots")["event_slots"]:
@@ -301,6 +372,7 @@ class Session:
                 "request_key": request_key(slot_id, account, "application"),
                 "event_slot_ids": [slot_id],
             },
+            retry=True,
         )
         if response.status_code not in (200, 201):
             say("FAIL", "application_lookup", f"status={response.status_code}", detail_of(response))
@@ -370,7 +442,7 @@ def prepare(session, args):
                 if profile.get(key) != value:
                     profile[key], changed = value, True
         if changed or not state["complete"]:
-            saved = client.change("PUT", "/api/me/profile", profile)
+            saved = client.change("PUT", "/api/me/profile", profile, retry=True)
             check(name + "_profile_complete", saved.status_code == 200 and saved.json()["complete"])
             profile = saved.json()["profile"]
         else:
@@ -382,7 +454,7 @@ def prepare(session, args):
                 for p in policies["policies"]
                 if p["required"]
             ]
-            accepted = client.change("PUT", "/api/me/consents", {"consents": decisions})
+            accepted = client.change("PUT", "/api/me/consents", {"consents": decisions}, retry=True)
             check(
                 name + "_consent_complete",
                 accepted.status_code == 200 and accepted.json()["complete"],
@@ -401,24 +473,35 @@ def prepare(session, args):
         check("region_known", any(r["code"] == args.region for r in regions))
         now = datetime.now(timezone.utc)
         closes = now + timedelta(minutes=args.close_minutes)
-        # (region, start) is unique; a random second avoids colliding with other slots.
+        # (region, start) is unique; a random second avoids colliding with other slots, and
+        # a whole-second start lets a lost create response be found again by that pair.
         starts = closes + timedelta(
             minutes=args.start_after_close_minutes, seconds=secrets.randbelow(50) + 1
         )
-        created = operator.change(
-            "POST",
-            "/api/admin/event-slots",
-            {
-                "region_code": args.region,
-                "starts_at": starts.isoformat(),
-                "ends_at": (starts + timedelta(minutes=args.duration_minutes)).isoformat(),
-                "closes_at": closes.isoformat(),
-                "matches_at": closes.isoformat(),
-                "capacity": 4,
-            },
-        )
-        slot = expect("operator_create_slot", created, 201)["event_slot"]
+        starts = starts.replace(microsecond=0)
+        payload = {
+            "region_code": args.region,
+            "starts_at": starts.isoformat(),
+            "ends_at": (starts + timedelta(minutes=args.duration_minutes)).isoformat(),
+            "closes_at": closes.isoformat(),
+            "matches_at": closes.isoformat(),
+            "capacity": 4,
+        }
+        try:
+            created = operator.change("POST", "/api/admin/event-slots", payload)
+        except (URLError, TimeoutError):
+            # Never resent: it may have committed. Look for it instead of creating another.
+            say("INFO", "slot_create_response_lost")
+            slots = operator.data("admin_slots", "/api/admin/event-slots")["event_slots"]
+            slot = find_created_slot(slots, args.region, starts)
+            if slot is None:
+                say("FAIL", "operator_create_slot", "code=network_error")
+                raise Failed("operator_create_slot") from None
+            say("PASS", "operator_create_slot_recovered")
+        else:
+            slot = expect("operator_create_slot", created, 201)["event_slot"]
     slot_id = slot["id"]
+    args.slot_id = slot_id  # the final line names it even if a later step fails
     say("INFO", "slot_id", slot_id)
     for moment in ("closes_at", "matches_at", "starts_at", "ends_at"):
         say("INFO", moment, slot[moment])
@@ -426,23 +509,33 @@ def prepare(session, args):
     inventory = operator.data("venue_inventory_read", "/api/admin/venue-inventory")["inventory"]
     if any(item["event_slot_id"] == slot_id for item in inventory):
         say("PASS", "verified_inventory_present")
+    elif parse_time(slot["closes_at"]) <= datetime.now(timezone.utc):
+        # Registering it now would be an operator action after the close (step 12) and
+        # could race the worker's venue allocation; this slot cannot prove the normal path.
+        say("FAIL", "verified_inventory_missing_after_close", slot_id)
+        raise Failed("verified_inventory_missing_after_close")
     else:
-        expect(
-            "verified_inventory_registered",
-            operator.change(
-                "POST",
-                "/api/admin/venue-inventory",
-                {
-                    "event_slot_id": slot_id,
-                    "name": VENUE_NAME,
-                    "address": "합성 주소 (배포 검증)",
-                    "map_url": "https://map.naver.com/",
-                    "price_krw": price,
-                    "capacity": 6,
-                },
-            ),
-            201,
-        )
+        venue = {
+            "event_slot_id": slot_id,
+            "name": VENUE_NAME,
+            "address": "합성 주소 (배포 검증)",
+            "map_url": "https://map.naver.com/",
+            "price_krw": price,
+            "capacity": 6,
+        }
+        try:
+            registered = operator.change("POST", "/api/admin/venue-inventory", venue)
+        except (URLError, TimeoutError):
+            # Never resent (it would add a second row); check whether it committed.
+            say("INFO", "inventory_create_response_lost")
+            inventory = operator.data("venue_inventory_read", "/api/admin/venue-inventory")
+            check(
+                "verified_inventory_registered",
+                any(i["event_slot_id"] == slot_id for i in inventory["inventory"]),
+                "code=network_error",
+            )
+        else:
+            expect("verified_inventory_registered", registered, 201)
 
     for account, client in members.items():
         name = account.replace("-", "_")
@@ -457,9 +550,9 @@ def prepare(session, args):
             "request_key": request_key(slot_id, account, "application"),
             "event_slot_ids": [slot_id],
         }
-        created = client.change("POST", "/api/me/applications", payload)
+        created = client.change("POST", "/api/me/applications", payload, retry=True)
         application_id = expect(name + "_application", created, 200, 201)["application"]["id"]
-        replay = client.change("POST", "/api/me/applications", payload)
+        replay = client.change("POST", "/api/me/applications", payload, retry=True)
         check(
             name + "_application_replay",
             replay.status_code == 200 and replay.json()["application"]["id"] == application_id,
@@ -471,12 +564,14 @@ def prepare(session, args):
                 "request_key": request_key(slot_id, account, "payment"),
                 "product_code": "single",
             }
-            paid = expect(name + "_mock_paid", client.change("POST", path, payment), 200, 201)
+            paid = expect(
+                name + "_mock_paid", client.change("POST", path, payment, retry=True), 200, 201
+            )
             check(
                 name + "_mock_payment_state",
                 paid["payment"]["state"] == "PAID" and paid["payment"]["mock"] is True,
             )
-            replay = client.change("POST", path, payment)
+            replay = client.change("POST", path, payment, retry=True)
             check(
                 name + "_payment_replay",
                 replay.status_code == 200
@@ -593,7 +688,8 @@ def check_matching(session, args):
         check(name + "_same_table", mine.get("id") == table_id)
         check(
             name + "_tablemates_display_name_only",
-            all(set(m) == {"display_name"} for m in mine.get("members", [])),
+            tablemates_display_name_only(mine.get("members") or [], table["member_count"]),
+            f"{len(mine.get('members') or [])}",
         )
         coverage = (application.get("coverage") or {}).get("entitlement") or {}
         check(
@@ -618,12 +714,9 @@ def check_matching(session, args):
         name = account.replace("-", "_")
         rooms = session.members[account].data("rooms", "/api/me/rooms")["rooms"]
         check(name + "_room_member", any(r["id"] == room_id for r in rooms))
-        kinds = {
-            n["kind"]
-            for n in session.members[account].data("notifications", "/api/me/notifications")[
-                "notifications"
-            ]
-        }
+        notes = session.members[account].data("notifications", "/api/me/notifications")
+        # Only this table's notices count; another table's from an earlier run never does.
+        kinds = {n["kind"] for n in table_notices(notes["notifications"], table_id)}
         check(name + "_notified", {"CONFIRMED", "VENUE_ASSIGNED", "REMINDER"} <= kinds)
 
     # One user message in the room, replayed with the same key, read by a tablemate.
@@ -634,11 +727,11 @@ def check_matching(session, args):
     }
     sent = expect(
         "room_message_sent",
-        session.members[PARTICIPANTS[0]].change("POST", path, message),
+        session.members[PARTICIPANTS[0]].change("POST", path, message, retry=True),
         200,
         201,
     )
-    replay = session.members[PARTICIPANTS[0]].change("POST", path, message)
+    replay = session.members[PARTICIPANTS[0]].change("POST", path, message, retry=True)
     check(
         "room_message_replay",
         replay.status_code == 200 and replay.json()["message"]["id"] == sent["message"]["id"],
@@ -688,22 +781,27 @@ def check_operator_untouched(session, slot_id, table_id, expect_checkins=None):
     operator = session.operator
     slot = session.slot(slot_id)
     closes = parse_time(slot["closes_at"])
-    targets = [slot_id, table_id]
+
+    def slot_exceptions(path):
+        return [
+            e
+            for e in operator.data("exceptions", path)["exceptions"]
+            if e.get("event_slot_id") == slot_id or e.get("dining_table_id") == table_id
+        ]
+
+    # Exceptions of this slot in any state: resolving one is an operator action too.
+    targets = [slot_id, table_id, *(e["id"] for e in slot_exceptions("/api/admin/exceptions"))]
     inventory = operator.data("venue_inventory_read", "/api/admin/venue-inventory")["inventory"]
     targets += [i["id"] for i in inventory if i["event_slot_id"] == slot_id]
     late = []
     for target in targets:
         rows = operator.data("audit", f"/api/admin/audit?target_id={target}&limit=200")["audit"]
-        late += [r for r in rows if parse_time(r["created_at"]) >= closes]
-    check("no_operator_action_after_close", not late)
-    exceptions = operator.data("exceptions", "/api/admin/exceptions?state=OPEN")["exceptions"]
+        late += late_operator_actions(rows, closes)
+    actions = sorted({r["action"].replace(".", "_") for r in late})
+    check("no_operator_action_after_close", not late, *actions)
     check(
         "no_open_exception_for_slot",
-        not [
-            e
-            for e in exceptions
-            if e.get("event_slot_id") == slot_id or e.get("dining_table_id") == table_id
-        ],
+        not slot_exceptions("/api/admin/exceptions?state=OPEN"),
     )
     view = operator.data("dashboard", f"/api/admin/dashboard?event_slot_id={slot_id}")["slots"][0]
     check("dashboard_open_exceptions_zero", view["open_exception_count"] == 0)
@@ -732,7 +830,7 @@ def check_event(session, args):
     first = session.members[PARTICIPANTS[0]]
     feedback_path = f"/api/me/tables/{table_id}/feedback"
     if datetime.now(timezone.utc) < ends:
-        early = first.change("PUT", feedback_path, RATINGS)
+        early = first.change("PUT", feedback_path, RATINGS, retry=True)
         check(
             "feedback_closed_before_end",
             early.status_code == 409 and detail_of(early) == "code=feedback_not_open",
@@ -751,13 +849,13 @@ def check_event(session, args):
         path = f"/api/me/tables/{table_id}/check-in"
         if datetime.now(timezone.utc) > ends:
             # Resumed after the end: an earlier run must already have checked in.
-            replay = session.members[account].change("POST", path)
+            replay = session.members[account].change("POST", path, retry=True)
             check(name + "_checked_in", replay.status_code == 200)
             continue
         checked = expect(
-            name + "_check_in", session.members[account].change("POST", path), 200, 201
+            name + "_check_in", session.members[account].change("POST", path, retry=True), 200, 201
         )
-        replay = session.members[account].change("POST", path)
+        replay = session.members[account].change("POST", path, retry=True)
         check(
             name + "_check_in_replay",
             replay.status_code == 200
@@ -771,9 +869,9 @@ def check_event(session, args):
         if account == SILENT:
             say("INFO", name + "_feedback_left_empty_for_reminder")
             continue
-        saved = session.members[account].change("PUT", feedback_path, RATINGS)
+        saved = session.members[account].change("PUT", feedback_path, RATINGS, retry=True)
         check(name + "_feedback_after_end", saved.status_code == 200)
-    revised = first.change("PUT", feedback_path, {**RATINGS, "venue_rating": 5})
+    revised = first.change("PUT", feedback_path, {**RATINGS, "venue_rating": 5}, retry=True)
     check("feedback_revised", revised.status_code == 200)
     state = first.data("feedback_read", feedback_path)
     check(
@@ -803,14 +901,13 @@ def check_feedback_reminder(session, args):
         raise NotYet("feedback_reminder_due")
     check("within_reminder_window_7_days", now < parse_time(slot["ends_at"]) + timedelta(days=7))
     deadline = phase_deadline(args, now + timedelta(minutes=2))
+    table_id, _ = our_table(session, args.slot_id)
+    check("confirmed_table_found", bool(table_id))
 
     def reminded():
         notes = session.members[SILENT].data("notifications", "/api/me/notifications")
-        return [
-            n
-            for n in notes["notifications"]
-            if n["kind"] == "FEEDBACK_REMINDER" and parse_time(n["created_at"]) >= due
-        ]
+        # Reminders of other tables (earlier or later runs) never count for this one.
+        return table_notices(notes["notifications"], table_id, "FEEDBACK_REMINDER")
 
     found = poll("silent_member_reminded", deadline, reminded)
     check("silent_member_reminded_once", len(found) == 1)
@@ -839,6 +936,12 @@ def parser():
     timing.add_argument("--start-after-close-minutes", type=float, default=8)
     timing.add_argument("--duration-minutes", type=float, default=10)
     timing.add_argument("--normalize-profiles", action="store_true")
+    timing.add_argument(
+        "--confirm-public-slot",
+        action="store_true",
+        help="required to create a slot on a non-loopback origin: real participants can see "
+        "and join it until it closes",
+    )
     timing.add_argument("--previous-slot-id", type=uuid.UUID)
     root = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = root.add_subparsers(dest="phase", required=True)
@@ -891,6 +994,11 @@ def main(argv=None):
         # within 24 hours; check-matching expects it, so keep the start inside that window.
         say("FAIL", "start_must_be_within_24h_of_close")
         return EXIT_REFUSED
+    if args.phase in ("prepare", "run") and public_slot_needs_confirmation(
+        origin, not args.slot_id, args.confirm_public_slot
+    ):
+        say("FAIL", "confirm_public_slot_required")
+        return EXIT_REFUSED
     if args.slot_id:
         args.slot_id = str(args.slot_id)
     if getattr(args, "previous_slot_id", None):
@@ -907,22 +1015,17 @@ def main(argv=None):
             check_event(session, args)
         if args.phase == "check-feedback-reminder":
             check_feedback_reminder(session, args)
+        status, code, detail = "PASS", 0, ""
     except NotYet:
-        say("WAIT", phase, args.slot_id or "")
-        return EXIT_WAIT
+        status, code, detail = "WAIT", EXIT_WAIT, ""
     except Failed:
-        say("FAIL", phase)
-        return EXIT_FAIL
+        status, code, detail = "FAIL", EXIT_FAIL, ""
     except Exception as error:  # never print the message: it may contain response data
-        say("FAIL", phase, type(error).__name__.lower()[:32])
-        return EXIT_FAIL
-    finally:
-        try:
-            session.logout()
-        except Exception:
-            pass
-    say("PASS", phase, args.slot_id)
-    return 0
+        status, code, detail = "FAIL", EXIT_FAIL, type(error).__name__.lower()[:32]
+    # Cleanup first (INFO only), so the phase verdict is always the last line.
+    session.logout()
+    say(status, phase, args.slot_id or "", detail)
+    return code
 
 
 if __name__ == "__main__":
