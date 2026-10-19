@@ -142,10 +142,13 @@ test("운영자와 참가자 세션을 다른 브라우저 문맥에서 동시�
     const sessionCookie = async (context: typeof operatorContext) =>
       (await context.cookies()).find((c) => c.name.endsWith("serentable_session"))
         ?.value;
-    expect(await sessionCookie(operatorContext)).toBeTruthy();
-    expect(await sessionCookie(operatorContext)).not.toBe(
-      await sessionCookie(participantContext),
-    );
+    // Both contexts must hold their own session cookie; a missing one would make the
+    // inequality below pass trivially.
+    const operatorCookie = await sessionCookie(operatorContext);
+    const participantCookie = await sessionCookie(participantContext);
+    expect(operatorCookie).toBeTruthy();
+    expect(participantCookie).toBeTruthy();
+    expect(operatorCookie).not.toBe(participantCookie);
 
     expect(await pageFetch(operator, "/api/admin/participants")).toBe(200);
     expect(await pageFetch(participant, "/api/admin/participants")).toBe(403);
