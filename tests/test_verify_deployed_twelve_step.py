@@ -183,6 +183,8 @@ def test_logout_is_cleanup_that_tries_every_account_and_never_prints_fail(monkey
     ]
     for client, script in zip(session.members.values(), scripts, strict=True):
         client.opener = FakeOpener(*script)
+    for client in (session.operator, *session.members.values()):
+        client.logged_in = True
     session.logout()
     assert capsys.readouterr().out.splitlines() == [
         "INFO logout_incomplete operator",
@@ -190,6 +192,14 @@ def test_logout_is_cleanup_that_tries_every_account_and_never_prints_fail(monkey
         "INFO logout_incomplete participant_03",
     ]
     assert all(not c.opener.script for c in session.members.values())
+
+
+def test_logout_skips_accounts_that_never_logged_in(capsys):
+    session = verifier.Session(verifier.Config("https://chance.example", "p", "o"))
+    for client in (session.operator, *session.members.values()):
+        client.opener = FakeOpener()  # any request would fail the test
+    session.logout()
+    assert capsys.readouterr().out == ""
 
 
 def test_a_slot_whose_create_response_was_lost_is_found_by_region_and_start():

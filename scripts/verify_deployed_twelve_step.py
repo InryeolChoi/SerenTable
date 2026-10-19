@@ -260,6 +260,7 @@ class Client:
         self.origin, self.timeout = origin, timeout
         self.opener = build_opener(HTTPCookieProcessor(CookieJar()))
         self.csrf_token = None  # bound to the session cookie; cleared on login
+        self.logged_in = False
 
     def request(self, method, path, payload=None, headers=None, retry=None):
         """Send once. A transient network error is retried only for reads, or for a write
@@ -339,6 +340,7 @@ class Session:
             )
             check(account.replace("-", "_") + "_login", response.status_code == 200)
             client.csrf_token = None  # the token was bound to the anonymous session
+            client.logged_in = True
         check(
             "private_no_store",
             self.operator.get("/api/auth/me").headers.get("cache-control") == "no-store",
@@ -348,6 +350,8 @@ class Session:
         """Cleanup only: try every account, report a leftover session as INFO, and never
         change the phase result (sessions also expire on their own)."""
         for account, client in (("operator", self.operator), *self.members.items()):
+            if not client.logged_in:
+                continue
             try:
                 done = client.change("POST", "/api/auth/logout", retry=True, report=False)
                 ok = done.status_code == 200
