@@ -1,6 +1,8 @@
 # 도구 간 작업 인계
 
-마지막 기록: 2026-10-19 (Asia/Seoul). Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
+마지막 기록: 2026-10-20 (Asia/Seoul). Codex·Claude Code 및 다른 개발 에이전트가 도구 전환 시 읽는 공통 상태 기록이다. 아래 내용은 해당 시점의 스냅샷이며 시작 시 Git·GitHub·배포 상태를 재확인한다.
+
+> **현재 기준(2026-10-20 00:45 KST 실측):** main `b633118`이 운영 배포됨(health version 일치), 열린 PR 0건, 최근 main CI 전부 success. 본문 앞부분의 "Draft PR·미병합·운영 미반영" 서술은 작성 시점 기록이며 현재 상태가 아니다. 최신 정정은 맨 아래 "2026-10-20 문서 정합성 정정" 절을 따른다.
 
 ## 먼저 확인할 현재 상태
 
@@ -334,3 +336,16 @@ Work9·상위Agenda는 감사보관U16·역할분리·기존조치사유정책·
 Work10 UI Task에서 목록/달력 알약 전환·날짜 말풍선·신청 후보 유지와 운영자 필터 간격을 보완했다. main의 PR52 아이콘/홈 화면명/푸시 구독 복원을 통합했다. 상세는 app-ui-refresh-2026-10-19.md. 실제 휴대폰 잠금화면 푸시는 사용자 확인 완료로 보고받았으며 이번 로컬 앱 내 알림 생성→도착→읽음 성공과 구분한다. preview는 http://127.0.0.1:8018 이고 localhost는 Origin 불일치403이다. 운영자 로그인 ID는 operator다. root 사용자 변경·Claude 작업트리는 보존했고 운영 migration/deploy/data/main 변경은 없다. 최종 E2E·PR CI 결과는 후속 기록을 확인한다.
 
 UI 후속 로컬 검증 완료: Chromium23/WebKit23 PASS, TypeScript/Vite/diff PASS. Touch 직접 생성의 브라우저 차이는 시험에서 공통 Event 형태로 수정했고 Chromium 해당1/WebKit 전체23 재확인. 로컬 합성 알림 도착·읽음 확인, 달력6폭 넘침0·필터3폭 간격 통과. PR53 Draft 후속 push와 Work10 기록을 갱신한다. 새 HEAD CI는 PR Checks를 확인하며 이전 HEAD 성공과 구분한다. Blaybus 같은 UI Task는 진행중(사용자 화면 인수·PR 검토/병합·Safari 실기기 메뉴 확인 남음). 실행 중인 로컬 preview16716/8018·전용 PG는 사용자 확인을 위해 유지한다.
+
+## 2026-10-20 00:45 KST — 문서 정합성 정정 (Claude Code)
+
+루트 `codex/w9-integration`(c5dadb5, main보다 72커밋 뒤)에서 시작해 실제 GitHub·배포 상태를 대조했다. 별도 작업 트리 `/private/tmp/serentable-docsync`(브랜치 `docs/post-submit-status-sync`, 기준 origin/main `b633118`)에서 stale 문서만 정정했다. 루트의 사용자 미커밋 `AGENTS.md`·`HANDOFF.md`·`.claude/`·`.codex/`·`scripts/claude-*.sh`는 보존했다.
+
+**대조 결과(실측):** main `b633118` = 운영 배포 버전(health version 일치). 열린 PR 0건. 최근 main CI 전부 success(최신 39276274162). readiness ready/connected, worker-health 200. PR #39/#41/#42/#43/#44/#47/#53/#54 모두 MERGED. PR #35 MERGED. U16은 ADR-0016으로 확정.
+
+**정정한 문서:**
+- `docs/operations/submission-readiness.md`: "운영 미반영·사용자 승인 전·PR #39/#41 미병합·U16 미정" → 해소 반영. 12단계 배포 환경을 부분 완료(1·2·3·5·6·7·9·10·12 PASS, 4·8은 로컬 격리 근거)로 갱신. 3절 사용자 작업을 완료/남은 것으로 분리.
+- `docs/design/twelve-step-acceptance-matrix.md`: "Work7~9 운영 미반영·전 단계 미완료" → 배포 완료 반영, 배포 결과는 별도 문서로 연결. 실기기 푸시를 iOS 완료/Android 미확인으로 구분. U16 확정 반영.
+- `docs/design/app-ui-refresh-2026-10-19.md`: PR #53 Draft·미병합 서술이 남아 있으면 병합 반영.
+
+**남은 것(이번 미실행):** 10단계 후기 리마인드(2026-10-20 22:34 이후), 11단계 두 번째 회차 재실행(10-19 22:40 API 재배포로 중단), 4·8단계 심사 자료 표기, Blaybus 수동 기록, Android/Chrome 실기기 푸시. 운영 쓰기·매칭 재실행 없음.
