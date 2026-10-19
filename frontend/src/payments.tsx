@@ -51,7 +51,9 @@ const newKey = () => crypto.randomUUID();
 export function RefundNotice() {
   return (
     <p className="small muted">
-      환불 안내: 현행 기준 화요일 24:00 이후 환불 불가. 시스템 최종 매칭 실패의 미사용 1회권은 시간 제한 없이 전액 모의 환불할 수 있습니다. 일반 취소의 세부 정책은 미정입니다. 신청 취소는 자동 환불이 아닙니다.
+      환불 안내: 현행 기준 화요일 24:00 이후 환불 불가. 시스템 최종 매칭 실패의
+      미사용 1회권은 시간 제한 없이 전액 모의 환불할 수 있습니다. 일반 취소의
+      세부 정책은 미정입니다. 신청 취소는 자동 환불이 아닙니다.
     </p>
   );
 }
@@ -70,8 +72,10 @@ export function NoShowNotice() {
 export function paymentOpen(application: Application) {
   return (
     application.payment_required &&
-    application.candidates.some(slot => slot.live) &&
-    application.candidates.filter(slot => slot.live).every((slot) => slot.recruiting)
+    application.candidates.some((slot) => slot.live) &&
+    application.candidates
+      .filter((slot) => slot.live)
+      .every((slot) => slot.recruiting)
   );
 }
 
@@ -201,8 +205,20 @@ export function PaymentPanel({
           않았습니다. 실패 기록은 남으며 다시 결제할 수 있습니다.
         </Notice>
       )}
-      {!paid && !reused && paymentOpen(application) && <ReusablePasses applicationId={application.id} onUsed={() => { setReused(true); onPaid?.(); }} />}
-      {reused ? <Notice>보관한 1회권을 적용했습니다. 추가 결제 없이 자동 매칭을 기다려 주세요.</Notice> : paid ? (
+      {!paid && !reused && paymentOpen(application) && (
+        <ReusablePasses
+          applicationId={application.id}
+          onUsed={() => {
+            setReused(true);
+            onPaid?.();
+          }}
+        />
+      )}
+      {reused ? (
+        <Notice>
+          보관한 1회권을 적용했습니다. 추가 결제 없이 자동 매칭을 기다려 주세요.
+        </Notice>
+      ) : paid ? (
         <Notice>
           결제 완료 ·{" "}
           {result
@@ -255,34 +271,71 @@ export function PaymentPanel({
   );
 }
 
-function ReusablePasses({ applicationId, onUsed }: { applicationId: string; onUsed: () => void }) {
+function ReusablePasses({
+  applicationId,
+  onUsed,
+}: {
+  applicationId: string;
+  onUsed: () => void;
+}) {
   const request = useScopedApi();
   const [rights, setRights] = useState<Entitlement[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [key] = useState(newKey);
   const [selected, setSelected] = useState("");
-  useEffect(() => { request<{ entitlements: Entitlement[] }>("/api/me/entitlements")
-    .then(body => setRights(body.entitlements.filter(right => right.reusable)))
-    .catch(error => setError(message(error))); }, [applicationId]);
+  useEffect(() => {
+    request<{ entitlements: Entitlement[] }>("/api/me/entitlements")
+      .then((body) =>
+        setRights(body.entitlements.filter((right) => right.reusable)),
+      )
+      .catch((error) => setError(message(error)));
+  }, [applicationId]);
   async function reuse(id: string) {
-    setPending(true); setError("");
+    setPending(true);
+    setError("");
     // Keep the idempotency key tied to a single chosen right across a lost response.
     try {
-      await request(`/api/me/entitlements/${id}/reuse`, { method: "POST", body: JSON.stringify({
-        application_id: applicationId, request_key: key,
-      }) }); onUsed();
-    } catch (error) { setError(error instanceof ApiError && error.status === 409
-      ? "이용권 또는 신청 상태가 변경되었습니다. 내 신청을 확인해 주세요." : message(error)); }
-    finally { setPending(false); }
+      await request(`/api/me/entitlements/${id}/reuse`, {
+        method: "POST",
+        body: JSON.stringify({
+          application_id: applicationId,
+          request_key: key,
+        }),
+      });
+      onUsed();
+    } catch (error) {
+      setError(
+        error instanceof ApiError && error.status === 409
+          ? "이용권 또는 신청 상태가 변경되었습니다. 내 신청을 확인해 주세요."
+          : message(error),
+      );
+    } finally {
+      setPending(false);
+    }
   }
-  return <section aria-label="보관한 이용권 재사용">
-    {error && <Notice error>{error}</Notice>}
-    {rights.length > 0 && <><p>보관한 1회권을 추가 결제 없이 사용할 수 있습니다.</p>
-      {rights.map((right, index) => <button key={right.id} disabled={pending || (!!selected && selected !== right.id)}
-        onClick={() => { setSelected(right.id); void reuse(right.id); }}>보관한 1회권 사용 {index + 1}</button>)}
-    </>}
-  </section>;
+  return (
+    <section aria-label="보관한 이용권 재사용">
+      {error && <Notice error>{error}</Notice>}
+      {rights.length > 0 && (
+        <>
+          <p>보관한 1회권을 추가 결제 없이 사용할 수 있습니다.</p>
+          {rights.map((right, index) => (
+            <button
+              key={right.id}
+              disabled={pending || (!!selected && selected !== right.id)}
+              onClick={() => {
+                setSelected(right.id);
+                void reuse(right.id);
+              }}
+            >
+              보관한 1회권 사용 {index + 1}
+            </button>
+          ))}
+        </>
+      )}
+    </section>
+  );
 }
 
 /** Payment state of an application, kept separate from the application state. */
@@ -292,8 +345,13 @@ export function paymentSummary(application: Application) {
     (payment) => payment.state === "FAILED",
   ).length;
   const failureNote = failures ? ` · 결제 실패 ${failures}회 기록` : "";
-  if (latest?.state === "REFUNDED") return `전액 모의 환불 완료 · ${won(latest.amount_krw)}`;
-  if (application.coverage?.entitlement.reserved_application_id === application.id && !latest)
+  if (latest?.state === "REFUNDED")
+    return `전액 모의 환불 완료 · ${won(latest.amount_krw)}`;
+  if (
+    application.coverage?.entitlement.reserved_application_id ===
+      application.id &&
+    !latest
+  )
     return "보관한 1회권 재사용 · 추가 결제 없음";
   if (latest?.state === "PAID")
     return `결제 완료 · ${latest.product.name} ${won(latest.amount_krw)} (모의)${failureNote}`;
@@ -339,7 +397,8 @@ export function MyEntitlements() {
               <p>
                 <strong>
                   {productNames[item.product_code]} ·{" "}
-                  {item.application_state === "CANCELED" && item.state === "HELD"
+                  {item.application_state === "CANCELED" &&
+                  item.state === "HELD"
                     ? "취소된 신청에 묶여 보유"
                     : entitlementStates[item.state]}
                 </strong>
@@ -349,12 +408,13 @@ export function MyEntitlements() {
                   ? `시작 ${day.format(new Date(item.starts_at))} · 만료 ${day.format(new Date(item.expires_at!))} · 기간 내 참여 횟수 무제한`
                   : item.reusable
                     ? "보관 완료 · 만료 없음 · 새 신청의 결제 화면에서 재사용 가능"
-                  : item.state === "REFUNDED" ? "원결제 금액 전액 모의 환불 완료 · 재사용 불가"
-                  : item.state === "USED"
-                    ? `테이블 확정으로 사용 완료 · ${day.format(new Date(item.used_at!))}`
-                  : item.application_state === "CANCELED"
-                    ? "결제한 신청이 취소됨 · 자동 환불 아님 · 보관·재사용 규칙 미정"
-                    : "결제한 신청에 보유 · 테이블 확정 시 사용 처리 예정 · 취소 시 보관·재사용 규칙 미정"}
+                    : item.state === "REFUNDED"
+                      ? "원결제 금액 전액 모의 환불 완료 · 재사용 불가"
+                      : item.state === "USED"
+                        ? `테이블 확정으로 사용 완료 · ${day.format(new Date(item.used_at!))}`
+                        : item.application_state === "CANCELED"
+                          ? "결제한 신청이 취소됨 · 자동 환불 아님 · 보관·재사용 규칙 미정"
+                          : "결제한 신청에 보유 · 테이블 확정 시 사용 처리 예정 · 취소 시 보관·재사용 규칙 미정"}
               </p>
             </li>
           ))}
@@ -362,10 +422,14 @@ export function MyEntitlements() {
       ) : (
         <p>보유한 이용권이 없습니다.</p>
       )}
-      <p className="small muted">
-        이용권 규칙은 임시 적용 중입니다(멤버십은 결제 완료 시각부터 달력 기준
-        개월 수, 말일 보정). 최종 실패 신청당 멤버십을 7일 한 번 연장합니다. 자동 갱신 정책은 미정입니다.
-      </p>
+      <details className="policy-disclosure">
+        <summary>이용권 안내</summary>
+        <p className="small muted">
+          이용권 규칙은 임시 적용 중입니다(멤버십은 결제 완료 시각부터 달력 기준
+          개월 수, 말일 보정). 최종 실패 신청당 멤버십을 7일 한 번 연장합니다.
+          자동 갱신 정책은 미정입니다.
+        </p>
+      </details>
     </>
   );
 }

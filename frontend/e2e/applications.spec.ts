@@ -1,3 +1,4 @@
+import { openScreen } from "./support";
 import { test, expect, type Page } from "@playwright/test";
 import { call, display, login } from "./support";
 
@@ -56,9 +57,7 @@ test("참가자가 복수 후보 회차를 골라 검토 후 신청하고 상태
     ],
   });
 
-  await participant
-    .getByRole("link", { name: "일정 신청", exact: true })
-    .click();
+  await openScreen(participant, "일정 신청");
   const picker = participant.getByRole("group", { name: "후보 회차" });
   await picker.getByRole("checkbox", { name: startsWith(firstName) }).check();
   await picker.getByRole("checkbox", { name: startsWith(secondName) }).check();
@@ -91,9 +90,7 @@ test("참가자가 복수 후보 회차를 골라 검토 후 신청하고 상태
     participant.getByRole("status").filter({ hasText: "신청을 제출했습니다" }),
   ).toBeVisible();
 
-  await participant
-    .getByRole("link", { name: "입력 상태", exact: true })
-    .click();
+  await participant.getByRole("link", { name: "내 식탁", exact: true }).click();
   const mine = participant
     .getByRole("list", { name: "내 신청" })
     // Each application is a direct item; its candidates form a nested list.

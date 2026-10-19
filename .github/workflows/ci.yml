@@ -61,9 +61,13 @@ jobs:
           retention-days: 7
 
   browser:
-    name: Browser E2E
+    name: Browser E2E (${{ matrix.browser }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
     services:
       postgres:
         image: postgres:17-alpine
@@ -79,6 +83,7 @@ jobs:
       DATABASE_URL: postgresql://serentable:ci-only@127.0.0.1:5432/serentable_test
       TEST_DATABASE_URL: postgresql://serentable:ci-only@127.0.0.1:5432/serentable_test
       PYTHONPATH: backend
+      E2E_BROWSER: ${{ matrix.browser }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -95,7 +100,7 @@ jobs:
       - run: npm run build --prefix frontend
       - run: uv sync --locked
       - run: uv run alembic upgrade head
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
         working-directory: frontend
       - run: npm run test:e2e --prefix frontend
 

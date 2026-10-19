@@ -18,7 +18,11 @@ type SlotDashboard = {
     table_count: number;
     alternative_offered_count: number;
   };
-  gathering: { venue_assigned: number; venue_pending: number; room_count: number };
+  gathering: {
+    venue_assigned: number;
+    venue_pending: number;
+    room_count: number;
+  };
   attendance: {
     check_in_count: number;
     no_show_candidate_count: number;
@@ -67,12 +71,21 @@ function SlotCard({ item }: { item: SlotDashboard }) {
     ["신청", breakdown(item.applications)],
     ["결제", breakdown(item.payments)],
     ["매칭", run],
-    ["확정 인원·테이블", `${matching.confirmed_count}명 · ${matching.table_count}개`],
+    [
+      "확정 인원·테이블",
+      `${matching.confirmed_count}명 · ${matching.table_count}개`,
+    ],
     ["대안 선택 대기", `${matching.alternative_offered_count}건`],
-    ["식당 배정", `완료 ${gathering.venue_assigned} · 대기 ${gathering.venue_pending}`],
+    [
+      "식당 배정",
+      `완료 ${gathering.venue_assigned} · 대기 ${gathering.venue_pending}`,
+    ],
     ["단체방", `${gathering.room_count}개`],
     ["푸시 발송", breakdown(item.push)],
-    ["체크인·노쇼 후보", `${attendance.check_in_count}명 · ${attendance.no_show_candidate_count}명`],
+    [
+      "체크인·노쇼 후보",
+      `${attendance.check_in_count}명 · ${attendance.no_show_candidate_count}명`,
+    ],
     [
       "피드백 제출률",
       `${rate(attendance.feedback_rate)} (${attendance.feedback_submitted}/${attendance.feedback_eligible})`,
@@ -129,25 +142,38 @@ export function DashboardSection() {
     <section>
       <h2>회차별 현황</h2>
       <p className="small muted">
-        자동 처리 결과를 숫자로만 보여 줍니다. 승인하거나 실행하는 기능은 없습니다.
+        자동 처리 결과를 숫자로만 보여 줍니다. 승인하거나 실행하는 기능은
+        없습니다.
       </p>
-      <label>
-        회차
-        <select value={selected} onChange={(e) => setSelected(e.target.value)}>
-          <option value="">전체 회차</option>
-          {slots.map((item) => (
-            <option key={item.event_slot.id} value={item.event_slot.id}>
-              {item.event_slot.region.name} · {show(item.event_slot.starts_at)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button type="button" onClick={() => setReload((value) => value + 1)} disabled={loading}>
-        새로 고침
-      </button>
+      <div className="dashboard-toolbar">
+        <label>
+          회차
+          <select
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+          >
+            <option value="">전체 회차</option>
+            {slots.map((item) => (
+              <option key={item.event_slot.id} value={item.event_slot.id}>
+                {item.event_slot.region.name} ·{" "}
+                {show(item.event_slot.starts_at)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          onClick={() => setReload((value) => value + 1)}
+          disabled={loading}
+        >
+          새로 고침
+        </button>
+      </div>
       {loading && <Notice>현황을 불러오고 있습니다.</Notice>}
       {error && <Notice error>{error}</Notice>}
-      {!loading && !error && slots.length === 0 && <Notice>등록된 회차가 없습니다.</Notice>}
+      {!loading && !error && slots.length === 0 && (
+        <Notice>등록된 회차가 없습니다.</Notice>
+      )}
       {visible.map((item) => (
         <SlotCard key={item.event_slot.id} item={item} />
       ))}

@@ -315,3 +315,22 @@ Work9·상위Agenda는 감사보관U16·역할분리·기존조치사유정책·
 - 실제 전체 수집 366개(신규 검증3 포함)를 92/92/91/91로 분할해 누락·중복 0 확인. 로컬 독립 DB 네 개에서 전체366 PASS, 실패/오류/skip0, 전체350.4초. YAML 파싱·집계 실패 차단·Ruff·형식·diff 검사를 통과했다.
 - 기준 GitHub CI39251409277은 총20분17초, pytest17분43초. 로컬 결과와 직접 비교하지 않으며 새 GitHub CI 실측이 남아 있다. 신규 PR과 Checks 및 최종 댓글을 확인한다. 상세: docs/design/ci-speed-verification-2026-10-19.md.
 - Blaybus 기존 「DB 연결과 CI 구성」에 수행/검증 추가 기록으로 관리한다. 기존 Work를 재개하거나 상위 제출 완료로 확대하지 않는다. 실제 시간은 사용자가 기록한다.
+
+## 2026-10-19 Codex 앱 UI 구현 체크포인트
+
+- 사용자 승인: 게시판처럼 나열된 화면을 자연스럽고 반응이 빠른 앱 형태로 구현. 별도 작업트리 `/private/tmp/serentable-app-ui`, 브랜치 `codex/app-ui`, 기준 main2bd003c(PR50 포함).
+- 최신 사용자 요청에 따라 운영자 예외·최종 검증·제출 → 통합 검증·제출(Work #10) → 앱형 UI·반응형 개선 및 회귀 검증의 신규 Task에 구현·검증을 기록한다. 기존 Task #18은 설계 참고로 연결하며 새 Agenda/Work는 추가하지 않는다. Blaybus 실제 등록은 사용자 수동 확인이 남았다. 상세 계획·색상·레이아웃·검증 경계는 `docs/design/app-ui-refresh-2026-10-19.md`.
+- 구현: 하단/상단 주요 이동4개+더보기, 현재 위치와44px 터치, 별도 알림 dialog와 같은 로그인 내 상태 유지, 프로필 구획/즉시 대기 안내, 내부 상태 코드의 한국어 표현,960px 운영자2열, 콘솔 지연 로딩과 로딩/실패 복구. 백엔드·DB·worker·상태판정·정책은 변경하지 않는다.
+- 현재 RED→GREEN: 메뉴, 알림/포커스, profile API 지연, 한국어 상태, 콘솔 지연 포커스, 알림 재열기, JS 다운로드 실패. 새 E2E6개와 기존15개를 유지한다. 중간 Chromium20PASS/trace ENOENT1은 겹친 엔진 실행의 결과 폴더 삭제 때문이며 제품 실패와 구분한다. 임시 WebKit 독립 실행21PASS를 확인했다. 정식 브라우저별 출력/CI matrix를 적용한 최종 재검증 중이다.
+- 실제 로컬PG17의 테스트 DB와 화면 캡처 DB는 서로 분리한다. preview8018은 합성 데이터만 사용한다. 화면 원본/측정은 `/private/tmp/serentable-app-ui-artifacts/`. root AGENTS/HANDOFF/개인 도구 미커밋 및 Claude 작업트리는 변경하지 않았다. 운영 migration·배포·데이터 변경 없음.
+- 다음: Chromium/WebKit 정식 설정 최종 결과,182렌더링·키보드/reduced motion,코드 검토→PR/CI→Blaybus 수행/검증/남은 항목. 기존 NotificationsPanel과 PWA 메타는 Claude 작업을 재작성하지 않는다. 실제 기기 검증은 별도다.
+
+### UI 검토용 PR 생성 준비
+
+정식 Chromium/WebKit 설정으로 각21개 통과 기록(passed/실패0), TypeScript·Vite 빌드·diff 검사 통과. GitHub CI는 PR 생성 후 확인한다. Chromium91렌더링에서 넘침 없음, WebKit 동일 렌더링 감사·실기기 인수는 미완료다. 사용자 요청에 따라 Work10 신규 UI Task의 검토용 Draft PR을 생성한다. 운영 반영·main 병합 없음.
+
+### PR #53 사용자 검토 후 후속
+
+Work10 UI Task에서 목록/달력 알약 전환·날짜 말풍선·신청 후보 유지와 운영자 필터 간격을 보완했다. main의 PR52 아이콘/홈 화면명/푸시 구독 복원을 통합했다. 상세는 app-ui-refresh-2026-10-19.md. 실제 휴대폰 잠금화면 푸시는 사용자 확인 완료로 보고받았으며 이번 로컬 앱 내 알림 생성→도착→읽음 성공과 구분한다. preview는 http://127.0.0.1:8018 이고 localhost는 Origin 불일치403이다. 운영자 로그인 ID는 operator다. root 사용자 변경·Claude 작업트리는 보존했고 운영 migration/deploy/data/main 변경은 없다. 최종 E2E·PR CI 결과는 후속 기록을 확인한다.
+
+UI 후속 로컬 검증 완료: Chromium23/WebKit23 PASS, TypeScript/Vite/diff PASS. Touch 직접 생성의 브라우저 차이는 시험에서 공통 Event 형태로 수정했고 Chromium 해당1/WebKit 전체23 재확인. 로컬 합성 알림 도착·읽음 확인, 달력6폭 넘침0·필터3폭 간격 통과. PR53 Draft 후속 push와 Work10 기록을 갱신한다. 새 HEAD CI는 PR Checks를 확인하며 이전 HEAD 성공과 구분한다. Blaybus 같은 UI Task는 진행중(사용자 화면 인수·PR 검토/병합·Safari 실기기 메뉴 확인 남음). 실행 중인 로컬 preview16716/8018·전용 PG는 사용자 확인을 위해 유지한다.

@@ -7,6 +7,7 @@ import {
   type ProductCode,
 } from "./api";
 import { show, SlotSummary } from "./events";
+import { SlotBrowser } from "./slot-browser";
 import {
   NoShowNotice,
   PaymentPanel,
@@ -214,18 +215,22 @@ export function ApplyPage({
           <p className="muted small">
             고른 회차만 후보로 저장합니다. 날짜와 지역을 따로 조합하지 않습니다.
           </p>
-          {slots.map((slot) => (
-            <label className="check" key={slot.id}>
-              <input
-                type="checkbox"
-                checked={chosen.includes(slot.id)}
-                onChange={(e) => toggle(slot.id, e.target.checked)}
-              />
-              <span>
-                <SlotSummary slot={slot} />
-              </span>
-            </label>
-          ))}
+          <SlotBrowser
+            slots={slots}
+            listLabel="선택 가능한 후보 회차"
+            renderSlot={(slot) => (
+              <label className="check" key={slot.id}>
+                <input
+                  type="checkbox"
+                  checked={chosen.includes(slot.id)}
+                  onChange={(e) => toggle(slot.id, e.target.checked)}
+                />
+                <span>
+                  <SlotSummary slot={slot} />
+                </span>
+              </label>
+            )}
+          />
         </fieldset>
       ) : (
         <p>현재 모집 중인 회차가 없습니다.</p>
@@ -263,7 +268,8 @@ const matchingReasons: Record<string, string> = {
   age_gap: "나이 차이 조건을 맞출 수 없습니다",
   no_valid_table: "조건에 맞는 테이블을 만들 수 없습니다",
   overlapping_confirmation: "같은 시간대의 다른 식탁에 이미 확정되었습니다",
-  no_qualifying_table: "조건과 최소 매칭 점수를 함께 만족하는 테이블을 찾지 못했습니다",
+  no_qualifying_table:
+    "조건과 최소 매칭 점수를 함께 만족하는 테이블을 찾지 못했습니다",
   pass_held: "미사용 1회권 보관 완료 · 새 신청에서 재사용할 수 있습니다",
   mock_refunded: "원결제 금액 전액 모의 환불 완료",
   mock_refund_failed: "모의 환불 실패 · 운영자 재시도 대기(이용권 예약 유지)",
@@ -278,8 +284,10 @@ function matchingSummary(application: Application) {
     const slot = application.candidates.find(
       (candidate) => candidate.id === matching.event_slot_id,
     );
-    const table = matching.table ? ` · 같은 테이블 ${matching.table.member_count}명` : "";
-    return `매칭 확정 (CONFIRMED)${slot ? ` · ${show(slot.starts_at)}` : ""}${table}`;
+    const table = matching.table
+      ? ` · 같은 테이블 ${matching.table.member_count}명`
+      : "";
+    return `매칭 확정${slot ? ` · ${show(slot.starts_at)}` : ""}${table}`;
   }
   // A slot that has not matched yet can still seat this application, so a run that left it
   // out in an earlier slot does not settle it.
@@ -290,9 +298,9 @@ function matchingSummary(application: Application) {
       Date.parse(slot.matches_at) > now,
   );
   if (awaiting.length)
-    return `매칭 대기 (WAITING) · 매칭 예정 ${[...new Set(awaiting.map((slot) => show(slot.matches_at)))].join(", ")}`;
+    return `매칭 대기 · 매칭 예정 ${[...new Set(awaiting.map((slot) => show(slot.matches_at)))].join(", ")}`;
   if (matching && matching.state !== "WAITING" && matching.state !== "MATCHING")
-    return `${matchingLabels[matching.state] ?? matching.state} (${matching.state})${
+    return `${matchingLabels[matching.state] ?? matching.state}${
       matching.reason_code
         ? ` · ${matchingReasons[matching.reason_code] ?? matching.reason_code}`
         : ""
@@ -314,123 +322,232 @@ function ApplicationItem({
         <strong>신청: {stateLabels[application.state]}</strong>
         {application.participant && ` · ${application.participant.login_id}`}
       </p>
-      <p className="small">결제: {paymentSummary(application)}{application.refund_state === "REFUND_AVAILABLE" && " · 환불 가능 (모의)"}</p>
+      <p className="small">
+        결제: {paymentSummary(application)}
+        {application.refund_state === "REFUND_AVAILABLE" &&
+          " · 환불 가능 (모의)"}
+      </p>
       <p className="small">매칭: {matchingSummary(application)}</p>
-      {application.matching?.state === "CONFIRMED" && application.matching.table && (
-        <p className="small">
-          같은 식탁 소개: {application.matching.table.members
-            .map((member) => member.display_name).join(", ")}
-        </p>
-      )}
+      {application.matching?.state === "CONFIRMED" &&
+        application.matching.table && (
+          <p className="small">
+            같은 식탁 소개:{" "}
+            {application.matching.table.members
+              .map((member) => member.display_name)
+              .join(", ")}
+          </p>
+        )}
       <ul className="candidates">
         {application.candidates.map((slot) => (
           <li key={slot.id}>
             <SlotSummary slot={slot} />
-            {!slot.live && <span className="small muted">이전 후보 · 종료됨</span>}
+            {!slot.live && (
+              <span className="small muted">이전 후보 · 종료됨</span>
+            )}
           </li>
         ))}
       </ul>
-      {!!application.resolutions?.length && <details>
-        <summary>실패 해결 이력</summary>
-        <ul>{application.resolutions.map(item => <li key={item.id}>
-          {show(item.created_at)} · {item.action === "TRANSFER" ? "일정 이동 동의·처리 완료"
-            : item.action === "HOLD" ? "이용권 보관·신청 종료"
-            : item.refund_status === "FAILED" ? "모의 환불 실패 · 운영자 재시도 대기(이용권 예약 유지)" : "전액 모의 환불 완료"}
-          {!!item.refund_events?.length && <ol aria-label="모의 환불 처리 이력">
-            {item.refund_events.map(event => <li key={event.state}>
-              {event.state === "REFUND_REQUESTED" ? "환불 요청" : event.state === "REFUND_PROCESSING" ? "환불 처리 중" : "환불 완료"}
-              {` · ${event.amount_krw.toLocaleString("ko-KR")}원 · ${show(event.created_at)}`}
-            </li>)}
-          </ol>}
-        </li>)}</ul>
-      </details>}
+      {!!application.resolutions?.length && (
+        <details>
+          <summary>실패 해결 이력</summary>
+          <ul>
+            {application.resolutions.map((item) => (
+              <li key={item.id}>
+                {show(item.created_at)} ·{" "}
+                {item.action === "TRANSFER"
+                  ? "일정 이동 동의·처리 완료"
+                  : item.action === "HOLD"
+                    ? "이용권 보관·신청 종료"
+                    : item.refund_status === "FAILED"
+                      ? "모의 환불 실패 · 운영자 재시도 대기(이용권 예약 유지)"
+                      : "전액 모의 환불 완료"}
+                {!!item.refund_events?.length && (
+                  <ol aria-label="모의 환불 처리 이력">
+                    {item.refund_events.map((event) => (
+                      <li key={event.state}>
+                        {event.state === "REFUND_REQUESTED"
+                          ? "환불 요청"
+                          : event.state === "REFUND_PROCESSING"
+                            ? "환불 처리 중"
+                            : "환불 완료"}
+                        {` · ${event.amount_krw.toLocaleString("ko-KR")}원 · ${show(event.created_at)}`}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       {action}
     </li>
   );
 }
 
 /** Explicit choices; the server revalidates the failure token and current coverage. */
-function AlternativeSlots({ application, onResolved }: {
-  application: Application; onResolved: () => Promise<void>;
+function AlternativeSlots({
+  application,
+  onResolved,
+}: {
+  application: Application;
+  onResolved: () => Promise<void>;
 }) {
   const request = useScopedApi();
   const [result, setResult] = useState<{
-    alternatives: EventSlot[]; pending_candidates: EventSlot[]; failure_run_id: string | null; refund_state: "REFUND_AVAILABLE" | null;
+    alternatives: EventSlot[];
+    pending_candidates: EventSlot[];
+    failure_run_id: string | null;
+    refund_state: "REFUND_AVAILABLE" | null;
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   // Keep a key for an unchanged choice after transport failure; refresh on a new choice.
-  const [attempt, setAttempt] = useState<{ choice: string; key: string } | null>(null);
+  const [attempt, setAttempt] = useState<{
+    choice: string;
+    key: string;
+  } | null>(null);
   async function load() {
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
     try {
-      setResult(await request(`/api/me/applications/${application.id}/alternatives`));
+      setResult(
+        await request(`/api/me/applications/${application.id}/alternatives`),
+      );
     } catch (error) {
-      setError(error instanceof ApiError && error.status === 409
-        ? "신청 상태가 변경되었습니다. 신청 상태를 새로 확인해 주세요." : message(error));
-    } finally { setLoading(false); }
+      setError(
+        error instanceof ApiError && error.status === 409
+          ? "신청 상태가 변경되었습니다. 신청 상태를 새로 확인해 주세요."
+          : message(error),
+      );
+    } finally {
+      setLoading(false);
+    }
   }
-  async function choose(action: "TRANSFER" | "HOLD" | "REFUND", slot: string | null = null) {
+  async function choose(
+    action: "TRANSFER" | "HOLD" | "REFUND",
+    slot: string | null = null,
+  ) {
     if (!result?.failure_run_id) return;
     const choice = `${result.failure_run_id}:${action}:${slot}`;
     const key = attempt?.choice === choice ? attempt.key : crypto.randomUUID();
-    setAttempt({ choice, key }); setLoading(true); setError("");
+    setAttempt({ choice, key });
+    setLoading(true);
+    setError("");
     try {
-      const response = await request<{ resolution: { refund_status?: "FAILED" | "SUCCEEDED" | null } }>(`/api/me/applications/${application.id}/resolutions`, {
-        method: "POST", body: JSON.stringify({ request_key: key, action,
-          event_slot_id: slot, failure_run_id: result.failure_run_id }),
+      const response = await request<{
+        resolution: { refund_status?: "FAILED" | "SUCCEEDED" | null };
+      }>(`/api/me/applications/${application.id}/resolutions`, {
+        method: "POST",
+        body: JSON.stringify({
+          request_key: key,
+          action,
+          event_slot_id: slot,
+          failure_run_id: result.failure_run_id,
+        }),
       });
-      setSuccess(action === "TRANSFER" ? "선택한 일정으로 이동했습니다. 자동 매칭을 기다려 주세요."
-        : action === "REFUND" ? (response.resolution.refund_status === "FAILED"
-          ? "모의 환불을 완료하지 못했습니다. 이용권은 예약 상태로 보존되며 운영자가 재시도합니다. 실제 입출금은 없습니다."
-          : "전액 모의 환불이 완료되었습니다. 실제 입출금은 없습니다.")
-        : "이번 신청을 종료하고 이용권을 보관했습니다.");
-      setResult(null); await onResolved();
+      setSuccess(
+        action === "TRANSFER"
+          ? "선택한 일정으로 이동했습니다. 자동 매칭을 기다려 주세요."
+          : action === "REFUND"
+            ? response.resolution.refund_status === "FAILED"
+              ? "모의 환불을 완료하지 못했습니다. 이용권은 예약 상태로 보존되며 운영자가 재시도합니다. 실제 입출금은 없습니다."
+              : "전액 모의 환불이 완료되었습니다. 실제 입출금은 없습니다."
+            : "이번 신청을 종료하고 이용권을 보관했습니다.",
+      );
+      setResult(null);
+      await onResolved();
     } catch (error) {
-      setError(error instanceof ApiError && error.status === 409
-        ? "신청 상태 또는 일정 자격이 변경되었습니다. 신청 상태를 새로 확인해 주세요." : message(error));
-    } finally { setLoading(false); }
+      setError(
+        error instanceof ApiError && error.status === 409
+          ? "신청 상태 또는 일정 자격이 변경되었습니다. 신청 상태를 새로 확인해 주세요."
+          : message(error),
+      );
+    } finally {
+      setLoading(false);
+    }
   }
   const single = application.coverage?.entitlement.kind === "SINGLE";
-  return <section aria-label="대체 일정">
-    <button disabled={loading} onClick={() => void load()}>
-      {loading ? "처리 중…" : "다른 일정 확인"}
-    </button>
-    {error && <Notice error>{error}</Notice>}
-    {success && <Notice>{success}</Notice>}
-    {result && (result.pending_candidates.length ? <>
-      <p>선택한 후보 회차의 매칭이 아직 남아 있습니다. 기존 신청으로 계속 기다립니다.</p>
-      <ul className="candidates">{result.pending_candidates.map(slot =>
-        <li key={slot.id}><SlotSummary slot={slot} /></li>)}</ul>
-    </> : <>
-      <p className="small muted">조회만으로 일정이나 결제가 변경되지 않습니다.
-        일정을 선택하면 해당 날짜·지역 이동에 동의하며 원결제를 유지합니다.</p>
-      {result.alternatives.length ? <ul className="candidates" aria-label="모집 중인 다른 일정">
-        {result.alternatives.map(slot => <li key={slot.id}>
-          <SlotSummary slot={slot} />
-          <button disabled={loading} onClick={() => void choose("TRANSFER", slot.id)}>이 일정으로 이동</button>
-        </li>)}
-      </ul> : <p>현재 이용권으로 이동 가능한 모집 일정이 없습니다.</p>}
-      {result.refund_state && <p className="small">환불 가능 · 미사용 1회권 원금 전액 (모의)</p>}
-      <div className="actions">
-        <button disabled={loading} onClick={() => void choose("HOLD")}>
-          {single ? "1회권 보관" : "이번 신청 종료·멤버십 유지"}</button>
-        {single && <button disabled={loading} onClick={() => void choose("REFUND")}>
-          1회권 전액 모의 환불</button>}
-      </div>
-      <p className="small muted">{single
-        ? "미사용 1회권은 만료 없이 보관 후 새 신청에서 재사용하거나 전액 모의 환불할 수 있습니다."
-        : "최종 실패 신청당 멤버십을 7일 한 번 연장합니다. 같은 신청의 재이동에는 추가 연장하지 않으며 금액 환불은 준비 중입니다."}</p>
-    </>)}
-  </section>;
+  return (
+    <section aria-label="대체 일정">
+      <button disabled={loading} onClick={() => void load()}>
+        {loading ? "처리 중…" : "다른 일정 확인"}
+      </button>
+      {error && <Notice error>{error}</Notice>}
+      {success && <Notice>{success}</Notice>}
+      {result &&
+        (result.pending_candidates.length ? (
+          <>
+            <p>
+              선택한 후보 회차의 매칭이 아직 남아 있습니다. 기존 신청으로 계속
+              기다립니다.
+            </p>
+            <ul className="candidates">
+              {result.pending_candidates.map((slot) => (
+                <li key={slot.id}>
+                  <SlotSummary slot={slot} />
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <>
+            <p className="small muted">
+              조회만으로 일정이나 결제가 변경되지 않습니다. 일정을 선택하면 해당
+              날짜·지역 이동에 동의하며 원결제를 유지합니다.
+            </p>
+            {result.alternatives.length ? (
+              <ul className="candidates" aria-label="모집 중인 다른 일정">
+                {result.alternatives.map((slot) => (
+                  <li key={slot.id}>
+                    <SlotSummary slot={slot} />
+                    <button
+                      disabled={loading}
+                      onClick={() => void choose("TRANSFER", slot.id)}
+                    >
+                      이 일정으로 이동
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>현재 이용권으로 이동 가능한 모집 일정이 없습니다.</p>
+            )}
+            {result.refund_state && (
+              <p className="small">환불 가능 · 미사용 1회권 원금 전액 (모의)</p>
+            )}
+            <div className="actions">
+              <button disabled={loading} onClick={() => void choose("HOLD")}>
+                {single ? "1회권 보관" : "이번 신청 종료·멤버십 유지"}
+              </button>
+              {single && (
+                <button
+                  disabled={loading}
+                  onClick={() => void choose("REFUND")}
+                >
+                  1회권 전액 모의 환불
+                </button>
+              )}
+            </div>
+            <p className="small muted">
+              {single
+                ? "미사용 1회권은 만료 없이 보관 후 새 신청에서 재사용하거나 전액 모의 환불할 수 있습니다."
+                : "최종 실패 신청당 멤버십을 7일 한 번 연장합니다. 같은 신청의 재이동에는 추가 연장하지 않으며 금액 환불은 준비 중입니다."}
+            </p>
+          </>
+        ))}
+    </section>
+  );
 }
 
 /** The participant's own applications with status; shown on the home page. */
 export function MyApplications({
-  navigate, onChanged,
+  navigate,
+  onChanged,
 }: {
-  navigate: (path: string) => void; onChanged?: () => void;
+  navigate: (path: string) => void;
+  onChanged?: () => void;
 }) {
   const request = useScopedApi();
   const [applications, setApplications] = useState<Application[] | null>(null);
@@ -493,8 +610,10 @@ export function MyApplications({
                     </button>
                   )}
                   {application.state === "SUBMITTED" &&
-                    application.candidates.some(slot => slot.live) &&
-                    application.candidates.filter(slot => slot.live).every((slot) => slot.recruiting) && (
+                    application.candidates.some((slot) => slot.live) &&
+                    application.candidates
+                      .filter((slot) => slot.live)
+                      .every((slot) => slot.recruiting) && (
                       <button
                         disabled={pending === application.id}
                         onClick={() => void cancel(application.id)}
@@ -504,8 +623,20 @@ export function MyApplications({
                     )}
                   {(application.matching?.state === "ALTERNATIVE_OFFERED" ||
                     (application.matching?.state === "NO_MATCH" &&
-                      !["overlapping_confirmation", "pass_held", "mock_refunded", "mock_refund_failed", "membership_held"].includes(application.matching.reason_code ?? ""))) && (
-                    <AlternativeSlots application={application} onResolved={async () => { await load(); onChanged?.(); }} />
+                      ![
+                        "overlapping_confirmation",
+                        "pass_held",
+                        "mock_refunded",
+                        "mock_refund_failed",
+                        "membership_held",
+                      ].includes(application.matching.reason_code ?? ""))) && (
+                    <AlternativeSlots
+                      application={application}
+                      onResolved={async () => {
+                        await load();
+                        onChanged?.();
+                      }}
+                    />
                   )}
                 </div>
               }
@@ -515,15 +646,25 @@ export function MyApplications({
       ) : (
         <p>아직 제출한 신청이 없습니다.</p>
       )}
-      <p className="small muted">
-        신청 취소는 후보 회차 중 가장 이른 신청 마감 전까지 가능하며 자동 환불이
-        아닙니다. 시스템 매칭 최종 실패의 미사용 1회권은 마감 제한 없이 전액 모의 환불할 수 있습니다.
-        결제는 가장 이른 신청 마감 전까지 가능하며 미결제 신청은 매칭에서
-        제외됩니다.
-      </p>
-      <NoShowNotice />
-      <button onClick={() => void load()}>신청 상태 새로고침</button>
-      <button onClick={() => navigate("/participant/apply")}>일정 신청</button>
+      <details className="policy-disclosure">
+        <summary>신청·결제 안내</summary>
+        <p className="small muted">
+          신청 취소는 후보 회차 중 가장 이른 신청 마감 전까지 가능하며 자동
+          환불이 아닙니다. 시스템 매칭 최종 실패의 미사용 1회권은 마감 제한 없이
+          전액 모의 환불할 수 있습니다. 결제는 가장 이른 신청 마감 전까지
+          가능하며 미결제 신청은 매칭에서 제외됩니다.
+        </p>
+        <NoShowNotice />
+      </details>
+      <div className="actions">
+        <button onClick={() => void load()}>신청 상태 새로고침</button>
+        <button
+          className="primary"
+          onClick={() => navigate("/participant/apply")}
+        >
+          일정 신청
+        </button>
+      </div>
     </>
   );
 }
@@ -566,8 +707,8 @@ function MatchHistory() {
     <section>
       <h2>매칭 이력</h2>
       <p className="lead">
-        회차별 자동 매칭 실행 세대와 결과입니다. 읽기 전용이며 운영자가 매칭을 시작하거나
-        결과를 바꿀 수 없습니다.
+        회차별 자동 매칭 실행 세대와 결과입니다. 읽기 전용이며 운영자가 매칭을
+        시작하거나 결과를 바꿀 수 없습니다.
       </p>
       {error && <Notice error>{error}</Notice>}
       {!runs ? (
@@ -578,7 +719,8 @@ function MatchHistory() {
             <li key={run.id}>
               <p>
                 <strong>
-                  {run.event_slot.region.name} · {show(run.event_slot.starts_at)}
+                  {run.event_slot.region.name} ·{" "}
+                  {show(run.event_slot.starts_at)}
                 </strong>{" "}
                 · {run.attempt}번째 실행 · {runLabels[run.state] ?? run.state}
               </p>
@@ -590,8 +732,11 @@ function MatchHistory() {
               </p>
               {run.policy && (
                 <p className="small">
-                  최소 점수 {Number(run.policy.min_score)} · 정책 {run.policy.version}
-                  {run.search_complete === false ? " · 탐색 시간 상한 도달" : ""}
+                  최소 점수 {Number(run.policy.min_score)} · 정책{" "}
+                  {run.policy.version}
+                  {run.search_complete === false
+                    ? " · 탐색 시간 상한 도달"
+                    : ""}
                 </p>
               )}
               {run.tables.some((table) => table.score !== null) && (
