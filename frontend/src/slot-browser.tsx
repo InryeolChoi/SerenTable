@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { EventSlot } from "./api";
 
 // Group by Seoul wall-clock date, including slots just after midnight.
@@ -33,6 +33,38 @@ export function SlotBrowser({
   const [selected, setSelected] = useState<string | null>(null);
   const touchX = useRef<number | null>(null);
   const bubbleId = useId();
+  const grid = useRef<HTMLDivElement>(null);
+  // Placed above the date when the grid has room there; dates in the top rows open below so
+  // the bubble never covers the view switch and month controls above the grid.
+  const [anchor, setAnchor] = useState<{ x: number; y: number; left: number; width: number; room: number; below: boolean } | null>(null);
+  useLayoutEffect(() => {
+    const host = grid.current;
+    if (!selected || view !== "calendar" || !host) return;
+    function measure() {
+      const button = host!.querySelector<HTMLButtonElement>(`button[data-date="${selected}"]`);
+      if (!button) return;
+      const rect = button.getBoundingClientRect();
+      const bounds = host!.getBoundingClientRect();
+      const width = Math.min(bounds.width, 350);
+      const x = rect.left - bounds.left + rect.width / 2;
+      const below = rect.top - bounds.top < 200;
+      const next = {
+        x, y: below ? rect.bottom - bounds.top : rect.top - bounds.top, width, below,
+        left: Math.max(0, Math.min(x - width / 2, bounds.width - width)),
+        room: Math.max(64, Math.min(240, below ? window.innerHeight - rect.bottom - 220 : rect.top - 200)),
+      };
+      setAnchor(current => current && Object.keys(next).every(key => current[key as keyof typeof next] === next[key as keyof typeof next]) ? current : next);
+    }
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(host);
+    window.addEventListener("scroll", measure, { passive: true, capture: true });
+    return () => { observer.disconnect(); window.removeEventListener("scroll", measure, true); };
+  }, [selected, view, month]);
+  function closeBubble() {
+    grid.current?.querySelector<HTMLButtonElement>(`button[data-date="${selected}"]`)?.focus({ preventScroll: true });
+    setSelected(null);
+  }
   const [year, monthNumber] = month.split("-").map(Number);
   const firstWeekday = new Date(Date.UTC(year, monthNumber - 1, 1)).getUTCDay();
   const days = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
@@ -103,38 +135,15 @@ export function SlotBrowser({
               ›
             </button>
           </div>
-          {selected && selectedSlots.length > 0 && (
-            <section
-              className="calendar-bubble"
-              id={bubbleId}
-              aria-label="선택한 날짜의 회차"
-            >
-              <div className="calendar-bubble-heading">
-                <strong>
-                  {Number(selected.slice(5, 7))}월 {Number(selected.slice(8))}일
-                </strong>
-                <button
-                  type="button"
-                  aria-label="날짜 회차 닫기"
-                  onClick={() => setSelected(null)}
-                >
-                  닫기
-                </button>
-              </div>
-              <ul className="slot-options">
-                {selectedSlots.map((slot) => (
-                  <li key={slot.id}>{renderSlot(slot)}</li>
-                ))}
-              </ul>
-            </section>
-          )}
           <div className="calendar-weekdays" aria-hidden="true">
             {["일", "월", "화", "수", "목", "금", "토"].map((day) => (
               <span key={day}>{day}</span>
             ))}
           </div>
           <div
+            ref={grid}
             className="calendar-days"
+            onKeyDown={event => { if (event.key === "Escape" && selected) { event.stopPropagation(); closeBubble(); } }}
             role="group"
             aria-label={`${year}년 ${monthNumber}월 날짜`}
           >
@@ -149,6 +158,7 @@ export function SlotBrowser({
                 <button
                   type="button"
                   key={key}
+                  data-date={key}
                   disabled={!available}
                   aria-label={`${year}년 ${monthNumber}월 ${day}일, ${available ? "회차 있음" : "모집 없음"}`}
                   aria-pressed={selected === key}
@@ -161,6 +171,33 @@ export function SlotBrowser({
                 </button>
               );
             })}
+          {selected && anchor && selectedSlots.length > 0 && (
+            <section
+              className="calendar-bubble"
+              id={bubbleId}
+              data-placement={anchor.below ? "below" : "above"}
+              style={{ left: anchor.left, width: anchor.width, top: anchor.below ? anchor.y + 10 : undefined, bottom: anchor.below ? undefined : `calc(100% - ${anchor.y}px + 10px)`, "--bubble-tail": `${anchor.x - anchor.left}px`, "--bubble-room": `${anchor.room}px` } as CSSProperties}
+              aria-label="선택한 날짜의 회차"
+            >
+              <div className="calendar-bubble-heading">
+                <strong>
+                  {Number(selected.slice(5, 7))}월 {Number(selected.slice(8))}일
+                </strong>
+                <button
+                  type="button"
+                  aria-label="날짜 회차 닫기"
+                  onClick={closeBubble}
+                >
+                  닫기
+                </button>
+              </div>
+              <ul className="slot-options">
+                {selectedSlots.map((slot) => (
+                  <li key={slot.id}>{renderSlot(slot)}</li>
+                ))}
+              </ul>
+            </section>
+          )}
           </div>
           <p className="small muted">
             점이 있는 날짜에 신청할 수 있는 회차가 있습니다.

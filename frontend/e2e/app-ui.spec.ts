@@ -200,12 +200,24 @@ test("목록과 달력을 전환해 가능한 날짜의 회차를 고르고 선�
     name: `${year}년 3월 1일, 회차 있음`,
     exact: true,
   });
+  const dayBefore = await day.boundingBox();
   await day.click();
   const bubble = page.getByRole("region", {
     name: "선택한 날짜의 회차",
     exact: true,
   });
   await expect(bubble).toContainText("홍대");
+  const dateBox = await day.boundingBox();
+  const bubbleBox = await bubble.boundingBox();
+  expect(Math.abs(dateBox!.y - dayBefore!.y)).toBeLessThan(1);
+  // A first-row date opens below itself so the view switch above the grid stays usable.
+  const gap = bubbleBox!.y - (dateBox!.y + dateBox!.height);
+  expect(gap).toBeGreaterThanOrEqual(8);
+  expect(gap).toBeLessThanOrEqual(16);
+  await expect(page.getByRole("button", { name: "목록 보기", exact: true })).toBeVisible();
+  expect(bubbleBox!.x).toBeGreaterThanOrEqual(0);
+  expect(bubbleBox!.x + bubbleBox!.width).toBeLessThanOrEqual(390);
+
   const choice = bubble.getByRole("checkbox");
   await choice.check();
   await page.getByRole("button", { name: "목록 보기", exact: true }).click();
