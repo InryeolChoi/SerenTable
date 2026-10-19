@@ -44,6 +44,23 @@ export function NotificationsPanel() {
     finally { setBusy(false); }
   }
   const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+  // On reopening, an existing browser subscription is re-saved (idempotent per endpoint)
+  // so the unsubscribe button returns; another account's endpoint gets 409 and stays hidden.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+        const subscription = await registration?.pushManager.getSubscription();
+        if (!subscription) return;
+        const result = await api<{id: string}>("/api/me/push-subscriptions", { method: "POST", body: JSON.stringify({ endpoint: subscription.endpoint, keys: subscription.toJSON().keys }) });
+        if (!cancelled) setSubscriptionId(result.id);
+      } catch { /* The allow button still works; nothing to show here. */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   async function disablePush() {
     setBusy(true); setError("");
     try {
