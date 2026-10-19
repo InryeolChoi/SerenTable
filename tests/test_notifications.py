@@ -97,6 +97,7 @@ def test_owner_notification_read_is_idempotent_and_private(notifications_databas
         assert send(owner, "POST", f"/api/me/notifications/{first}/read").json() == read.json()
         items = owner.get("/api/me/notifications").json()["notifications"]
         assert len(items) == 1 and items[0]["read_at"] is not None
+        assert items[0]["table_id"] is None  # not a table announcement
         assert items[0]["push_status"] == "not_subscribed"
         assert owner.get("/api/me/notifications").headers["cache-control"] == "no-store"
 
