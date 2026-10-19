@@ -33,7 +33,7 @@ U03/U04의 실패 연장·이용권 보관/재사용·환불, U05 점수, U09 �
 
 ## Blaybus 수동 반영 문구
 
-공통 PR: https://github.com/InryeolChoi/SerenTable/pull/33 . 새 Work/Task 추가는 없다. 실제 투입 시간은 사용자 타이머 기록을 사용한다. 전체 Task/Work는 미정·잔여 기준을 포함하므로 진행 중을 유지한다. 코드 부분 결과는 검토·머지 대기로 기록한다.
+공통 PR: https://github.com/InryeolChoi/SerenTable/pull/33 (병합 완료). 새 Work/Task 추가는 없다. 실제 투입 시간은 사용자 타이머 기록을 사용한다. **100명 실행 사례와 작은 정답 사례 준비 Task는 사례 준비 범위에서 완료로 표시할 수 있다.** 성능 SLA·데모 시드는 별도다. 나머지 두 Task와 Work #5/#6·Agenda는 진행 중을 유지한다. Blaybus 실제 변경은 사용자 수동이며 반영 확인 전이다.
 
 **자동 매칭·실패 해결 → 규칙·데이터·정답 기준 → 100명 실행 사례와 작은 정답 사례 준비**
 

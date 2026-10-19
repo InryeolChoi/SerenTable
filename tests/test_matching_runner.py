@@ -204,7 +204,8 @@ def test_the_planner_keeps_the_tables_within_the_slot_capacity():
     participants = [Participant(application_id=f"a{index}", birth_year=1995) for index in range(8)]
     plan = plan_allocation(participants, capacity=6)
     assert plan.seated_count == 6
-    assert [reason for _, reason in plan.unseated] == ["no_valid_table", "no_valid_table"]
+    # Without the limit all eight would sit (4 + 4), so the full slot is the reason.
+    assert [reason for _, reason in plan.unseated] == ["capacity", "capacity"]
 
 
 @pytest.mark.parametrize("capacity, expected", [(24, 13), (8, 8)])
@@ -496,7 +497,9 @@ def test_an_interrupted_generation_is_abandoned_and_replaced_by_a_new_attempt():
         for participant in members:
             apply_and_pay(participant, slot_id)
         time.sleep(3.6)
-        # A process that died mid-run leaves its generation behind, uncommitted to nothing.
+        # A durable stale RUNNING fixture exercises legacy/manual recovery. An actual
+        # killed worker rolls back its uncommitted generation; test_worker_crash_recovery
+        # checks that different case through a separate process and the public API.
         with database_engine().begin() as connection:
             connection.execute(
                 text("""INSERT INTO match_run
