@@ -4,6 +4,9 @@ Every scenario builds real confirmed tables with the matching runner on PostgreS
 reads the result over HTTP; only the isolated slot times are moved with SQL.
 """
 
+import os
+import subprocess
+import sys
 import time
 from contextlib import ExitStack
 from datetime import datetime, timedelta
@@ -225,7 +228,24 @@ def components(slot):
         ]
 
 
-def test_the_next_matching_separates_excluded_pairs_and_spares_mutual_meet_again(first_table):
+def seated_by_separate_worker(operator, slot):
+    """One cycle of the real runner process; the result is read back over HTTP."""
+    process = subprocess.run(
+        [sys.executable, "-m", "serentable.worker", "--once"],
+        env=os.environ.copy(),
+        capture_output=True,
+        timeout=60,
+    )
+    assert process.returncode == 0, process.stderr
+    runs = operator.get("/api/admin/match-runs").json()["match_runs"]
+    (run,) = [run for run in runs if run["event_slot"]["id"] == slot]
+    return run["seated_count"]
+
+
+@pytest.mark.parametrize("runner", ["in_process", "separate_worker"])
+def test_the_next_matching_separates_excluded_pairs_and_spares_mutual_meet_again(
+    first_table, runner
+):
     from serentable.matching import run_due_matches
     from test_matching_runner import apply_and_pay, due_slot
 
@@ -252,8 +272,14 @@ def test_the_next_matching_separates_excluded_pairs_and_spares_mutual_meet_again
     for client in [*first_table["members"], *first_table["extras"]]:
         apply_and_pay(client, slot)
     time.sleep(6.6)
-    (summary,) = run_due_matches()
-    assert summary["seated_count"] == 8
+    if runner == "in_process":
+        (summary,) = run_due_matches()
+        seated = summary["seated_count"]
+    else:
+        # PRD step 4 through the deployed shape: the separate worker repairs the excluded
+        # pairs inside one run and still seats everyone.
+        seated = seated_by_separate_worker(first_table["operator"], slot)
+    assert seated == 8
 
     excluded = [{i1, i3}, {i2, i4}, {i1, i4}]
     tables = components(slot)
