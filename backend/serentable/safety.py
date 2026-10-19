@@ -1,8 +1,9 @@
-"""Work #8 reports, blocks and sanctions (feedback-contract.md, ADR-0014).
+"""Work #8 reports, blocks and sanctions (feedback-contract.md, ADR-0014, ADR-0016).
 
 A report separates the pair from future matching in the same transaction that stores it
-(U09); the operator's review only decides sanctions. Nothing here tells the reported
-participant that a report or block exists.
+(U09); the operator's review decides sanctions, and only a dismissed report's separation
+may later be released by an operator with a reason (ADR-0016). Nothing here tells the
+reported participant that a report or block exists.
 """
 
 import uuid
@@ -201,6 +202,9 @@ def table_safety(table_id: uuid.UUID, user: Principal = Depends(require_particip
 
 
 ADMIN_REPORT_SELECT = """SELECT r.*, reporter.login_id AS reporter_login,
+    EXISTS(SELECT 1 FROM participant_exclusion e WHERE e.source='report'
+        AND e.user_low=LEAST(r.reporter_id, r.reported_id)
+        AND e.user_high=GREATEST(r.reporter_id, r.reported_id)) AS separation_active,
     reporter_p.data->>'display_name' AS reporter_name,
     reported.login_id AS reported_login, reported_p.data->>'display_name' AS reported_name
     FROM safety_report r
@@ -225,6 +229,7 @@ def admin_report_json(row):
         "state": row["state"],
         "created_at": iso(row["created_at"]),
         "reviewed_at": iso(row["reviewed_at"]),
+        "separation_active": row["separation_active"],
     }
 
 
@@ -286,6 +291,62 @@ def review_report(
         elif row["state"] != payload.decision:
             raise HTTPException(409, "report_already_reviewed")
         result = admin_report_json(row)
+    return private_response({"report": result})
+
+
+class ReleaseInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    reason: str = Field(min_length=1, max_length=500)
+
+
+@router.post("/api/admin/reports/{report_id}/release-separation")
+def release_report_separation(
+    report_id: uuid.UUID,
+    payload: ReleaseInput,
+    operator: Principal = Depends(require_csrf_operator),
+):
+    """Lift the report separation of a dismissed report (ADR-0016).
+
+    Only the pair's 'report' exclusion is removed; blocks and avoid choices stay. While any
+    report between the two is still open or confirmed, the separation is kept.
+    """
+    if not payload.reason.strip():
+        raise HTTPException(422, "reason_required")
+    with database_engine().begin() as connection:
+        lock_matching(connection)
+        connection.execute(
+            text("SELECT id FROM safety_report WHERE id=:id FOR UPDATE"), {"id": report_id}
+        )
+        row = read_admin_report(connection, report_id)
+        if row["state"] != "DISMISSED":
+            raise HTTPException(409, "report_not_dismissed")
+        low, high = sorted((str(row["reporter_id"]), str(row["reported_id"])))
+        active = connection.execute(
+            text("""SELECT 1 FROM safety_report WHERE state IN ('OPEN','CONFIRMED')
+            AND LEAST(reporter_id, reported_id)=:low
+            AND GREATEST(reporter_id, reported_id)=:high LIMIT 1"""),
+            {"low": low, "high": high},
+        ).scalar()
+        if active:
+            raise HTTPException(409, "pair_has_active_report")
+        deleted = connection.execute(
+            text("""DELETE FROM participant_exclusion
+            WHERE user_low=:low AND user_high=:high AND source='report' RETURNING 1"""),
+            {"low": low, "high": high},
+        ).scalar()
+        if deleted:
+            # States only: the report's detail text never enters the audit trail.
+            record_audit(
+                connection,
+                operator.id,
+                "report.release_separation",
+                "safety_report",
+                report_id,
+                reason=payload.reason.strip(),
+                before={"separation_active": True},
+                after={"separation_active": False},
+            )
+        result = admin_report_json(read_admin_report(connection, report_id))
     return private_response({"report": result})
 
 

@@ -24,6 +24,7 @@ type AdminReport = {
   detail: string | null;
   state: ReportState;
   created_at: string;
+  separation_active: boolean;
 };
 type SanctionKind = "WARNING" | "SUSPENSION" | "PERMANENT_BAN";
 type Sanction = {
@@ -217,8 +218,8 @@ function ReportReview({ onChanged }: { onChanged: () => void }) {
     <section>
       <h2>신고 검토</h2>
       <p className="muted">
-        신고 접수 즉시 두 사람은 다음 매칭에서 분리됩니다. 확인·기각은 제재 판단에만 쓰이며 기각해도
-        분리는 유지됩니다.
+        신고 접수 즉시 두 사람은 다음 매칭에서 분리됩니다. 확인·기각은 제재 판단에 쓰이며 기각해도
+        분리는 유지됩니다. 기각된 신고만 사유를 남기고 분리를 해제할 수 있습니다(차단·비선호는 유지).
       </p>
       {error && <Notice error>{error}</Notice>}
       {reports.length === 0 && !error && <Notice>접수된 신고가 없습니다.</Notice>}
@@ -243,9 +244,55 @@ function ReportReview({ onChanged }: { onChanged: () => void }) {
             </div>
           )}
           {item.state === "CONFIRMED" && <SanctionForm report={item} />}
+          {item.state === "DISMISSED" &&
+            (item.separation_active ? (
+              <ReleaseSeparation report={item} onReleased={() => void load()} />
+            ) : (
+              <p className="muted">매칭 분리 해제됨</p>
+            ))}
         </article>
       ))}
     </section>
+  );
+}
+
+function ReleaseSeparation({ report, onReleased }: { report: AdminReport; onReleased: () => void }) {
+  const request = useScopedApi();
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setPending(true);
+    setError("");
+    try {
+      await request(`/api/admin/reports/${report.id}/release-separation`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      });
+      onReleased();
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setPending(false);
+    }
+  }
+  return (
+    <form onSubmit={submit}>
+      <label>
+        매칭 분리 해제 사유(필수, 500자 이내)
+        <input
+          required
+          maxLength={500}
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+        />
+      </label>
+      <button type="submit" disabled={pending || !reason.trim()}>
+        매칭 분리 해제
+      </button>
+      {error && <Notice error>{error}</Notice>}
+    </form>
   );
 }
 
