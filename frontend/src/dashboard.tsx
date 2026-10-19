@@ -131,6 +131,7 @@ export function DashboardSection() {
       <p className="small muted">
         자동 처리 결과를 숫자로만 보여 줍니다. 승인하거나 실행하는 기능은 없습니다.
       </p>
+      <div className="dashboard-toolbar">
       <label>
         회차
         <select value={selected} onChange={(e) => setSelected(e.target.value)}>
@@ -145,6 +146,7 @@ export function DashboardSection() {
       <button type="button" onClick={() => setReload((value) => value + 1)} disabled={loading}>
         새로 고침
       </button>
+      </div>
       {loading && <Notice>현황을 불러오고 있습니다.</Notice>}
       {error && <Notice error>{error}</Notice>}
       {!loading && !error && slots.length === 0 && <Notice>등록된 회차가 없습니다.</Notice>}

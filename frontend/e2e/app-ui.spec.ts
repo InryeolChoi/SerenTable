@@ -159,3 +159,63 @@ test("운영 화면 파일을 받지 못해도 다른 메뉴로 이동할 수 �
     page.getByRole("heading", { name: "합성 참가자 관리", exact: true }),
   ).toBeVisible();
 });
+
+test("목록과 달력을 전환해 가능한 날짜의 회차를 고르고 선택을 유지한다", async ({ browser }) => {
+  const { call, operatorPassword, openScreen } = await import("./support");
+  const adminContext = await browser.newContext();
+  const admin = await adminContext.newPage();
+  await login(admin, "operator", operatorPassword);
+  // Fixed Seoul date on the first day of a future month checks UTC/date boundaries.
+  const year = new Date().getUTCFullYear() + 1;
+  await call(admin, "POST", "/api/admin/event-slots", {
+    region_code: "hongdae", starts_at: `${year}-03-01T00:30:00+09:00`,
+    ends_at: `${year}-03-01T02:30:00+09:00`, closes_at: `${year}-02-27T00:00:00+09:00`,
+    matches_at: `${year}-02-28T00:00:00+09:00`, capacity: 12,
+  });
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, "participant-01", participantPassword);
+  await openScreen(page, "일정 신청");
+  await page.getByRole("button", { name: "달력 보기", exact: true }).click();
+  // The calendar initially shows the earliest offered month; navigate forward as needed.
+  for (let i = 0; i < 24 && !(await page.getByRole("button", { name: `${year}년 3월 1일, 회차 있음`, exact: true }).count()); i++) {
+    await page.getByRole("button", { name: "다음 달", exact: true }).click();
+  }
+  const day = page.getByRole("button", { name: `${year}년 3월 1일, 회차 있음`, exact: true });
+  await day.click();
+  const bubble = page.getByRole("region", { name: "선택한 날짜의 회차", exact: true });
+  await expect(bubble).toContainText("홍대");
+  const choice = bubble.getByRole("checkbox");
+  await choice.check();
+  await page.getByRole("button", { name: "목록 보기", exact: true }).click();
+  await expect(page.locator('input[type="checkbox"]:checked')).toHaveCount(1);
+  await page.getByRole("button", { name: "달력 보기", exact: true }).click();
+  await expect(bubble.getByRole("checkbox")).toBeChecked();
+  const switcher = page.getByRole("group", { name: "회차 보기 방식" });
+  await switcher.dispatchEvent("touchstart", { touches: [{ clientX: 20 }] });
+  await switcher.dispatchEvent("touchend", { changedTouches: [{ clientX: 100 }] });
+  await expect(page.getByRole("button", { name: "목록 보기", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "달력 보기", exact: true }).click();
+  const disabled = page.locator('.calendar-days button:disabled');
+  expect(await disabled.count()).toBeGreaterThan(0);
+  await page.setViewportSize({ width: 320, height: 740 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  await context.close(); await adminContext.close();
+});
+
+
+test("운영자 회차 필터와 새로 고침은 작은 화면에서도 떨어져 배치된다", async ({ page }) => {
+  const { operatorPassword, openScreen } = await import("./support");
+  await login(page, "operator", operatorPassword);
+  await openScreen(page, "운영 현황");
+  const section = page.locator("section").filter({ has: page.getByRole("heading", { name: "회차별 현황", exact: true }) }).last();
+  for (const width of [320, 601, 834]) {
+    await page.setViewportSize({ width, height: 900 });
+    const select = await section.getByRole("combobox").boundingBox();
+    const refresh = await section.getByRole("button", { name: "새로 고침", exact: true }).boundingBox();
+    expect(select).not.toBeNull(); expect(refresh).not.toBeNull();
+    const xGap = Math.max(refresh!.x - (select!.x + select!.width), select!.x - (refresh!.x + refresh!.width));
+    const yGap = Math.max(refresh!.y - (select!.y + select!.height), select!.y - (refresh!.y + refresh!.height));
+    expect(Math.max(xGap, yGap)).toBeGreaterThanOrEqual(15);
+  }
+});

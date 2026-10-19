@@ -7,6 +7,7 @@ import {
   type ProductCode,
 } from "./api";
 import { show, SlotSummary } from "./events";
+import { SlotBrowser } from "./slot-browser";
 import {
   NoShowNotice,
   PaymentPanel,
@@ -214,18 +215,12 @@ export function ApplyPage({
           <p className="muted small">
             고른 회차만 후보로 저장합니다. 날짜와 지역을 따로 조합하지 않습니다.
           </p>
-          {slots.map((slot) => (
+          <SlotBrowser slots={slots} listLabel="선택 가능한후보 회차" renderSlot={slot => (
             <label className="check" key={slot.id}>
-              <input
-                type="checkbox"
-                checked={chosen.includes(slot.id)}
-                onChange={(e) => toggle(slot.id, e.target.checked)}
-              />
-              <span>
-                <SlotSummary slot={slot} />
-              </span>
+              <input type="checkbox" checked={chosen.includes(slot.id)} onChange={e => toggle(slot.id, e.target.checked)} />
+              <span><SlotSummary slot={slot} /></span>
             </label>
-          ))}
+          )} />
         </fieldset>
       ) : (
         <p>현재 모집 중인 회차가 없습니다.</p>

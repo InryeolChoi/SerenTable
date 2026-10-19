@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ApiError, type EventSlot, type Region } from "./api";
 import { message, Notice, useScopedApi } from "./ui";
+import { SlotBrowser } from "./slot-browser";
 
 // Operators enter Seoul wall-clock time; the API stores absolute instants.
 const seoulInstant = (local: string) => `${local}:00+09:00`;
@@ -251,13 +252,7 @@ export function ParticipantEventsPage() {
       {loading ? (
         <Notice>회차를 확인하고 있습니다…</Notice>
       ) : slots.length ? (
-        <ul className="participants" aria-label="모집 중인 회차">
-          {slots.map((slot) => (
-            <li key={slot.id}>
-              <SlotSummary slot={slot} />
-            </li>
-          ))}
-        </ul>
+        <SlotBrowser slots={slots} listLabel="모집 중인 회차" renderSlot={slot => <SlotSummary slot={slot} />} />
       ) : (
         !error && <p>현재 모집 중인 회차가 없습니다.</p>
       )}
