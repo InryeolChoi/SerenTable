@@ -93,6 +93,18 @@ npm run test:e2e --prefix frontend
 
 CI는 모든 PR과 `main`, `integration/mvp` push에서 실행한다. 별도 PostgreSQL 서비스 컨테이너와 두 DB 변수를 워크플로에서 설정하고 화면 타입 검사/빌드, Python lint/format, Alembic upgrade, 실제 DB HTTP 통합 테스트, Chromium 모바일 크기 화면 이동/새로고침, 런타임 이미지 빌드를 필수 단계로 수행한다. 조건부 성공이나 DB 없는 skip을 사용하지 않는다.
 
+### CI 분할 실행과 필수 검사
+
+CI 속도 개선은 `backend` 4개 분할, `browser`, `recovery`를 독립 실행한다. 각 backend 실행기는 별도 PostgreSQL 서비스 컨테이너를 사용한다. 테스트 파일 안의 순서·fixture는 유지하며 같은 DB에서 pytest를 병렬 실행하지 않는다. `scripts/ci_pytest.py`는 전체 수집 결과의 파일별 테스트 수를 기준으로 결정적으로 배분하므로 새 테스트도 자동 포함한다. 분할별 `--durations=25` 로그와 7일 보관 JUnit artifact에서 다음 병목을 확인한다.
+
+기존 필수 검사 이름 `verify`는 최종 집계 작업으로 유지한다. 모든 backend 분할·브라우저·복원 작업이 성공한 경우에만 성공하며 실패·취소·skip을 성공으로 바꾸지 않는다. 브랜치 보호와 Railway의 Wait for CI 설정은 이 파일 변경만으로 바뀌지 않는다. 실행기 동시 사용량에 따라 대기 시간이 생길 수 있고, 사용한 실행기 시간의 합이 줄어든다는 뜻은 아니다.
+
+로컬에서 분할을 검증할 때는 각 프로세스에 **다른 전용 테스트 DB**를 설정한 뒤 아래 명령의 `--shard`를 1~4로 지정한다. 같은 DB URL로 동시에 실행하지 않는다. E2E는 별도 DB와 포트8000이 필요하다.
+
+```sh
+uv run python scripts/ci_pytest.py --shard 1 --shards 4 -- -q --durations=25
+```
+
 ## Railway 서비스 설정
 
 신규 서비스에서 구형 `railway.toml`/`railway.json`은 사용하지 않는다. Dashboard 기반으로 한 프로젝트의 PostgreSQL·API·worker 세 서비스를 구성한다. 사전 로그인, 플랜·결제 확인, GitHub App의 비공개 저장소 접근 승인은 사용자 계정 작업이다. 비밀값은 채팅이나 커밋에 넣지 않는다.
