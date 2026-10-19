@@ -174,6 +174,9 @@ def test_one_slot_runs_all_twelve_steps_without_operator_action_after_the_deadli
         assert "12단계 가상 식당" in messages[1]["body"]
         notified = members[0].get("/api/me/notifications").json()["notifications"]
         assert {n["kind"] for n in notified} >= {"CONFIRMED", "VENUE_ASSIGNED"}
+        # Each table announcement names the caller's own table, so a client can tell tables
+        # apart without guessing from text or time.
+        assert {n["table_id"] for n in notified} == {gathering["id"]}
         body = members[0].get("/api/me/applications").text + str(messages)
         for secret in ("010-0000-0000", "synthetic_demo", "score", "components"):
             assert secret not in body

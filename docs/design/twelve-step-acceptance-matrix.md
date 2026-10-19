@@ -44,10 +44,10 @@
 
 ## 남은 공백
 
-- **배포 환경 12단계 미완료**: Work7~9 migration·deploy가 승인 전이라 공개 URL에서 전 단계를 재현하지 못했다. 심사위원용 참가자·운영자 계정·링크 제공과 결과 안내까지 접속 유지도 미확인.
+- **배포 환경 12단계 미완료**: Work7~9 migration·deploy가 승인 전이라 공개 URL에서 전 단계를 재현하지 못했다. 심사위원용 참가자·운영자 계정·링크 제공과 결과 안내까지 접속 유지도 미확인. 배포 후 사용자가 실행할 단계별 검증 도구와 절차는 [배포 환경 12단계 검증 절차](../operations/deployed-twelve-step-verification.md)에 있다(로컬 실행만 확인, 운영 미실행).
 - **실기기 푸시 미완료**: 실제 휴대폰 구독·수신(권한 허용/거부·미지원 포함)은 별도 인수.
 - **브라우저 E2E 재실행**: 이번 작업에서 Playwright를 실행하지 않았다. 현재 브랜치에서 재실행이 필요하다.
-- **같은 회차 내 재배치의 별도 프로세스 근거**: 제외 관계 수리·재착석은 실제 PG지만 같은 프로세스 실행기 호출(`test_recommendations.py`)로만 확인된다.
+- ~~같은 회차 내 재배치의 별도 프로세스 근거~~ → 2026-10-19 해소: `tests/test_recommendations.py::test_the_next_matching_separates_excluded_pairs_and_spares_mutual_meet_again[separate_worker]`가 별도 프로세스 실행기로 제외 쌍 분리·8명 전원 재착석을 확인한다.
 - **실제 실행기 강제 종료 복구**: PR #35(worker crash) 범위이며 이 문서에서 다루지 않는다.
 
 ## 미결정 정책 (구현하지 않음)

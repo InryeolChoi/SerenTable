@@ -55,13 +55,17 @@ def enqueue_notification(connection, user_id, event_key, kind, title, body, url,
     return notification_id
 
 
+# table_id names the caller's own table for table announcements ('table:<id>:<event>',
+# 'feedback-reminder:<id>'; see admin_dashboard.NOTIFICATION_SLOT) and is null otherwise.
 @router.get("/api/me/notifications")
 def notifications(user: Annotated[Principal, Depends(require_participant)]):
     with database_engine().connect() as connection:
         rows = (
             connection.execute(
                 text("""SELECT n.id,n.kind,n.title,n.body,n.url,n.created_at,
-            n.read_at, CASE WHEN EXISTS(SELECT 1 FROM push_delivery d WHERE d.notification_id=n.id
+            n.read_at, CASE WHEN n.event_key LIKE 'table:%' OR n.event_key LIKE
+              'feedback-reminder:%' THEN split_part(n.event_key,':',2) END table_id,
+            CASE WHEN EXISTS(SELECT 1 FROM push_delivery d WHERE d.notification_id=n.id
               AND d.state='SENT') THEN 'accepted' WHEN EXISTS(SELECT 1 FROM push_delivery d
               WHERE d.notification_id=n.id AND d.state='PENDING') THEN 'pending'
               WHEN EXISTS(SELECT 1 FROM push_delivery d WHERE d.notification_id=n.id
