@@ -3,15 +3,20 @@ import { test, expect, devices, type Page } from "@playwright/test";
 import { call, display, login, participantPassword } from "./support";
 
 // The accounts the seed creates; a table needs at least four of them.
-const members = ["participant-01", "participant-02", "participant-03", "participant-04"];
+const members = [
+  "participant-01",
+  "participant-02",
+  "participant-03",
+  "participant-04",
+];
 
 /** Run the separate runner once. It is the only way matching starts (MAT-01). */
 function runMatchingWorker() {
-  execFileSync(
-    "uv",
-    ["run", "python", "-m", "serentable.worker", "--once"],
-    { cwd: "..", env: { ...process.env, PYTHONPATH: "backend" }, stdio: "inherit" },
-  );
+  execFileSync("uv", ["run", "python", "-m", "serentable.worker", "--once"], {
+    cwd: "..",
+    env: { ...process.env, PYTHONPATH: "backend" },
+    stdio: "inherit",
+  });
 }
 
 async function createSlot(
@@ -103,10 +108,26 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
   for (const [index, participant] of participants.entries())
     await prepare(participant, members[index], 1994 + index);
 
-  const full = await createSlot(operator, 45 + Math.random(), "hongdae", closeInSeconds);
-  const partial = await createSlot(operator, 52 + Math.random(), "gangnam", closeInSeconds);
-  const alternative = await createSlot(operator, 60 + Math.random(), "euljiro", 3600);
-  for (const participant of participants) await submitAndPay(participant, full.id);
+  const full = await createSlot(
+    operator,
+    45 + Math.random(),
+    "hongdae",
+    closeInSeconds,
+  );
+  const partial = await createSlot(
+    operator,
+    52 + Math.random(),
+    "gangnam",
+    closeInSeconds,
+  );
+  const alternative = await createSlot(
+    operator,
+    60 + Math.random(),
+    "euljiro",
+    3600,
+  );
+  for (const participant of participants)
+    await submitAndPay(participant, full.id);
   // Only three applications here: fewer people than a table needs.
   for (const participant of participants.slice(0, 3))
     await submitAndPay(participant, partial.id);
@@ -118,10 +139,12 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
 
   const mine = await openMyApplications(participants[0]);
   const confirmed = mine.filter({ hasText: full.name });
-  await expect(confirmed).toContainText("매칭: 매칭 확정 (CONFIRMED)");
+  await expect(confirmed).toContainText("매칭: 매칭 확정");
   await expect(confirmed).toContainText("같은 테이블 4명");
   const passes = participants[0].getByRole("list", { name: "내 이용권" });
-  await expect(passes.getByText("1회권 · 사용 완료", { exact: true })).toBeVisible();
+  await expect(
+    passes.getByText("1회권 · 사용 완료", { exact: true }),
+  ).toBeVisible();
   await expect(confirmed).toContainText("같은 식탁 소개:");
   for (const suffix of ["01", "02", "03", "04"])
     await expect(confirmed).toContainText(`매칭 식탁 ${suffix}`);
@@ -130,23 +153,33 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
   expect(statusText).not.toContain("010-0000-0000");
   for (const suffix of ["02", "03", "04"])
     expect(statusText).not.toContain(`synthetic_match_${suffix}`);
-  await confirmed.screenshot({ path: testInfo.outputPath("matching-confirmed-mobile.png") });
+  await confirmed.screenshot({
+    path: testInfo.outputPath("matching-confirmed-mobile.png"),
+  });
   // A slot the runner left out says why, instead of staying "waiting" forever.
   await expect(mine.filter({ hasText: partial.name })).toContainText(
-    "매칭: 매칭 실패 · 대안 선택 대기 (ALTERNATIVE_OFFERED) · 함께 앉을 인원이 부족합니다",
+    "매칭: 매칭 실패 · 대안 선택 대기 · 함께 앉을 인원이 부족합니다",
   );
   const unseated = mine.filter({ hasText: partial.name });
   await unseated.getByRole("button", { name: "다른 일정 확인" }).click();
   const suggestions = unseated.getByRole("region", { name: "대체 일정" });
   await expect(suggestions).toContainText(alternative.name);
-  await expect(suggestions).toContainText("조회만으로 일정이나 결제가 변경되지 않습니다");
-  expect(await participants[0].evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
-  await unseated.screenshot({ path: testInfo.outputPath("matching-alternatives-mobile.png") });
+  await expect(suggestions).toContainText(
+    "조회만으로 일정이나 결제가 변경되지 않습니다",
+  );
+  expect(
+    await participants[0].evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await unseated.screenshot({
+    path: testInfo.outputPath("matching-alternatives-mobile.png"),
+  });
   // Every seated participant sees the same confirmation.
   for (const participant of participants.slice(1)) {
     const rows = await openMyApplications(participant);
     await expect(rows.filter({ hasText: full.name })).toContainText(
-      "매칭 확정 (CONFIRMED)",
+      "매칭 확정",
     );
   }
 
@@ -175,15 +208,29 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
     ).toBeTruthy();
   }
   // Failed participants can complete their own resolution, without operator approval.
-  const originalConfirmed = (await (await participants[0].request.get("/api/me/applications")).json())
-    .applications.find((item: { matching: { state: string } }) => item.matching?.state === "CONFIRMED");
-  await suggestions.getByRole("list", { name: "모집 중인 다른 일정" })
-    .locator(":scope > li").filter({ hasText: alternative.name })
-    .getByRole("button", { name: "이 일정으로 이동" }).click();
-  await expect(mine.filter({ hasText: partial.name })).toContainText("매칭 대기 (WAITING)");
-  await expect(mine.filter({ hasText: partial.name }).getByText("이전 후보 · 종료됨")).toBeVisible();
-  const afterTransfer = (await (await participants[0].request.get("/api/me/applications")).json())
-    .applications.find((item: { id: string }) => item.id === originalConfirmed.id);
+  const originalConfirmed = (
+    await (await participants[0].request.get("/api/me/applications")).json()
+  ).applications.find(
+    (item: { matching: { state: string } }) =>
+      item.matching?.state === "CONFIRMED",
+  );
+  await suggestions
+    .getByRole("list", { name: "모집 중인 다른 일정" })
+    .locator(":scope > li")
+    .filter({ hasText: alternative.name })
+    .getByRole("button", { name: "이 일정으로 이동" })
+    .click();
+  await expect(mine.filter({ hasText: partial.name })).toContainText(
+    "매칭 대기",
+  );
+  await expect(
+    mine.filter({ hasText: partial.name }).getByText("이전 후보 · 종료됨"),
+  ).toBeVisible();
+  const afterTransfer = (
+    await (await participants[0].request.get("/api/me/applications")).json()
+  ).applications.find(
+    (item: { id: string }) => item.id === originalConfirmed.id,
+  );
   expect(afterTransfer).toEqual(originalConfirmed);
 
   const holdRows = await openMyApplications(participants[1]);
@@ -191,14 +238,32 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
   await toHold.getByRole("button", { name: "다른 일정 확인" }).click();
   await toHold.getByRole("button", { name: "1회권 보관", exact: true }).click();
   await expect(toHold).toContainText("미사용 1회권 보관 완료");
-  const newApplication = await call(participants[1], "POST", "/api/me/applications", {
-    request_key: crypto.randomUUID(), event_slot_ids: [alternative.id],
-  });
-  await participants[1].goto(`/participant/payment/${newApplication.application.id}`);
-  await participants[1].getByRole("button", { name: "보관한 1회권 사용 1" }).click();
-  await expect(participants[1].getByRole("status").filter({ hasText: "보관한 1회권을 적용했습니다" })).toBeVisible();
-  await participants[1].getByRole("button", { name: "내 신청 보기", exact: true }).click();
-  await expect(participants[1].getByRole("list", { name: "내 신청" })).toContainText("보관한 1회권 재사용 · 추가 결제 없음");
+  const newApplication = await call(
+    participants[1],
+    "POST",
+    "/api/me/applications",
+    {
+      request_key: crypto.randomUUID(),
+      event_slot_ids: [alternative.id],
+    },
+  );
+  await participants[1].goto(
+    `/participant/payment/${newApplication.application.id}`,
+  );
+  await participants[1]
+    .getByRole("button", { name: "보관한 1회권 사용 1" })
+    .click();
+  await expect(
+    participants[1]
+      .getByRole("status")
+      .filter({ hasText: "보관한 1회권을 적용했습니다" }),
+  ).toBeVisible();
+  await participants[1]
+    .getByRole("button", { name: "내 신청 보기", exact: true })
+    .click();
+  await expect(
+    participants[1].getByRole("list", { name: "내 신청" }),
+  ).toContainText("보관한 1회권 재사용 · 추가 결제 없음");
 
   const refundRows = await openMyApplications(participants[2]);
   const toRefund = refundRows.filter({ hasText: partial.name });
@@ -207,17 +272,29 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
   await toRefund.getByRole("button", { name: "1회권 전액 모의 환불" }).click();
   await expect(toRefund).toContainText("전액 모의 환불 완료");
   await toRefund.getByText("실패 해결 이력", { exact: true }).click();
-  const refundHistory = toRefund.getByRole("list", { name: "모의 환불 처리 이력" });
+  const refundHistory = toRefund.getByRole("list", {
+    name: "모의 환불 처리 이력",
+  });
   await expect(refundHistory).toContainText("환불 요청");
   await expect(refundHistory).toContainText("환불 처리 중");
   await expect(refundHistory).toContainText("환불 완료");
-  await expect(participants[2].getByRole("list", { name: "내 이용권" })).toContainText("모의 환불 완료");
-  await expect(toRefund.getByRole("button", { name: "다른 일정 확인" })).toHaveCount(0);
+  await expect(
+    participants[2].getByRole("list", { name: "내 이용권" }),
+  ).toContainText("모의 환불 완료");
+  await expect(
+    toRefund.getByRole("button", { name: "다른 일정 확인" }),
+  ).toHaveCount(0);
   for (const width of [360, 1440]) {
     await participants[0].setViewportSize({ width, height: 900 });
-    expect(await participants[0].evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    expect(
+      await participants[0].evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBeTruthy();
   }
-  await participants[0].screenshot({ path: testInfo.outputPath("matching-resolution-mobile.png") });
+  await participants[0].screenshot({
+    path: testInfo.outputPath("matching-resolution-mobile.png"),
+  });
   for (const context of participantContexts) await context.close();
   await operatorContext.close();
 });

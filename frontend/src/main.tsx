@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { createRoot } from "react-dom/client";
 import {
   api,
@@ -23,8 +30,7 @@ import { AdminVenuesPage, GatheringsPage } from "./gatherings";
 import { RoomsPage } from "./chat";
 import { HistoryPage } from "./history";
 import { AdminSafetyPage } from "./safety";
-import { AdminConsolePage } from "./console";
-import { NotificationsPanel } from "./notifications";
+import { NotificationCenter } from "./notification-center";
 import {
   AdminApplicationsPage,
   ApplyPage,
@@ -33,7 +39,13 @@ import {
 import { MyEntitlements, PaymentPage } from "./payments";
 import symbol from "./chance-table-symbol.svg";
 import { message, Notice, useScopedApi } from "./ui";
+import { AppNavigation } from "./app-navigation";
+import { ScreenLoadBoundary } from "./screen-load-boundary";
 import "./style.css";
+
+const AdminConsolePage = lazy(() =>
+  import("./console").then((module) => ({ default: module.AdminConsolePage })),
+);
 
 function Login({
   onLogin,
@@ -119,18 +131,20 @@ function Checks({
   selected,
   onChange,
   hint,
+  compact = false,
 }: {
   title: string;
   choices: Choice[];
   selected: string[];
   onChange: (values: string[]) => void;
   hint?: string;
+  compact?: boolean;
 }) {
   return (
     <fieldset>
       <legend>{title}</legend>
       {hint && <p className="muted small">{hint}</p>}
-      <div className="checks">
+      <div className={compact ? "checks compact" : "checks"}>
         {choices.map((choice) => (
           <label key={choice.value}>
             <input
@@ -264,16 +278,23 @@ function ProfilePage({
       setPending(false);
     }
   }
-  if (loading) return <Notice>프로필을 확인하고 있습니다…</Notice>;
+  if (loading)
+    return (
+      <section className="narrow" aria-busy="true">
+        <h1>내 프로필</h1>
+        <Notice>프로필을 확인하고 있습니다…</Notice>
+      </section>
+    );
   if (!options || !draft)
     return (
-      <>
+      <section className="narrow">
+        <h1>내 프로필</h1>
         <Notice error>{error}</Notice>
         <button onClick={() => void load()}>다시 불러오기</button>
-      </>
+      </section>
     );
   const textFields = [
-    ["name", "이름 원문"],
+    ["name", "이름"],
     ["display_name", "표시명"],
     ["contact", "연락처"],
     ["instagram_id", "Instagram ID"],
@@ -286,59 +307,64 @@ function ProfilePage({
         합성 정보만 입력해 주세요. 미완성 상태로도 저장할 수 있습니다.
       </p>
       <p className="muted">
-        이름과 표시명은 다릅니다. 연락처·Instagram·출생연도·이름 원문은 다른
-        참가자에게 공개하지 않습니다.
+        이름은 본인 확인용이고, 표시명은 식탁에서 사용하는 이름입니다.
+        이름·연락처·Instagram·출생연도는 다른 참가자에게 공개하지 않습니다.
       </p>
       <form aria-label="본인 프로필" onSubmit={save}>
         <fieldset disabled={pending} className="form-body">
-          {textFields.map(([name, title]) => (
-            <label key={name}>
-              {title}
+          <div className="profile-basics">
+            <h2>기본 정보</h2>
+            {textFields.map(([name, title]) => (
+              <label key={name}>
+                {title}
+                <span className="small muted">
+                  {name === "instagram_id"
+                    ? "입력 완료에 필요 · @ 없이 영문·숫자·마침표·밑줄만 입력"
+                    : "입력 완료에 필요"}
+                </span>
+                <input
+                  value={draft[name] ?? ""}
+                  maxLength={
+                    name === "instagram_id" ? 30 : name === "contact" ? 40 : 100
+                  }
+                  autoComplete="off"
+                  onChange={(e) => {
+                    setSaved("");
+                    setDraft({ ...draft, [name]: e.target.value });
+                  }}
+                />
+              </label>
+            ))}
+            <label>
+              출생연도
               <span className="small muted">
-                {name === "instagram_id"
-                  ? "입력 완료에 필요 · @ 없이 영문·숫자·마침표·밑줄만 입력"
-                  : "입력 완료에 필요"}
+                4자리 연도. 정확한 만나이로 표시하지 않습니다.
               </span>
               <input
-                value={draft[name] ?? ""}
-                maxLength={
-                  name === "instagram_id" ? 30 : name === "contact" ? 40 : 100
+                type="number"
+                min={1000}
+                max={new Date().getFullYear()}
+                value={draft.birth_year ?? ""}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    birth_year: e.target.value ? Number(e.target.value) : null,
+                  })
                 }
-                autoComplete="off"
-                onChange={(e) => {
-                  setSaved("");
-                  setDraft({ ...draft, [name]: e.target.value });
-                }}
               />
             </label>
-          ))}
-          <label>
-            출생연도
-            <span className="small muted">
-              4자리 연도. 정확한 만나이로 표시하지 않습니다.
-            </span>
-            <input
-              type="number"
-              min={1000}
-              max={new Date().getFullYear()}
-              value={draft.birth_year ?? ""}
-              onChange={(e) =>
-                setDraft({
-                  ...draft,
-                  birth_year: e.target.value ? Number(e.target.value) : null,
-                })
-              }
-            />
-          </label>
-          <label>
-            성별
-            <input
-              value={draft.gender ?? ""}
-              maxLength={100}
-              onChange={(e) => setDraft({ ...draft, gender: e.target.value })}
-            />
-          </label>
+            <label>
+              성별
+              <input
+                value={draft.gender ?? ""}
+                maxLength={100}
+                onChange={(e) => setDraft({ ...draft, gender: e.target.value })}
+              />
+            </label>
+          </div>
+          <h2>성향과 관심사</h2>
           <Checks
+            compact
             title="MBTI (복수 선택)"
             hint="모르면 선택하지 않아도 됩니다."
             choices={options.mbtis}
@@ -362,6 +388,7 @@ function ProfilePage({
               onChange={(values) => setDraft({ ...draft, [name]: values })}
             />
           ))}
+          <h2>함께 먹기 위한 정보</h2>
           <FoodField
             name="food_restrictions"
             title="못 먹는 음식"
@@ -379,7 +406,7 @@ function ProfilePage({
           </p>
           {error && <Notice error>{error}</Notice>}
           {saved && <Notice>{saved}</Notice>}
-          <div className="actions">
+          <div className="actions form-actions">
             <button className="primary" disabled={pending}>
               {pending ? "저장 중…" : "프로필 저장"}
             </button>
@@ -566,19 +593,35 @@ function ParticipantHome({ navigate }: { navigate: (path: string) => void }) {
         </dl>
       )}
       <div className="actions">
+        {profile?.complete && consent?.complete && (
+          <button
+            className="primary"
+            onClick={() => navigate("/participant/events")}
+          >
+            모집 회차 보기
+          </button>
+        )}
         <button
-          className="primary"
+          className={!profile?.complete ? "primary" : undefined}
           onClick={() => navigate("/participant/profile")}
         >
           프로필 수정
         </button>
-        <button onClick={() => navigate("/participant/consent")}>
+        <button
+          className={
+            profile?.complete && !consent?.complete ? "primary" : undefined
+          }
+          onClick={() => navigate("/participant/consent")}
+        >
           동의 내용 확인
         </button>
       </div>
-      <MyApplications navigate={navigate} onChanged={() => setPassRevision(value => value + 1)} />
+      <MyApplications
+        navigate={navigate}
+        onChanged={() => setPassRevision((value) => value + 1)}
+      />
       <MyEntitlements key={passRevision} />
-      <p className="notice">
+      <p className="small muted confirmation-note">
         신청 제출과 모의 결제 완료는 참가 확정이 아닙니다. 매칭 결과는 별도로
         안내합니다.
       </p>
@@ -849,9 +892,11 @@ function App() {
         본문으로 이동
       </a>
       <div className="demo-banner">
-        합성 데이터 심사용 데모 · 실제 개인정보를 입력하지 마세요
+        심사용 합성 데이터 · 실제 개인정보 입력 금지
       </div>
-      <div className="shell">
+      <div
+        className={user ? `shell signed-in ${user.role}` : "shell signed-out"}
+      >
         <header>
           <a
             className="brand"
@@ -871,10 +916,11 @@ function App() {
           </a>
           {user && (
             <div className="account">
-              <span>
-                {user.login_id} ·{" "}
-                {user.role === "operator" ? "운영자" : "참가자"}
-              </span>
+              {user.role === "participant" ? (
+                <NotificationCenter key={user.id} />
+              ) : (
+                <span className="role-label">운영자</span>
+              )}
               <button disabled={logoutPending} onClick={() => void logout()}>
                 {logoutPending ? "로그아웃 중…" : "로그아웃"}
               </button>
@@ -882,87 +928,16 @@ function App() {
           )}
         </header>
         {user && (
-          <nav aria-label="주요 화면">
-            <a
-              href={user.role === "operator" ? "/admin" : "/participant"}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate(user.role === "operator" ? "/admin" : "/participant");
-              }}
-            >
-              {user.role === "operator" ? "참가자 관리" : "입력 상태"}
-            </a>
-            <a href={user.role === "operator" ? "/admin/venues" : "/participant/gatherings"} onClick={e => {e.preventDefault(); navigate(user.role === "operator" ? "/admin/venues" : "/participant/gatherings");}}>{user.role === "operator" ? "식당 배정" : "모임 안내"}</a>
-            {user.role === "participant" && <a href="/participant/rooms" onClick={e => {e.preventDefault(); navigate("/participant/rooms");}}>단체방</a>}
-            {user.role === "operator" && <a href="/admin/console" onClick={e => {e.preventDefault(); navigate("/admin/console");}}>운영 현황</a>}
-            <a href={user.role === "operator" ? "/admin/safety" : "/participant/history"} onClick={e => {e.preventDefault(); navigate(user.role === "operator" ? "/admin/safety" : "/participant/history");}}>{user.role === "operator" ? "안전·노쇼" : "참가 이력"}</a>
-            {user.role === "operator" && (
-              <a
-                href="/admin/events"
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate("/admin/events");
-                }}
-              >
-                회차 관리
-              </a>
-            )}
-            {user.role === "operator" && (
-              <a
-                href="/admin/applications"
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate("/admin/applications");
-                }}
-              >
-                신청 현황
-              </a>
-            )}
-            {user.role === "participant" && (
-              <>
-                <a
-                  href="/participant/events"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate("/participant/events");
-                  }}
-                >
-                  모집 회차
-                </a>
-                <a
-                  href="/participant/apply"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate("/participant/apply");
-                  }}
-                >
-                  일정 신청
-                </a>
-                <a
-                  href="/participant/profile"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate("/participant/profile");
-                  }}
-                >
-                  프로필
-                </a>
-                <a
-                  href="/participant/consent"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate("/participant/consent");
-                  }}
-                >
-                  동의
-                </a>
-              </>
-            )}
-          </nav>
+          <AppNavigation
+            key={user.id}
+            user={user}
+            path={path}
+            navigate={navigate}
+          />
         )}
         <main id="main">
           {logoutError && <Notice error>{logoutError}</Notice>}
-          {user?.role === "participant" && <NotificationsPanel />}
+
           {loading ? (
             <Notice>로그인 상태를 확인하고 있습니다…</Notice>
           ) : initialError ? (
@@ -982,7 +957,18 @@ function App() {
             </section>
           ) : user.role === "operator" ? (
             path === "/admin/console" ? (
-              <AdminConsolePage />
+              <ScreenLoadBoundary>
+                <Suspense
+                  fallback={
+                    <section>
+                      <h1>운영 현황</h1>
+                      <Notice>운영 화면을 준비하고 있습니다…</Notice>
+                    </section>
+                  }
+                >
+                  <AdminConsolePage />
+                </Suspense>
+              </ScreenLoadBoundary>
             ) : path === "/admin/safety" ? (
               <AdminSafetyPage />
             ) : path === "/admin/venues" ? (
@@ -1024,7 +1010,6 @@ function App() {
         </main>
         <footer>
           <p>우연한 식탁 · 운영사 와썹하우스</p>
-          <p>제공 자료를 참고한 재현 심볼이며 공식 로고 원본이 아닙니다.</p>
         </footer>
       </div>
     </>

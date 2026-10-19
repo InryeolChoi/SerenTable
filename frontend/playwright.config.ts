@@ -1,6 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const origin = "http://127.0.0.1:8000";
+const engine = process.env.E2E_BROWSER ?? "chromium";
+if (engine !== "chromium" && engine !== "webkit") {
+  throw new Error("E2E_BROWSER must be chromium or webkit");
+}
 const authEnvironment = {
   APP_ORIGIN: origin,
   APP_ENV: "development",
@@ -10,10 +14,19 @@ const authEnvironment = {
 };
 export default defineConfig({
   testDir: "./e2e",
+  outputDir: `./test-results/${engine}`,
   fullyParallel: false,
   workers: 1,
   use: { baseURL: origin, trace: "retain-on-failure" },
-  projects: [{ name: "mobile-chromium", use: { ...devices["Pixel 7"] } }],
+  projects:
+    engine === "webkit"
+      ? [
+          {
+            name: "mobile-webkit",
+            use: { ...devices["iPhone 13"], browserName: "webkit" },
+          },
+        ]
+      : [{ name: "mobile-chromium", use: { ...devices["Pixel 7"] } }],
   webServer: {
     // Each run starts from an empty local schema (the reset refuses non-local databases).
     command:

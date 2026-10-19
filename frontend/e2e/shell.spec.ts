@@ -1,3 +1,4 @@
+import { openScreen } from "./support";
 import { test, expect, type Page } from "@playwright/test";
 import {
   login as signIn,
@@ -58,10 +59,10 @@ test("미완성 프로필과 목적별 동의가 실제 DB에 저장되고 새�
   page,
 }) => {
   await login(page);
-  await page.getByRole("link", { name: "프로필", exact: true }).click();
+  await openScreen(page, "프로필");
   await expect(page.getByRole("form", { name: "본인 프로필" })).toBeVisible();
   const form = page.getByRole("form", { name: "본인 프로필" });
-  await form.getByLabel("이름 원문").fill("합성 참가자 하나");
+  await form.getByLabel("이름", { exact: false }).fill("합성 참가자 하나");
   for (const label of [
     "표시명",
     "연락처",
@@ -80,10 +81,14 @@ test("미완성 프로필과 목적별 동의가 실제 DB에 저장되고 새�
       .selectOption("unknown");
   await page.getByRole("button", { name: "프로필 저장", exact: true }).click();
   await expect(
-    page.getByRole("status").filter({ hasText: "미완성 프로필을 저장했습니다" }),
+    page
+      .getByRole("status")
+      .filter({ hasText: "미완성 프로필을 저장했습니다" }),
   ).toBeVisible();
   await page.reload();
-  await expect(form.getByLabel("이름 원문")).toHaveValue("합성 참가자 하나");
+  await expect(form.getByLabel("이름", { exact: false })).toHaveValue(
+    "합성 참가자 하나",
+  );
   await expect(
     form
       .getByRole("group", { name: "알레르기", exact: true })
@@ -124,7 +129,7 @@ test("미완성 프로필과 목적별 동의가 실제 DB에 저장되고 새�
   await expect(
     form.getByRole("checkbox", { name: "ENFP", exact: true }),
   ).toBeChecked();
-  await page.getByRole("link", { name: "동의", exact: true }).click();
+  await openScreen(page, "동의");
   await expect(page.getByText("버전: demo-2026-10-16").first()).toBeVisible();
   await expect(page.locator(".policy-body")).toHaveCount(2);
   for (const checkbox of await page.getByRole("checkbox").all())
@@ -143,7 +148,7 @@ test("미완성 프로필과 목적별 동의가 실제 DB에 저장되고 새�
   await expect(page.getByRole("checkbox")).toHaveCount(2);
   for (const checkbox of await page.getByRole("checkbox").all())
     await expect(checkbox).toBeChecked();
-  await page.getByRole("link", { name: "입력 상태", exact: true }).click();
+  await page.getByRole("link", { name: "내 식탁", exact: true }).click();
   await expect(page.getByText("입력 완료", { exact: true })).toBeVisible();
   await expect(page.getByText("동의 완료", { exact: true })).toBeVisible();
   expect(
@@ -157,7 +162,7 @@ test("연결 실패·입력 오류·서버 세션 철회 후에도 같은 계정
   page,
 }) => {
   await login(page);
-  await page.getByRole("link", { name: "프로필", exact: true }).click();
+  await openScreen(page, "프로필");
   const form = page.getByRole("form", { name: "본인 프로필" });
   await expect(form).toBeVisible();
   await form.getByLabel("표시명").fill("만료 전 미저장 표시명");
@@ -200,7 +205,7 @@ test("연결 실패·입력 오류·서버 세션 철회 후에도 같은 계정
     .getByLabel("비밀번호", { exact: true })
     .fill("synthetic-participant-password");
   await page.getByRole("button", { name: "로그인", exact: true }).click();
-  await page.getByRole("link", { name: "프로필", exact: true }).click();
+  await openScreen(page, "프로필");
   await expect(form.getByLabel("표시명")).toHaveValue("만료 전 미저장 표시명");
   await page.getByRole("button", { name: "로그아웃", exact: true }).click();
   await page.getByLabel("계정 ID", { exact: true }).fill("participant-02");
@@ -208,7 +213,7 @@ test("연결 실패·입력 오류·서버 세션 철회 후에도 같은 계정
     .getByLabel("비밀번호", { exact: true })
     .fill("synthetic-participant-password");
   await page.getByRole("button", { name: "로그인", exact: true }).click();
-  await page.getByRole("link", { name: "프로필", exact: true }).click();
+  await openScreen(page, "프로필");
   await expect(form.getByLabel("표시명")).not.toHaveValue(
     "만료 전 미저장 표시명",
   );
@@ -250,7 +255,7 @@ test("만료된 CSRF 토큰은 새로 받아 한 번 재시도하고 입력을 �
   page,
 }) => {
   await login(page);
-  await page.getByRole("link", { name: "프로필", exact: true }).click();
+  await openScreen(page, "프로필");
   const form = page.getByRole("form", { name: "본인 프로필" });
   await expect(form).toBeVisible();
   await form.getByLabel("직업").fill("토큰 갱신 후 저장");

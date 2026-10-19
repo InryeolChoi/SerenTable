@@ -105,6 +105,16 @@ CI 속도 개선은 `backend` 4개 분할, `browser`, `recovery`를 독립 실�
 uv run python scripts/ci_pytest.py --shard 1 --shards 4 -- -q --durations=25
 ```
 
+### UI 브라우저 엔진 검증
+
+기본 `npm run test:e2e --prefix frontend`는 Chromium 한 엔진만 실행한다. WebKit은 `E2E_BROWSER=webkit`를 지정한다. CI는 엔진별 runner와 PostgreSQL을 분리하며 두 엔진 모두 성공해야 `verify`가 통과한다. 결과 폴더도 `frontend/test-results/chromium`·`webkit`으로 나눈다. 로컬에서는 같은8000포트·DB로 두 엔진을 동시에 실행하지 않는다. 포트가 사용 중이면 기존 서버를 재사용하거나 중단하지 말고 현재 시험 종료 후 실행한다.
+
+```sh
+E2E_BROWSER=webkit npm run test:e2e --prefix frontend
+```
+
+WebKit 자동 시험은 실제 iPad/PWA/폴더블 힌지와 가상 키보드 검증을 대신하지 않는다.
+
 ## Railway 서비스 설정
 
 신규 서비스에서 구형 `railway.toml`/`railway.json`은 사용하지 않는다. Dashboard 기반으로 한 프로젝트의 PostgreSQL·API·worker 세 서비스를 구성한다. 사전 로그인, 플랜·결제 확인, GitHub App의 비공개 저장소 접근 승인은 사용자 계정 작업이다. 비밀값은 채팅이나 커밋에 넣지 않는다.
