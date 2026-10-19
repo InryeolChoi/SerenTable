@@ -25,7 +25,9 @@
 - `WEB_PUSH_NETWORK_ENABLED=true`: 실제 전송 허용. 기본 비활성. 운영/실기기 전송 승인은 이번 구현 범위에 없다.
 - pywebpush2.5.0/py-vapid1.9.6의 암호화·VAPID 서명을 재사용한다. 공개키는 개인키에서 도출하여 불일치를 막는다. 단말 잠금화면 payload와 서비스 워커 표시는 일반 새 안내+고정 `/participant/gatherings`; 개인이름·연락처·장소·테이블정보를 넣지 않는다.
 
-정확한 허용 호스트는 `fcm.googleapis.com`, `updates.push.services.mozilla.com`이다. HTTPS443만, userinfo/IP/fragment/control/backslash 거부. auth16바이트·p256dh65바이트 엄격 base64url과 P-256 곡선점 검증. Apple은 공식 자료가 wildcard만 명시하여 정확 host 근거가 확보되지 않아 현재 미지원이다. 그 외 공급자도 거부한다.
+정확한 허용 호스트는 `fcm.googleapis.com`, `updates.push.services.mozilla.com`, `web.push.apple.com`이다. HTTPS443만, userinfo/IP/fragment/control/backslash 거부. auth16바이트·p256dh65바이트 엄격 base64url과 P-256 곡선점 검증. 그 외 공급자도 거부한다.
+
+추가 결정(2026-10-19): Apple 공식 자료는 `*.push.apple.com` 범위를 명시하고 iOS/Safari 구독 endpoint는 `web.push.apple.com`이다. 실기기(iPhone 홈 화면 앱) 구독이 `invalid_push_subscription`으로 거절된 것을 운영에서 확인해, wildcard 대신 이 정확 호스트 하나만 허용 목록에 추가했다. DNS global 주소 검사·고정 소켓 연결 등 나머지 제한은 그대로 적용된다.
 
 매 실제 전송 시 endpoint를 다시 검사하고 DNS 모든 A/AAAA의 global 여부와 IPv4-mapped IPv6 거부를 검사한다. 검사한 sockaddr로 직접 socket 연결해 DNS 재바인딩 재해석을 막고 원호스트 SNI/인증서 검증을 사용한다. 표준 HTTPSConnection 직접접속으로 redirect·환경 proxy·netrc를 사용하지 않는다. socket/TLS/HTTP10초 timeout, 시스템 DNS resolver 자체의 총 지연 상한은 별도 보장하지 않는다. 제공자 본문·예외문자열을 저장/로그하지 않고 고정 오류 코드만 반환한다. 외부 전송 대역을 주입하는 session 인자는 격리 시험용이며 HTTP API에서 주입할 수 없다.
 

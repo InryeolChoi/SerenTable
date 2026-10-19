@@ -28,6 +28,8 @@ def subscription(endpoint="https://fcm.googleapis.com/fcm/send/synthetic"):
 def test_provider_subscription_rejects_unsafe_urls_and_invalid_keys():
     valid = subscription()
     assert validate_subscription(valid)["endpoint"] == valid["endpoint"]
+    apple = subscription("https://web.push.apple.com/QGuQyavXutnMH_synthetic")
+    assert validate_subscription(apple)["endpoint"] == apple["endpoint"]
     for endpoint in [
         "http://fcm.googleapis.com/a",
         "https://127.0.0.1/a",
@@ -37,6 +39,8 @@ def test_provider_subscription_rejects_unsafe_urls_and_invalid_keys():
         "https://fcm.googleapis.com/a#x",
         "https://fcm.googleapis.com/a\\b",
         "https://fcm.googleapis.com/a\n",
+        "https://evil.push.apple.com/a",
+        "https://web.push.apple.com.evil.test/a",
     ]:
         with pytest.raises(ValueError):
             validate_subscription(subscription(endpoint))

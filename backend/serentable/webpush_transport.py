@@ -17,7 +17,11 @@ from pywebpush import WebPushException, webpush
 from requests import Response
 
 # Official provider references are recorded in webpush-transport-contract.md.
-PROVIDERS = frozenset({"fcm.googleapis.com", "updates.push.services.mozilla.com"})
+# Exact hosts only. Apple documents the *.push.apple.com range; Safari/iOS subscriptions
+# use web.push.apple.com, so that single host is allowed rather than the wildcard.
+PROVIDERS = frozenset(
+    {"fcm.googleapis.com", "updates.push.services.mozilla.com", "web.push.apple.com"}
+)
 
 
 def decode_key(value, length):
