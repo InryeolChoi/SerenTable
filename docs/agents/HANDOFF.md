@@ -305,3 +305,13 @@ Work9·상위Agenda는 감사보관U16·역할분리·기존조치사유정책·
 - 리뷰 전 통합 브랜치 전체 pytest 346 PASS. 리뷰 수정 후 관련 59 PASS, 검증기 로컬 `run` PASS. 최종 CI는 PR #47에서 확인한다.
 - 운영 URL·Railway 접속 없음. 검증 스크립트의 운영 실행은 사용자가 컨테이너에서 한다. 새 공개 회차를 만들려면 `--confirm-public-slot`이 필요하고, 운영에 남는 데이터 목록은 문서에 있다.
 
+
+
+## 2026-10-19 Codex CI 속도 개선
+
+- 위치: 개발·배포 기반 확보 → 첫 배포·CI·DB 연결(#2) → DB 연결과 CI 구성 유지보수. 부모 Issue는 CLOSED를 유지하고 새 Task/Work를 만들지 않는다. 제출 검증(#10)의 범위를 줄이지 않는다.
+- 별도 작업트리 `/private/tmp/serentable-ci-speed`, 브랜치 `codex/ci-speed`, 기준 main01deb3f. Claude 작업트리와 루트 미커밋 AGENTS/HANDOFF/개인 도구 파일을 변경하지 않았다.
+- 전체 pytest를 파일 경계를 지킨 네 runner/독립 PG17에 배분한다. 브라우저 및 이미지/PG18복원은 별도 runner다. 기존 필수 검사 `verify`는 모든 선행 결과가 success여야 통과하며 failure/cancelled/skipped를 성공 처리하지 않는다. main 병합·운영 배포·운영 DB 변경 없음.
+- 실제 전체 수집 366개(신규 검증3 포함)를 92/92/91/91로 분할해 누락·중복 0 확인. 로컬 독립 DB 네 개에서 전체366 PASS, 실패/오류/skip0, 전체350.4초. YAML 파싱·집계 실패 차단·Ruff·형식·diff 검사를 통과했다.
+- 기준 GitHub CI39251409277은 총20분17초, pytest17분43초. 로컬 결과와 직접 비교하지 않으며 새 GitHub CI 실측이 남아 있다. 신규 PR과 Checks 및 최종 댓글을 확인한다. 상세: docs/design/ci-speed-verification-2026-10-19.md.
+- Blaybus 기존 「DB 연결과 CI 구성」에 수행/검증 추가 기록으로 관리한다. 기존 Work를 재개하거나 상위 제출 완료로 확대하지 않는다. 실제 시간은 사용자가 기록한다.
