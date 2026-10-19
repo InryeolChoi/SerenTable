@@ -200,7 +200,9 @@ test("목록과 달력을 전환해 가능한 날짜의 회차를 고르고 선�
     name: `${year}년 3월 1일, 회차 있음`,
     exact: true,
   });
-  const dayBefore = await day.boundingBox();
+  // Page coordinates: the click may scroll the date into view, which is not a layout shift.
+  const pageTop = () => day.evaluate((element) => element.getBoundingClientRect().top + window.scrollY);
+  const dayBefore = await pageTop();
   await day.click();
   const bubble = page.getByRole("region", {
     name: "선택한 날짜의 회차",
@@ -209,7 +211,7 @@ test("목록과 달력을 전환해 가능한 날짜의 회차를 고르고 선�
   await expect(bubble).toContainText("홍대");
   const dateBox = await day.boundingBox();
   const bubbleBox = await bubble.boundingBox();
-  expect(Math.abs(dateBox!.y - dayBefore!.y)).toBeLessThan(1);
+  expect(Math.abs((await pageTop()) - dayBefore)).toBeLessThan(1);
   // A first-row date opens below itself so the view switch above the grid stays usable.
   const gap = bubbleBox!.y - (dateBox!.y + dateBox!.height);
   expect(gap).toBeGreaterThanOrEqual(8);
