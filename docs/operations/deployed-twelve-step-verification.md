@@ -3,7 +3,7 @@
 - 작성: 2026-10-19, Work #10 「12단계 E2E·100명·복구 검증」의 배포 환경 부분
 - 도구: [`scripts/verify_deployed_twelve_step.py`](../../scripts/verify_deployed_twelve_step.py) (표준 라이브러리만 사용)
 - 기준: [구현 명세 §4](../design/mvp-implementation-spec.md#4-prd-12단계-e2e-인수-기준), [12단계 인수 근거 매트릭스](../design/twelve-step-acceptance-matrix.md), [신청·모의 결제 배포 검증](./application-deployment-verification.md)
-- 상태: **배포 환경에서는 아직 실행하지 않았다.** 아래 "로컬 실행 결과"는 로컬 근거이며 운영 통과가 아니다.
+- 상태: 2026-10-19 운영 `run` **PASS**(아래 "운영 실행 결과"). 후기 리마인드(10단계 일부)와 11단계(두 번째 회차)는 아직 운영에서 확인하지 않았다.
 
 ## 무엇을 하는 도구인가
 
@@ -94,6 +94,14 @@
 - 이 네 명은 서로 "이미 만난 사이"로 기록되어 이후 매칭에서 새로운 사람 점수가 낮아진다. 사람별 선호·신고·차단·제재는 만들지 않는다.
 - 기본 동작에서 비어 있던 프로필·동의 항목이 채워지고, `--normalize-profiles`를 주면 위 항목이 덮어써진다.
 - 11단계 확인을 위해 두 번째 `run`을 하면 위 목록이 한 벌 더 생긴다.
+
+## 운영 실행 결과 (2026-10-19)
+
+- 환경: Railway production, API 서비스 컨테이너에서 실행(공개 HTTPS `APP_ORIGIN`), 배포 커밋 `01deb3f`(`DEPLOY_EXPECT_VERSION` 일치 PASS). worker는 같은 날 DB와 같은 리전(Southeast Asia)으로 옮긴 뒤(주기 약 2초) 실행했다.
+- 첫 시도: 프로필·동의까지 PASS 후 `FAIL shared_meal_budget`(네 합성 계정의 공통 식비 구간 없음)으로 회차 생성 전에 멈췄다. 운영 데이터 변화 없음.
+- 두 번째 시도: 사용자 승인으로 `run --confirm-public-slot --normalize-profiles`. slot `8faf8481-0980-4a9b-af03-6fc3a584a523`, table `437f3487-18cf-47f5-a5c2-f827d8dadeec`, 마감·매칭 22:16:11, 시작 22:24:40, 종료 22:34:40(KST). `prepare`·`check-matching`·`check-event` 전부 PASS, FAIL 0, 마지막 줄 `PASS run`. 매칭 실행 SUCCEEDED·4명 한 테이블·최소 점수 이상(`new` 100.00), 확정·이용권 1회 사용, 검증 재고 배정·예약명, 단체방·이 테이블 알림, 방 메시지·재전송, 비공개 값 비노출, 외부인 방 거절, 시작 후 대화 주제 1회, 체크인 4·재전송, 종료 후 후기 3건 저장·수정, 종료 후 소급 게시 없음, 마감 후 운영자 조치 0·예외 0, 대시보드 체크인·노쇼 후보 0·후기 일치.
+- 실기기: `participant-01`로 구독한 iPhone 홈 화면 앱에서 확정·식당·리마인드 앱 알림(22:16:15)과 시작 대화 주제 푸시(22:24:51)를 잠금화면에서 확인했다(사용자 확인). Android는 미확인.
+- 남은 운영 확인: `check-feedback-reminder --slot-id 8faf8481-0980-4a9b-af03-6fc3a584a523`은 2026-10-20 22:34:40 KST 이후(7일 이내), 11단계는 두 번째 `run --previous-slot-id 8faf8481-...`.
 
 ## 로컬 실행 결과 (운영 통과 아님)
 
