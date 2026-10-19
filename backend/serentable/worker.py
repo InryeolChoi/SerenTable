@@ -7,6 +7,7 @@ import argparse
 import logging
 import signal
 import threading
+import time
 
 from sqlalchemy import text
 
@@ -31,6 +32,7 @@ def heartbeat():
 
 def match_due_slots():
     """Match due slots once. Failures are logged; the next cycle retries what it left."""
+    started = time.monotonic()
     try:
         summaries = run_due_matches()
     except Exception:
@@ -39,19 +41,27 @@ def match_due_slots():
         return
     if summaries:
         logger.info("worker_matching_ok runs=%d", len(summaries))
+    logger.info("worker_matching_timed matching_ms=%d", (time.monotonic() - started) * 1000)
 
 
 def gathering_jobs():
+    from serentable.feedback import run_feedback_jobs
+    from serentable.notifications import dispatch_notifications
+
+    timings = []
     try:
-        run_gathering_jobs()
-        from serentable.feedback import run_feedback_jobs
-
-        run_feedback_jobs()
-        from serentable.notifications import dispatch_notifications
-
-        dispatch_notifications()
+        for name, job in (
+            ("gathering", run_gathering_jobs),
+            ("feedback", run_feedback_jobs),
+            ("notifications", dispatch_notifications),
+        ):
+            started = time.monotonic()
+            job()
+            timings.append(f"{name}_ms={round((time.monotonic() - started) * 1000)}")
     except Exception:
         logger.error("worker_gathering_unavailable")
+    # Durations only: a cycle longer than the 30 s heartbeat window reads as a dead worker.
+    logger.info("worker_jobs_timed %s", " ".join(timings))
 
 
 def main():
