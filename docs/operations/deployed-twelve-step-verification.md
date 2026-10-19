@@ -3,7 +3,7 @@
 - 작성: 2026-10-19, Work #10 「12단계 E2E·100명·복구 검증」의 배포 환경 부분
 - 도구: [`scripts/verify_deployed_twelve_step.py`](../../scripts/verify_deployed_twelve_step.py) (표준 라이브러리만 사용)
 - 기준: [구현 명세 §4](../design/mvp-implementation-spec.md#4-prd-12단계-e2e-인수-기준), [12단계 인수 근거 매트릭스](../design/twelve-step-acceptance-matrix.md), [신청·모의 결제 배포 검증](./application-deployment-verification.md)
-- 상태: 2026-10-19 운영 `run` **PASS**(아래 "운영 실행 결과"). 후기 리마인드(10단계 일부)와 11단계(두 번째 회차)는 아직 운영에서 확인하지 않았다.
+- 상태: 2026-10-19 운영 `run` **PASS**, 11단계 `check-matching` **PASS**(아래 "운영 실행 결과"). 후기 리마인드(10단계 일부)는 종료 24시간 뒤 확인 예정이다.
 
 ## 무엇을 하는 도구인가
 
@@ -101,7 +101,8 @@
 - 첫 시도: 프로필·동의까지 PASS 후 `FAIL shared_meal_budget`(네 합성 계정의 공통 식비 구간 없음)으로 회차 생성 전에 멈췄다. 운영 데이터 변화 없음.
 - 두 번째 시도: 사용자 승인으로 `run --confirm-public-slot --normalize-profiles`. slot `8faf8481-0980-4a9b-af03-6fc3a584a523`, table `437f3487-18cf-47f5-a5c2-f827d8dadeec`, 마감·매칭 22:16:11, 시작 22:24:40, 종료 22:34:40(KST). `prepare`·`check-matching`·`check-event` 전부 PASS, FAIL 0, 마지막 줄 `PASS run`. 매칭 실행 SUCCEEDED·4명 한 테이블·최소 점수 이상(`new` 100.00), 확정·이용권 1회 사용, 검증 재고 배정·예약명, 단체방·이 테이블 알림, 방 메시지·재전송, 비공개 값 비노출, 외부인 방 거절, 시작 후 대화 주제 1회, 체크인 4·재전송, 종료 후 후기 3건 저장·수정, 종료 후 소급 게시 없음, 마감 후 운영자 조치 0·예외 0, 대시보드 체크인·노쇼 후보 0·후기 일치.
 - 실기기: `participant-01`로 구독한 iPhone 홈 화면 앱에서 확정·식당·리마인드 앱 알림(22:16:15)과 시작 대화 주제 푸시(22:24:51)를 잠금화면에서 확인했다(사용자 확인). Android는 미확인.
-- 남은 운영 확인: `check-feedback-reminder --slot-id 8faf8481-0980-4a9b-af03-6fc3a584a523`은 2026-10-20 22:34:40 KST 이후(7일 이내), 11단계는 두 번째 `run --previous-slot-id 8faf8481-...`.
+- 11단계: 두 번째 `run --confirm-public-slot --previous-slot-id 8faf8481-…`(slot `537191ce-1a30-4ff9-b4f8-671e3d7ac44a`, 마감 22:45:51·시작 22:54:17·종료 23:04:17). `prepare` PASS 후 실행 중 다른 PR(#50) 병합으로 API 서비스가 재배포돼 컨테이너가 교체되며 스크립트가 끊겼다(회차 자체는 worker가 정상 진행, 실기기 알림 수신). 이어서 `check-matching --slot-id 537191ce-… --previous-slot-id 8faf8481-…` PASS: 4명 확정, `new` 100.00→**0.00**, `next_matching_counts_previous_meeting` PASS. `check-event`는 종료 뒤에 실행돼 대화 주제 1회 PASS 후 체크인 창이 닫혀 `FAIL participant_01_checked_in`(검증 실행 중단 탓, 체크인·후기 단계는 첫 회차에서 PASS). 운영 검증 실행 중에는 main 병합을 멈춘다.
+- 남은 운영 확인: `check-feedback-reminder --slot-id 8faf8481-0980-4a9b-af03-6fc3a584a523`은 2026-10-20 22:34:40 KST 이후(7일 이내).
 
 ## 로컬 실행 결과 (운영 통과 아님)
 
