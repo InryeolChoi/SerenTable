@@ -22,8 +22,21 @@ export const display = new Intl.DateTimeFormat("ko-KR", {
   hourCycle: "h23",
 });
 
+/**
+ * Mark the first-visit guide card as already seen for this page's context.
+ * The card is a modal, so leaving it open blocks every later click. The card
+ * itself is covered by its own test in app-ui.spec.ts, which does not call this.
+ * The key mirrors STORAGE_KEY in src/guide.tsx.
+ */
+export async function skipGuide(page: Page) {
+  await page.addInitScript(() =>
+    window.sessionStorage.setItem("serentable.guide.v1", "1"),
+  );
+}
+
 /** Sign in through the login screen and wait until it has been left. */
 export async function login(page: Page, loginId: string, password: string) {
+  await skipGuide(page);
   await page.goto("/login");
   await page.getByLabel("계정 ID", { exact: true }).fill(loginId);
   await page.getByLabel("비밀번호", { exact: true }).fill(password);

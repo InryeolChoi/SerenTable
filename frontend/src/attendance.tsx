@@ -13,6 +13,9 @@ type Candidate = {
   starts_at: string;
   ends_at: string;
 };
+// 표시명이 겹치면 조치 대상이 화면에서 유일하게 정해지지 않는다. 계정 ID는 노출하지 않고
+// 이미 응답에 있는 user_id 앞자리만 구분자로 쓴다(tests/test_attendance.py:127).
+const disambiguate = (candidate: Candidate) => candidate.user_id.slice(0, 8);
 type Decision = "CONFIRMED_NO_SHOW" | "EXCUSED";
 
 function checkInError(error: unknown) {
@@ -107,7 +110,9 @@ export function NoShowSection() {
         method: "POST",
         body: JSON.stringify({ decision }),
       });
-      setResult(`${candidate.display_name}: ${decisionLabel[decision]}로 기록했습니다.`);
+      setResult(
+        `${candidate.display_name} (참가자 ${disambiguate(candidate)}): ${decisionLabel[decision]}로 기록했습니다.`,
+      );
     } catch (error) {
       setError(
         error instanceof ApiError && error.status === 409
@@ -119,6 +124,14 @@ export function NoShowSection() {
       setReload((value) => value + 1);
     }
   }
+  // 같은 표시명이 둘 이상이면 어느 행인지 알 수 없으므로 그 행들에만 구분자를 붙인다.
+  const nameCounts = candidates.reduce<Record<string, number>>(
+    (counts, candidate) => {
+      counts[candidate.display_name] = (counts[candidate.display_name] ?? 0) + 1;
+      return counts;
+    },
+    {},
+  );
   return (
     <section>
       <h2>노쇼 후보</h2>
@@ -135,8 +148,11 @@ export function NoShowSection() {
           return (
             <li key={key}>
               <strong>{candidate.display_name}</strong>
+              {nameCounts[candidate.display_name] > 1 && (
+                <span className="small muted"> 참가자 {disambiguate(candidate)}</span>
+              )}
               <span className="small muted">
-                {" "}{show(candidate.starts_at)} · {candidate.region_name}
+                {" "}· {show(candidate.starts_at)} · {candidate.region_name}
               </span>
               <div className="actions">
               {(Object.keys(decisionLabel) as Decision[]).map((decision) => (

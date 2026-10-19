@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { api } from "./api";
 
+// 더보기에서 처음 안내 카드를 다시 여는 신호. 화면 간 결합을 피하려 이벤트로 전달한다.
+export const GUIDE_EVENT = "guide-open";
 export function message(error: unknown) {
   return error instanceof Error ? error.message : "요청을 완료하지 못했습니다.";
 }

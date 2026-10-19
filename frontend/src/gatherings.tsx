@@ -57,7 +57,7 @@ export function AdminVenuesPage() {
   }
   return <section><h1>식당 배정 관리</h1><p>한 건은 해당 회차에서 예약 가능한 테이블 하나입니다. 실제 식당 예약을 실행하지 않습니다.</p>
     {error && <Notice error>{error}</Notice>}{saved && <Notice>{saved}</Notice>}
-    <form onSubmit={e => void submit(e)}>
+    <form className="operator-form" onSubmit={e => void submit(e)}>
       <label>회차<select required value={form.event_slot_id} onChange={e => setForm({...form, event_slot_id: e.target.value})}><option value="">회차 선택</option>{slots.map(s => <option key={s.id} value={s.id}>{show(s.starts_at)} · {s.region.name}</option>)}</select></label>
       {([['name','식당명'], ['address','주소'], ['map_url','HTTPS 지도 링크'], ['price_krw','1인 식비(원)'], ['capacity','좌석 수']] as const).map(([key,label]) => <label key={key}>{label}<input required value={form[key]} type={key === 'price_krw' || key === 'capacity' ? 'number' : 'text'} onChange={e => setForm({...form, [key]: e.target.value})} /></label>)}
       <button disabled={pending}>가상 재고 등록</button>

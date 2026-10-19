@@ -40,6 +40,7 @@ import { MyEntitlements, PaymentPage } from "./payments";
 import symbol from "./chance-table-symbol.svg";
 import { message, Notice, useScopedApi } from "./ui";
 import { AppNavigation } from "./app-navigation";
+import { FirstVisitGuide } from "./guide";
 import { ScreenLoadBoundary } from "./screen-load-boundary";
 import "./style.css";
 
@@ -934,6 +935,9 @@ function App() {
             path={path}
             navigate={navigate}
           />
+        )}
+        {user && (
+          <FirstVisitGuide key={`guide-${user.id}`} user={user} navigate={navigate} />
         )}
         <main id="main">
           {logoutError && <Notice error>{logoutError}</Notice>}

@@ -34,11 +34,16 @@ test("운영자가 만든 회차를 참가자가 서울 시각으로 확인한�
     .fill(seoulLocal(days, 14, minute));
   await form.getByLabel("정원").fill("12");
   await form.getByRole("button", { name: "회차 만들기" }).click();
-  await expect(
-    operator
-      .getByRole("alert")
-      .filter({ hasText: "신청 마감 ≤ 매칭 예정 ≤ 시작 시각" }),
-  ).toBeVisible();
+  // 입력 문제는 인라인 배너가 아니라 팝업으로 모아 알린다. 닫으면 입력은 그대로 남는다.
+  const problems = operator.getByRole("dialog", {
+    name: "입력을 확인해 주세요",
+  });
+  await expect(problems).toBeVisible();
+  await expect(problems).toContainText("신청 마감 ≤ 매칭 예정 ≤ 시작 시각");
+  await operator
+    .getByRole("button", { name: "입력을 확인해 주세요 닫기", exact: true })
+    .click();
+  await expect(problems).not.toBeVisible();
   await expect(form.getByLabel("정원")).toHaveValue("12");
   await form
     .getByLabel("매칭 예정", { exact: true })
