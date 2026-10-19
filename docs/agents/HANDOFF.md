@@ -328,3 +328,9 @@ Work9·상위Agenda는 감사보관U16·역할분리·기존조치사유정책·
 ### UI 검토용 PR 생성 준비
 
 정식 Chromium/WebKit 설정으로 각21개 통과 기록(passed/실패0), TypeScript·Vite 빌드·diff 검사 통과. GitHub CI는 PR 생성 후 확인한다. Chromium91렌더링에서 넘침 없음, WebKit 동일 렌더링 감사·실기기 인수는 미완료다. 사용자 요청에 따라 Work10 신규 UI Task의 검토용 Draft PR을 생성한다. 운영 반영·main 병합 없음.
+
+### PR #53 사용자 검토 후 후속
+
+Work10 UI Task에서 목록/달력 알약 전환·날짜 말풍선·신청 후보 유지와 운영자 필터 간격을 보완했다. main의 PR52 아이콘/홈 화면명/푸시 구독 복원을 통합했다. 상세는 app-ui-refresh-2026-10-19.md. 실제 휴대폰 잠금화면 푸시는 사용자 확인 완료로 보고받았으며 이번 로컬 앱 내 알림 생성→도착→읽음 성공과 구분한다. preview는 http://127.0.0.1:8018 이고 localhost는 Origin 불일치403이다. 운영자 로그인 ID는 operator다. root 사용자 변경·Claude 작업트리는 보존했고 운영 migration/deploy/data/main 변경은 없다. 최종 E2E·PR CI 결과는 후속 기록을 확인한다.
+
+UI 후속 로컬 검증 완료: Chromium23/WebKit23 PASS, TypeScript/Vite/diff PASS. Touch 직접 생성의 브라우저 차이는 시험에서 공통 Event 형태로 수정했고 Chromium 해당1/WebKit 전체23 재확인. 로컬 합성 알림 도착·읽음 확인, 달력6폭 넘침0·필터3폭 간격 통과. PR53 Draft 후속 push와 Work10 기록을 갱신한다. 새 HEAD CI는 PR Checks를 확인하며 이전 HEAD 성공과 구분한다. Blaybus 같은 UI Task는 진행중(사용자 화면 인수·PR 검토/병합·Safari 실기기 메뉴 확인 남음). 실행 중인 로컬 preview16716/8018·전용 PG는 사용자 확인을 위해 유지한다.

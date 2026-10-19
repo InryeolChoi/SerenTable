@@ -252,7 +252,11 @@ export function ParticipantEventsPage() {
       {loading ? (
         <Notice>회차를 확인하고 있습니다…</Notice>
       ) : slots.length ? (
-        <SlotBrowser slots={slots} listLabel="모집 중인 회차" renderSlot={slot => <SlotSummary slot={slot} />} />
+        <SlotBrowser
+          slots={slots}
+          listLabel="모집 중인 회차"
+          renderSlot={(slot) => <SlotSummary slot={slot} />}
+        />
       ) : (
         !error && <p>현재 모집 중인 회차가 없습니다.</p>
       )}
