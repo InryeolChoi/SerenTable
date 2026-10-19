@@ -297,3 +297,11 @@ Work9·상위Agenda는 감사보관U16·역할분리·기존조치사유정책·
 - 결정 후보(구현 안 함): 정원 때문에 남은 신청의 미배정 이유가 `capacity`가 아니라 `no_valid_table`로 표시됨, 느린 기계에서 계획기 5초 보호로 배정 수가 줄 수 있음(같은 입력 96→76명). U19·U16·역할 분리·사유 입력은 미정 유지.
 - 격리 DB `serentable_w10_a`·`serentable_w10_b`·`serentable_w10_int` 생성(운영 쓰기 없음). 남은 일: 사용자 검토 후 push/PR(대상 `codex/work7-gathering-integration` 권장), CI에서 E2E 12개 확인, 배포 환경 12단계·실기기 푸시 인수.
 
+## 2026-10-19 Work10 배포 후 인수 준비 (PR #47, 운영 미실행)
+
+- 통합 브랜치 `claude/w10-deploy-readiness`(main 4559215 기준), Draft PR #47.
+- 포함: T3 별도 실행기 재배치 시험, T1 A5-W2 권한 회귀(API 전 경로·객체 권한, 브라우저 3개), T2 `scripts/verify_deployed_twelve_step.py`와 [실행 절차](../operations/deployed-twelve-step-verification.md), 리뷰 10건 수정.
+- 제품 변경 1건: `GET /api/me/notifications`에 본인 테이블 `table_id`를 추가했다. 검증 스크립트가 테이블별 알림을 구분하려면 이 변경이 배포돼 있어야 한다.
+- 리뷰 전 통합 브랜치 전체 pytest 346 PASS. 리뷰 수정 후 관련 59 PASS, 검증기 로컬 `run` PASS. 최종 CI는 PR #47에서 확인한다.
+- 운영 URL·Railway 접속 없음. 검증 스크립트의 운영 실행은 사용자가 컨테이너에서 한다. 새 공개 회차를 만들려면 `--confirm-public-slot`이 필요하고, 운영에 남는 데이터 목록은 문서에 있다.
+
