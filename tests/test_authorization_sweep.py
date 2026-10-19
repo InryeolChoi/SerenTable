@@ -48,7 +48,7 @@ ANY_USER_API = {
 PARTICIPANT_API_OUTSIDE_ME = {("GET", "/api/event-slots")}
 # Non-API GET routes only serve the static CSR shell or build assets; every data call the
 # shell makes goes through /api and is covered below.
-STATIC_PATHS = {"/favicon.svg", "/sw.js"}
+STATIC_PATHS = {"/favicon.svg", "/apple-touch-icon.png", "/sw.js"}
 STATIC_MOUNTS = {"/assets"}
 
 

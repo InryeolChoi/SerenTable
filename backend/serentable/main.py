@@ -129,6 +129,13 @@ def brand_icon():
     return FileResponse(WEB_ROOT / "favicon.svg", media_type="image/svg+xml")
 
 
+@app.get("/apple-touch-icon.png", include_in_schema=False)
+def home_screen_icon():
+    if not (WEB_ROOT / "apple-touch-icon.png").is_file():
+        raise HTTPException(503, "web_build_unavailable")
+    return FileResponse(WEB_ROOT / "apple-touch-icon.png", media_type="image/png")
+
+
 @app.get("/sw.js", include_in_schema=False)
 def push_service_worker():
     if not (WEB_ROOT / "sw.js").is_file():
