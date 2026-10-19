@@ -344,3 +344,71 @@ def test_safety_changes_wait_for_matching_before_locking_participants(table, act
     saved = serialize_api_with_matching(request, ids[0])
     assert saved.status_code in (200, 201), saved.text
     assert pair(ids[0], ids[1], action) in exclusions()
+
+
+def release(client, report_id, reason="기각된 신고, 재매칭 허용"):
+    return send(
+        client, "POST", f"/api/admin/reports/{report_id}/release-separation", {"reason": reason}
+    )
+
+
+def test_operator_releases_a_dismissed_reports_separation_once_with_a_reason(table):
+    operator, members, ids, table_id = table
+    created = report(members[0], table_id, ids[1], detail="원문").json()["report"]
+    assert release(operator, created["id"]).status_code == 409  # still OPEN
+    assert review(operator, created["id"], "DISMISSED").status_code == 200
+    (listed,) = operator.get("/api/admin/reports").json()["reports"]
+    assert listed["separation_active"] is True
+    assert release(operator, created["id"], reason="").status_code == 422
+    released = release(operator, created["id"])
+    assert released.status_code == 200, released.text
+    assert released.json()["report"]["separation_active"] is False
+    assert exclusions() == set()
+    assert release(operator, created["id"]).json() == released.json()
+    audits = connection_scalar(
+        "SELECT count(*) FROM operator_audit WHERE action='report.release_separation'"
+    )
+    assert audits == 1
+    reason = connection_scalar(
+        "SELECT reason FROM operator_audit WHERE action='report.release_separation'"
+    )
+    assert reason == "기각된 신고, 재매칭 허용"
+    assert "원문" not in str(
+        connection_scalar(
+            "SELECT before_state::text || after_state::text FROM operator_audit "
+            "WHERE action='report.release_separation'"
+        )
+    )
+    # The reported participant still learns nothing about the report.
+    assert "원문" not in members[1].get(f"/api/me/tables/{table_id}/safety").text
+    assert release(operator, str(uuid.uuid4())).status_code == 404
+
+
+def test_release_keeps_blocks_and_waits_for_other_open_or_confirmed_reports(table):
+    operator, members, ids, table_id = table
+    first = report(members[0], table_id, ids[1]).json()["report"]
+    second = report(members[1], table_id, ids[0]).json()["report"]
+    assert review(operator, first["id"], "DISMISSED").status_code == 200
+    blocked = release(operator, first["id"])
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"] == "pair_has_active_report"
+    assert review(operator, second["id"], "CONFIRMED").status_code == 200
+    assert release(operator, first["id"]).status_code == 409
+    assert exclusions() == {pair(ids[0], ids[1], "report")}
+
+    other = report(members[2], table_id, ids[3]).json()["report"]
+    assert block(members[2], table_id, ids[3]).status_code == 200
+    assert review(operator, other["id"], "DISMISSED").status_code == 200
+    assert release(operator, other["id"]).status_code == 200
+    assert pair(ids[2], ids[3], "block") in exclusions()
+    assert pair(ids[2], ids[3], "report") not in exclusions()
+
+
+def test_release_is_operator_only_and_requires_csrf(table):
+    operator, members, ids, table_id = table
+    created = report(members[0], table_id, ids[1]).json()["report"]
+    assert review(operator, created["id"], "DISMISSED").status_code == 200
+    assert release(members[0], created["id"]).status_code == 403
+    path = f"/api/admin/reports/{created['id']}/release-separation"
+    assert operator.post(path, json={"reason": "x"}).status_code == 403
+    assert exclusions() == {pair(ids[0], ids[1], "report")}
