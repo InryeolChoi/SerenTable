@@ -18,7 +18,7 @@ async function login(
   );
   await expect(
     page.getByRole("heading", {
-      name: role === "operator" ? "합성 참가자 관리" : "내 식탁 준비",
+      name: role === "operator" ? "참가자 관리" : "내 식탁 준비",
     }),
   ).toBeVisible();
 }
@@ -52,7 +52,7 @@ test("합성 참가자가 실제 로그인하고 권한 거절과 로그아웃�
   expect(denied.status()).toBe(403);
   await page.getByRole("button", { name: "로그아웃", exact: true }).click();
   await expect(
-    page.getByRole("form", { name: "합성 계정 로그인" }),
+    page.getByRole("form", { name: "계정 로그인" }),
   ).toBeVisible();
   expect((await page.request.get("/api/me/profile")).status()).toBe(401);
   expect(await storedKeysBeyondGuide(page)).toEqual([]);
@@ -198,7 +198,7 @@ test("연결 실패·입력 오류·서버 세션 철회 후에도 같은 계정
   expect(revoked.status()).toBe(200);
   await page.getByRole("button", { name: "프로필 저장", exact: true }).click();
   await expect(
-    page.getByRole("form", { name: "합성 계정 로그인" }),
+    page.getByRole("form", { name: "계정 로그인" }),
   ).toBeVisible();
   await expect(
     page.getByRole("alert").filter({ hasText: "세션이 만료되었습니다" }),
@@ -313,7 +313,7 @@ test("로그인 혼잡은 계정 잠금과 다른 안내를 보이고 다시 시
   // Narrow to the login form: the expired-session notice is another alert on the
   // same screen, and a filtered locator would make the negative check vacuous.
   const loginAlerts = page
-    .getByRole("form", { name: "합성 계정 로그인" })
+    .getByRole("form", { name: "계정 로그인" })
     .getByRole("alert");
   await expect(loginAlerts).toContainText("로그인 요청이 잠시 몰렸습니다");
   await expect(loginAlerts).not.toContainText("로그인 시도가 많습니다");

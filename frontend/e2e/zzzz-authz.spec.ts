@@ -64,7 +64,7 @@ test("로그아웃 후 뒤로 가기·새로고침에도 본인 정보가 보이
   await expect(form.getByLabel("Instagram ID")).toHaveValue(probe);
 
   await page.getByRole("button", { name: "로그아웃", exact: true }).click();
-  const loginForm = page.getByRole("form", { name: "합성 계정 로그인" });
+  const loginForm = page.getByRole("form", { name: "계정 로그인" });
   await expect(loginForm).toBeVisible();
   expect(await showsProbe(page)).toBe(false);
 
@@ -162,7 +162,7 @@ test("운영자와 참가자 세션을 다른 브라우저 문맥에서 동시�
     ).toBeVisible();
     await operator.goto("/admin/participants");
     await expect(
-      operator.getByRole("heading", { name: "합성 참가자 관리" }),
+      operator.getByRole("heading", { name: "참가자 관리" }),
     ).toBeVisible();
 
     // Logging one out revokes only that session.
@@ -170,13 +170,13 @@ test("운영자와 참가자 세션을 다른 브라우저 문맥에서 동시�
       .getByRole("button", { name: "로그아웃", exact: true })
       .click();
     await expect(
-      participant.getByRole("form", { name: "합성 계정 로그인" }),
+      participant.getByRole("form", { name: "계정 로그인" }),
     ).toBeVisible();
     expect(await pageFetch(participant, "/api/auth/me")).toBe(401);
     expect(await pageFetch(operator, "/api/admin/session")).toBe(200);
     await operator.reload();
     await expect(
-      operator.getByRole("heading", { name: "합성 참가자 관리" }),
+      operator.getByRole("heading", { name: "참가자 관리" }),
     ).toBeVisible();
   } finally {
     await operatorContext.close();
