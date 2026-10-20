@@ -1,0 +1,333 @@
+{
+  "commit": "be7a8779b4e74d186cf9e828fb0e477115a5a6fd",
+  "scope": "local isolated PostgreSQL17 and API; production health read only",
+  "ui": {
+    "renders": 198,
+    "overflows": 0,
+    "page_errors": [],
+    "missing_labels": 0,
+    "interaction_observations": [
+      {
+        "engine": "chromium",
+        "test": "invalid_form_close_focus",
+        "tag": "BODY"
+      },
+      {
+        "engine": "chromium",
+        "test": "past_close_feedback",
+        "dialog": false,
+        "alert": [
+          "신청 마감의 입력 형식을 확인해 주세요. 입력 내용은 유지됩니다."
+        ]
+      },
+      {
+        "engine": "webkit",
+        "test": "invalid_form_close_focus",
+        "tag": "BODY"
+      },
+      {
+        "engine": "webkit",
+        "test": "past_close_feedback",
+        "dialog": false,
+        "alert": [
+          "신청 마감의 입력 형식을 확인해 주세요. 입력 내용은 유지됩니다."
+        ]
+      }
+    ]
+  },
+  "database": {
+    "concurrency": {
+      "profile_http": 503,
+      "gathering": "committed",
+      "sqlstates": [
+        "40P01"
+      ]
+    },
+    "venue_before": "ASSIGNED",
+    "venue_after_food_change": "ASSIGNED",
+    "exception_count_after_food_change": 0
+  },
+  "matching_failure": {
+    "run_state": "FAILED",
+    "participant_state": "EXCEPTION",
+    "operator_exception_count": 0,
+    "recovery_state": "SUCCEEDED"
+  },
+  "scale": {
+    "environment": {
+      "machine": "arm64",
+      "system": "Darwin",
+      "python": "3.12.12",
+      "commit": "be7a8779b4e74d186cf9e828fb0e477115a5a6fd",
+      "min_score": "60",
+      "policy_version": "prd-weighted-v1"
+    },
+    "runs": [
+      {
+        "shape": "uniform_random",
+        "seed": 0,
+        "participants": 100,
+        "capacity": 100,
+        "seconds": 0.30168666699319147,
+        "peak_traced_bytes": 5940492,
+        "seated": 100,
+        "tables": 17,
+        "table_sizes": {
+          "5": 2,
+          "6": 15
+        },
+        "min_table_score": 67.63333333333334,
+        "known_optimum": null,
+        "upper_bound": 100,
+        "gap_to_reference": 0,
+        "hard_violations": 0,
+        "score_violations": 0,
+        "duplicate_seats": 0,
+        "missing": 0,
+        "double_accounted": 0,
+        "unknown_output": 0,
+        "seated_count_consistent": true,
+        "deterministic": true,
+        "repeat_seconds": 0.3119954589928966,
+        "search_complete": true,
+        "over_adr_target": false,
+        "traced_seated": 100,
+        "traced_search_complete": true,
+        "unseated_reasons": {}
+      },
+      {
+        "shape": "skewed_gender_age",
+        "seed": 0,
+        "participants": 100,
+        "capacity": 100,
+        "seconds": 2.7021915419900324,
+        "peak_traced_bytes": 24562196,
+        "seated": 96,
+        "tables": 17,
+        "table_sizes": {
+          "4": 2,
+          "5": 2,
+          "6": 13
+        },
+        "min_table_score": 60.013888888888886,
+        "known_optimum": null,
+        "upper_bound": 100,
+        "gap_to_reference": 4,
+        "hard_violations": 0,
+        "score_violations": 0,
+        "duplicate_seats": 0,
+        "missing": 0,
+        "double_accounted": 0,
+        "unknown_output": 0,
+        "seated_count_consistent": true,
+        "deterministic": true,
+        "repeat_seconds": 2.74436224999954,
+        "search_complete": true,
+        "over_adr_target": false,
+        "traced_seated": 87,
+        "traced_search_complete": false,
+        "unseated_reasons": {
+          "no_qualifying_table": 4
+        }
+      },
+      {
+        "shape": "two_age_groups",
+        "seed": 0,
+        "participants": 100,
+        "capacity": 100,
+        "seconds": 0.5077983750088606,
+        "peak_traced_bytes": 9341380,
+        "seated": 100,
+        "tables": 18,
+        "table_sizes": {
+          "5": 8,
+          "6": 10
+        },
+        "min_table_score": 93.33333333333333,
+        "known_optimum": 100,
+        "upper_bound": 100,
+        "gap_to_reference": 0,
+        "hard_violations": 0,
+        "score_violations": 0,
+        "duplicate_seats": 0,
+        "missing": 0,
+        "double_accounted": 0,
+        "unknown_output": 0,
+        "seated_count_consistent": true,
+        "deterministic": true,
+        "repeat_seconds": 0.5001468749978812,
+        "search_complete": true,
+        "over_adr_target": false,
+        "traced_seated": 100,
+        "traced_search_complete": true,
+        "unseated_reasons": {}
+      },
+      {
+        "shape": "dense_exclusions",
+        "seed": 0,
+        "participants": 100,
+        "capacity": 100,
+        "seconds": 0.20949074999953154,
+        "peak_traced_bytes": 19884564,
+        "seated": 100,
+        "tables": 18,
+        "table_sizes": {
+          "5": 8,
+          "6": 10
+        },
+        "min_table_score": 100.0,
+        "known_optimum": 100,
+        "upper_bound": 100,
+        "gap_to_reference": 0,
+        "hard_violations": 0,
+        "score_violations": 0,
+        "duplicate_seats": 0,
+        "missing": 0,
+        "double_accounted": 0,
+        "unknown_output": 0,
+        "seated_count_consistent": true,
+        "deterministic": true,
+        "repeat_seconds": 0.21465854099369608,
+        "search_complete": true,
+        "over_adr_target": false,
+        "traced_seated": 100,
+        "traced_search_complete": true,
+        "unseated_reasons": {},
+        "excluded_pairs": 1387
+      },
+      {
+        "shape": "isolated_and_unknown_age",
+        "seed": 0,
+        "participants": 100,
+        "capacity": 100,
+        "seconds": 0.8379037499980768,
+        "peak_traced_bytes": 12212580,
+        "seated": 92,
+        "tables": 16,
+        "table_sizes": {
+          "5": 4,
+          "6": 12
+        },
+        "min_table_score": 100.0,
+        "known_optimum": 92,
+        "upper_bound": 92,
+        "gap_to_reference": 0,
+        "hard_violations": 0,
+        "score_violations": 0,
+        "duplicate_seats": 0,
+        "missing": 0,
+        "double_accounted": 0,
+        "unknown_output": 0,
+        "seated_count_consistent": true,
+        "deterministic": true,
+        "repeat_seconds": 0.8395858749863692,
+        "search_complete": true,
+        "over_adr_target": false,
+        "traced_seated": 92,
+        "traced_search_complete": true,
+        "unseated_reasons": {
+          "no_valid_table": 3,
+          "unknown_age": 5
+        }
+      },
+      {
+        "shape": "capacity_limited",
+        "seed": 0,
+        "participants": 100,
+        "capacity": 62,
+        "seconds": 1.332356874991092,
+        "peak_traced_bytes": 12594684,
+        "seated": 62,
+        "tables": 12,
+        "table_sizes": {
+          "4": 4,
+          "5": 2,
+          "6": 6
+        },
+        "min_table_score": 100.0,
+        "known_optimum": 62,
+        "upper_bound": 62,
+        "gap_to_reference": 0,
+        "hard_violations": 0,
+        "score_violations": 0,
+        "duplicate_seats": 0,
+        "missing": 0,
+        "double_accounted": 0,
+        "unknown_output": 0,
+        "seated_count_consistent": true,
+        "deterministic": true,
+        "repeat_seconds": 1.3369478750100825,
+        "search_complete": true,
+        "over_adr_target": false,
+        "traced_seated": 62,
+        "traced_search_complete": true,
+        "unseated_reasons": {
+          "capacity": 37,
+          "no_qualifying_table": 1
+        }
+      }
+    ]
+  },
+  "bounded_stress": {
+    "reads_1_concurrent": {
+      "requests": 50,
+      "statuses": {
+        "200": 50
+      },
+      "seconds": 0.159,
+      "p50_ms": 2.81,
+      "p95_ms": 3.59,
+      "max_ms": 11.25
+    },
+    "reads_10_concurrent": {
+      "requests": 200,
+      "statuses": {
+        "200": 200
+      },
+      "seconds": 0.219,
+      "p50_ms": 10.1,
+      "p95_ms": 16.25,
+      "max_ms": 23.4
+    },
+    "reads_25_concurrent": {
+      "requests": 300,
+      "statuses": {
+        "200": 300
+      },
+      "seconds": 0.333,
+      "p50_ms": 25.5,
+      "p95_ms": 41.09,
+      "max_ms": 52.54
+    },
+    "short_soak_20_seconds": {
+      "requests": 1606,
+      "statuses": {
+        "200": 1606
+      },
+      "max_ms": 158.64
+    },
+    "duplicate_application_20": {
+      "statuses": {
+        "201": 1,
+        "200": 19
+      },
+      "unique_response_ids": 1,
+      "applications_in_api": 1
+    },
+    "duplicate_payment_20": {
+      "statuses": {
+        "201": 1,
+        "200": 19
+      },
+      "entitlements_in_api": 1
+    }
+  },
+  "isolated_regression": {
+    "files": [
+      "tests/test_admin_dashboard.py",
+      "tests/test_admin_exceptions.py"
+    ],
+    "passed": 6,
+    "failed": 4
+  }
+}
