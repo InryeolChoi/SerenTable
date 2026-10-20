@@ -101,7 +101,9 @@
 - 첫 시도: 프로필·동의까지 PASS 후 `FAIL shared_meal_budget`(네 합성 계정의 공통 식비 구간 없음)으로 회차 생성 전에 멈췄다. 운영 데이터 변화 없음.
 - 두 번째 시도: 사용자 승인으로 `run --confirm-public-slot --normalize-profiles`. slot `8faf8481-0980-4a9b-af03-6fc3a584a523`, table `437f3487-18cf-47f5-a5c2-f827d8dadeec`, 마감·매칭 22:16:11, 시작 22:24:40, 종료 22:34:40(KST). `prepare`·`check-matching`·`check-event` 전부 PASS, FAIL 0, 마지막 줄 `PASS run`. 매칭 실행 SUCCEEDED·4명 한 테이블·최소 점수 이상(`new` 100.00), 확정·이용권 1회 사용, 검증 재고 배정·예약명, 단체방·이 테이블 알림, 방 메시지·재전송, 비공개 값 비노출, 외부인 방 거절, 시작 후 대화 주제 1회, 체크인 4·재전송, 종료 후 후기 3건 저장·수정, 종료 후 소급 게시 없음, 마감 후 운영자 조치 0·예외 0, 대시보드 체크인·노쇼 후보 0·후기 일치.
 - 실기기: `participant-01`로 구독한 iPhone 홈 화면 앱에서 확정·식당·리마인드 앱 알림(22:16:15)과 시작 대화 주제 푸시(22:24:51)를 잠금화면에서 확인했다(사용자 확인). Android는 미확인.
-- 남은 운영 확인: `check-feedback-reminder --slot-id 8faf8481-0980-4a9b-af03-6fc3a584a523`은 2026-10-20 22:34:40 KST 이후(7일 이내), 11단계는 두 번째 `run --previous-slot-id 8faf8481-...`.
+- 11단계(같은 날 23:10 KST): 두 번째 `run --confirm-public-slot --previous-slot-id 8faf8481-...`(slot `537191ce-1a30-4ff9-b4f8-671e3d7ac44a`)은 실행 중 API 서비스 재배포로 컨테이너가 바뀌어 스크립트가 끊겼다. 이어서 `check-matching --slot-id 537191ce-... --previous-slot-id 8faf8481-...`은 **PASS**였다. 두 번째 테이블 `new` 0.00(첫 회차 100.00), `next_matching_counts_previous_meeting` 통과. 이어서 실행한 `check-event`는 종료 후라 체크인 창이 닫혀 `FAIL participant_01_checked_in`이 나왔다. 이는 검증 시각 문제이며 11단계 판정과는 관계없다. 두 번째 회차의 체크인·후기 단계는 11단계에 필요하지 않아 다시 실행하지 않았다.
+- 10단계 후기 리마인드(2026-10-21 00:40 KST 무렵, 사용자 실행): API 서비스 `SerenTable` 컨테이너에서 `DEPLOY_EXPECT_VERSION=e401405…`로 `check-feedback-reminder --slot-id 8faf8481-0980-4a9b-af03-6fc3a584a523`을 실행해 **PASS**가 나왔다. 운영 worker가 실제 24시간 경과 뒤 후기를 남기지 않은 `participant-04`에게 이 테이블의 리마인드를 만든 것이며, 시각은 바꾸지 않았다. 사용자는 마지막 줄 PASS만 보고했고, 개별 확인 줄은 기록하지 않았다.
+- 이로써 배포 환경 12단계 중 4·8단계(로컬 격리 근거)를 뺀 1~3·5~7·9~12단계가 운영에서 PASS다.
 
 ## 로컬 실행 결과 (운영 통과 아님)
 
@@ -130,7 +132,7 @@
 ## 사용자가 남은 일
 
 1. Work7~9 기능이 포함된 커밋의 운영 배포 확인(마이그레이션 포함).
-2. 컨테이너에서 실제 사용자가 없는 시간에 `run --confirm-public-slot` 실행 → 결과 줄과 slot id 기록(비밀값·응답 본문은 기록하지 않음).
-3. 종료 24시간 후 7일 안에 `check-feedback-reminder --slot-id <id>` 실행.
-4. 필요하면 첫 회차 종료 후 `run --confirm-public-slot --previous-slot-id <id>`로 11단계 확인(데이터 한 벌 추가).
+2. ~~컨테이너에서 `run --confirm-public-slot` 실행~~ → 2026-10-19 PASS(위 운영 실행 결과).
+3. ~~`check-feedback-reminder`~~ → 2026-10-21 PASS(위).
+4. ~~11단계 두 번째 회차~~ → 2026-10-19 `check-matching --previous-slot-id` PASS(위).
 5. 결과를 이 문서와 인수 매트릭스에 실제 배포 커밋·시각과 함께 기록. 실기기 푸시·배포 브라우저 흐름은 별도 인수다.

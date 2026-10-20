@@ -44,7 +44,7 @@
 
 ## 남은 공백
 
-- **배포 환경 12단계**: 2026-10-19 운영 `run` PASS(FAIL 0). Work7~9 migration·deploy는 승인·배포됐다. 정상 흐름(1·2·3·5·6·7·9·10·12)은 운영에서 재현됐고, **4단계 해제·재배치와 8단계 미매칭 대안·이동·환불은 정상 흐름이 아니라 로컬 격리 근거만** 유지한다(운영 데이터에 실패 상태를 만들지 않기로 한 결정). 남은 운영 확인: 10단계 후기 리마인드, 11단계 두 번째 회차. 절차는 [배포 환경 12단계 검증 절차](../operations/deployed-twelve-step-verification.md).
+- **배포 환경 12단계**: 2026-10-19 운영 `run` PASS(FAIL 0). Work7~9 migration·deploy는 승인·배포됐다. 정상 흐름(1·2·3·5·6·7·9·10·12)은 운영에서 재현됐고, **4단계 해제·재배치와 8단계 미매칭 대안·이동·환불은 정상 흐름이 아니라 로컬 격리 근거만** 유지한다(운영 데이터에 실패 상태를 만들지 않기로 한 결정). 이후 11단계(2026-10-19 `check-matching --previous-slot-id` PASS)와 10단계 후기 리마인드(2026-10-21 `check-feedback-reminder` PASS)도 운영에서 확인했다. 상세는 [배포 환경 12단계 검증](../operations/deployed-twelve-step-verification.md).
 - **실기기 푸시**: iOS(iPhone 홈 화면 앱) 수신 확인 완료(2026-10-19). Android/Chrome 실기기·권한 거부·미지원 경로는 미확인.
 - **브라우저 E2E 재실행**: 이번 작업에서 Playwright를 실행하지 않았다. 현재 브랜치에서 재실행이 필요하다.
 - ~~같은 회차 내 재배치의 별도 프로세스 근거~~ → 2026-10-19 해소: `tests/test_recommendations.py::test_the_next_matching_separates_excluded_pairs_and_spares_mutual_meet_again[separate_worker]`가 별도 프로세스 실행기로 제외 쌍 분리·8명 전원 재착석을 확인한다.
