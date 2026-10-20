@@ -739,6 +739,9 @@ function MatchHistory() {
                 · {run.attempt}번째 실행 · {runLabels[run.state] ?? run.state}
               </p>
               <p className="small">
+                {run.state === "SUCCEEDED" && run.finished_at
+                  ? `${run.seated_count ? "자동 확정" : "매칭 실패"} 시각 ${show(run.finished_at)} · `
+                  : ""}
                 확정 {run.seated_count}명 · 규칙 {run.rule_version}
                 {run.reason_code
                   ? ` · ${matchingReasons[run.reason_code] ?? run.reason_code}`

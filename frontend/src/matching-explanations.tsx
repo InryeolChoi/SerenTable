@@ -18,10 +18,11 @@ export function TableExplanationView({ explanation: e, components, year }: {
 }) {
   return <details className="small"><summary>확정 당시 구성과 점수 근거</summary>
     {e ? <>
-      <p>출생연도 {e.birth_year_min}~{e.birth_year_max}년 · 회차 연도 기준 {year - e.birth_year_max}~{year - e.birth_year_min}세(생일 미반영)</p>
+      <p>출생연도 {e.birth_year_min}~{e.birth_year_max}년 · 회차 연도 기준 {year - e.birth_year_max}~{year - e.birth_year_min}세(생일 미반영) · 최고·최저 차이 {e.birth_year_max - e.birth_year_min}살</p>
       <p>성비: {counts(e.gender_counts)} · 분류 불가 {e.gender_unknown_count}명</p>
       <p>MBTI: {counts(e.mbti_counts)} · 미기록 {e.mbti_unknown_count}명. 복수 선택은 중복 집계합니다.</p>
       <p>공유 관심사: {e.shared_interests.map(i => `${labels[i.code] ?? i.code} ${i.count}명`).join(" · ") || "없음"}</p>
+      <p>차단·비선호·신고 충돌: 없음 (필수 조건이라 충돌하는 쌍은 같은 테이블에 배치하지 않습니다)</p>
       <p>이전 만남 {e.previous_pair_count}쌍 · 새로운 사람 점수에 반영 {e.newness_penalized_pair_count}쌍(상호 재만남 희망은 면제). 이전 확정 동석 기록 기준이며 실제 참석 확인과 구분합니다.</p>
     </> : <p>당시 구성 설명 미기록 · 현재 프로필로 소급 계산하지 않습니다.</p>}
     {components && <p>{Object.entries(components).map(([key, value]) => `${labels[key] ?? key} ${value ?? "계산 제외"}`).join(" · ")}</p>}
@@ -30,7 +31,10 @@ export function TableExplanationView({ explanation: e, components, year }: {
 
 export function MemberExplanationView({ explanation: e }: { explanation: MatchRunMember["explanation"] }) {
   return e ? <p className="small">희망 성향별 충족: {Object.entries(e.trait_satisfaction).map(([key, value]) => `${labels[key] ?? key} ${value}%`).join(" · ") || "희망 성향 미기록"}
-    {" · "}같은 테이블의 이전 만남 {e.previous_peer_count}명 · 동의한 대안 이동 {e.transfer_count}회
+    {" · "}같은 테이블의 이전 만남 {e.previous_peer_count}명
+    <br />희망 날짜·지역: 충족 (본인이 신청했거나 이동에 동의한 회차에서 확정)
+    {" · "}자동 재배치 {e.reallocation_count ?? "미기록"}{e.reallocation_count === undefined ? "" : "회"} · 동의한 대안 이동 {e.transfer_count}회
+    {" · "}최종 배치 사유: 필수 조건과 최소 점수를 충족한 테이블
     <span className="muted"> (확정 당시, 상대별 평가 공개 없음)</span>
   </p> : <p className="small muted">당시 개인 설명 미기록</p>;
 }

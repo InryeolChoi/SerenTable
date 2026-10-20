@@ -220,6 +220,11 @@ const operatorMore = [
     label: "신청 현황",
     description: "신청·결제·매칭 이력",
   },
+  {
+    path: "/admin/messages",
+    label: "테이블·메시지",
+    description: "테이블 상세와 자동 메시지 이력",
+  },
 ];
 export function AppNavigation({
   user,

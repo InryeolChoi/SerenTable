@@ -27,6 +27,7 @@ import {
 } from "./api";
 import { AdminEventsPage, ParticipantEventsPage } from "./events";
 import { AdminVenuesPage, GatheringsPage } from "./gatherings";
+import { AdminMessagesPage } from "./messages";
 import { RoomsPage } from "./chat";
 import { HistoryPage } from "./history";
 import { AdminSafetyPage } from "./safety";
@@ -988,6 +989,8 @@ function App() {
               <AdminEventsPage />
             ) : path === "/admin/applications" ? (
               <AdminApplicationsPage />
+            ) : path === "/admin/messages" ? (
+              <AdminMessagesPage />
             ) : (
               <AdminPage />
             )

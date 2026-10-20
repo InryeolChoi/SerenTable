@@ -81,6 +81,8 @@ def test_alternative_selection_keeps_payment_and_reaches_worker_confirmation():
         confirmed_run = next(r for r in history if r["event_slot"]["id"] == target)
         moved = next(m for m in confirmed_run["members"] if m["application_id"] == application)
         assert moved["explanation"]["transfer_count"] == 1
+        # A participant's own move is a transfer, not an automatic reallocation.
+        assert moved["explanation"]["reallocation_count"] == 0
         mine = owner.get("/api/me/applications").json()["applications"][0]
         assert mine["matching"]["state"] == "CONFIRMED"
         assert owner.get("/api/me/entitlements").json()["entitlements"][0]["state"] == "USED"
@@ -504,3 +506,9 @@ def test_existing_consented_candidate_continues_automatically_after_first_failur
         (mine,) = owners[0].get("/api/me/applications").json()["applications"]
         assert mine["id"] == original and mine["matching"]["state"] == "CONFIRMED"
         assert len(mine["payments"]) == 1
+        # PRD §7.2: the automatic move to the later consented slot is counted once.
+        history = operator.get("/api/admin/match-runs").json()["match_runs"]
+        later_run = next(r for r in history if r["event_slot"]["id"] == later)
+        seated = next(m for m in later_run["members"] if m["application_id"] == original)
+        assert seated["explanation"]["reallocation_count"] == 1
+        assert seated["explanation"]["transfer_count"] == 0
