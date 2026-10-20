@@ -14,12 +14,13 @@ from serentable.auth import (
     require_operator,
     require_participant,
 )
-from serentable.clock import iso, locked_now
+from serentable.clock import SEOUL, iso, locked_now
 from serentable.database import database_engine
 from serentable.eligibility import eligible_slot_ids
 from serentable.events import SLOT_COLUMNS, field_error, slot_json
 from serentable.match_resolution import resolution_json, single_right, target_allowed
 from serentable.matching import participation_details
+from serentable.participant_notices import application_submitted
 from serentable.payments import payment_details
 from serentable.profile import consent_state, profile_state, read_profile
 from serentable.safety import participation_restricted
@@ -194,6 +195,42 @@ def offers_alternatives(matching_state, reason_code):
     return matching_state == "NO_MATCH" and reason_code != "overlapping_confirmation"
 
 
+PREFERENCES = (
+    "same_date_same_region",
+    "same_date_other_region",
+    "other_date_same_region",
+    "other_date_other_region",
+)
+
+
+def preference_order(connection, application_id, slots):
+    """PRD §7.4 order for the participant's own choice: same date and region first,
+    then same date, then same region, then the rest; earliest first within each group.
+    Dates and regions come from every slot this application ever named."""
+    applied = (
+        connection.execute(
+            text("""SELECT DISTINCT (s.starts_at AT TIME ZONE 'Asia/Seoul')::date AS day,
+            s.region_code FROM application_candidate c JOIN event_slot s ON s.id=c.event_slot_id
+            WHERE c.application_id=:id"""),
+            {"id": application_id},
+        )
+        .mappings()
+        .all()
+    )
+    days = {row["day"] for row in applied}
+    regions = {row["region_code"] for row in applied}
+
+    def preference(slot):
+        same_day = slot["starts_at"].astimezone(SEOUL).date() in days
+        same_region = slot["region_code"] in regions
+        return PREFERENCES[(0 if same_day else 2) + (0 if same_region else 1)]
+
+    ranked = [{**slot, "preference": preference(slot)} for slot in slots]
+    return sorted(
+        ranked, key=lambda slot: (PREFERENCES.index(slot["preference"]), slot["starts_at"])
+    )
+
+
 @router.get("/api/me/applications/{application_id}/alternatives")
 def list_application_alternatives(
     application_id: uuid.UUID, user: Principal = Depends(require_participant)
@@ -277,6 +314,7 @@ def list_application_alternatives(
                         ).scalar()
                     )
                 ]
+                alternatives = preference_order(connection, application_id, alternatives)
             return private_response(
                 {
                     "refund_state": "REFUND_AVAILABLE" if has_single else None,
@@ -284,7 +322,10 @@ def list_application_alternatives(
                     if application["match_run_id"]
                     else None,
                     "pending_candidates": [slot_json(slot, now) for slot in pending],
-                    "alternatives": [slot_json(slot, now) for slot in alternatives],
+                    "alternatives": [
+                        {**slot_json(slot, now), "preference": slot["preference"]}
+                        for slot in alternatives
+                    ],
                 }
             )
     except SQLAlchemyError:
@@ -369,6 +410,7 @@ def submit_application(
                     (application_id, user_id, event_slot_id) VALUES (:id, :user_id, :slot)"""),
                     {"id": application_id, "user_id": user.id, "slot": slot_id},
                 )
+            application_submitted(connection, user.id, application_id, now)
             (application,) = read_applications(
                 connection, "WHERE a.id = :id", {"id": application_id}, now
             )

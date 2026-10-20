@@ -29,7 +29,7 @@ def table_explanation(members, previous_pairs, penalized_pairs):
     }
 
 
-def member_explanation(member, peers, previous_pairs, transfers, format_score):
+def member_explanation(member, peers, previous_pairs, transfers, reallocations, format_score):
     return {
         "version": 1,
         "trait_satisfaction": {
@@ -40,4 +40,7 @@ def member_explanation(member, peers, previous_pairs, transfers, format_score):
             frozenset((member.user_id, peer.user_id)) in previous_pairs for peer in peers
         ),
         "transfer_count": transfers,
+        # PRD §7.2: earlier unseated runs that continued to another consented candidate
+        # slot without a participant choice (a choice to move is counted as a transfer).
+        "reallocation_count": reallocations,
     }

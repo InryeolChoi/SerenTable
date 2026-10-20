@@ -92,6 +92,27 @@ COUNT_QUERIES = {
         JOIN match_run r ON r.id=mp.match_run_id
         WHERE mp.state='ALTERNATIVE_OFFERED' AND {0} GROUP BY 1""",
     ),
+    # PRD §11 success rate: members of succeeded runs, seated versus unseated.
+    "run_seated_count": (
+        "m.event_slot_id",
+        """SELECT m.event_slot_id,count(*) FROM match_run_member mm
+        JOIN match_run m ON m.id=mm.match_run_id
+        WHERE m.state='SUCCEEDED' AND mm.outcome='SEATED' AND {0} GROUP BY 1""",
+    ),
+    "run_unseated_count": (
+        "m.event_slot_id",
+        """SELECT m.event_slot_id,count(*) FROM match_run_member mm
+        JOIN match_run m ON m.id=mm.match_run_id
+        WHERE m.state='SUCCEEDED' AND mm.outcome='UNSEATED' AND {0} GROUP BY 1""",
+    ),
+    # PRD §11 "자동 해결되지 않은 조건 충돌": allocated tables whose meal conditions changed
+    # and await the operator's review (ADR-0017).
+    "condition_conflict_count": (
+        "t.event_slot_id",
+        """SELECT t.event_slot_id,count(*) FROM gathering_exception e
+        JOIN dining_table t ON t.id=e.dining_table_id
+        WHERE e.kind='VENUE_CONDITIONS' AND e.state='OPEN' AND {0} GROUP BY 1""",
+    ),
     "table_count": (
         "lt.event_slot_id",
         f"SELECT lt.event_slot_id,count(*) FROM ({LIVE_TABLES}) lt WHERE {{0}} GROUP BY 1",
@@ -200,6 +221,7 @@ def plain_counts(connection, slot):
 def slot_summary(slot, now, sections, counts, run):
     count = {name: values.get(slot["id"], 0) for name, values in counts.items()}
     eligible, submitted = count["feedback_eligible"], count["feedback_submitted"]
+    seated, unseated = count["run_seated_count"], count["run_unseated_count"]
     return {
         "event_slot": slot_json(slot, now),
         **{
@@ -212,6 +234,7 @@ def slot_summary(slot, now, sections, counts, run):
             "confirmed_count": count["confirmed_count"],
             "table_count": count["table_count"],
             "alternative_offered_count": count["alternative_offered_count"],
+            "success_rate": round(seated / (seated + unseated), 4) if seated + unseated else None,
         },
         "gathering": {
             "venue_assigned": count["venue_assigned"],
@@ -226,6 +249,9 @@ def slot_summary(slot, now, sections, counts, run):
             "feedback_rate": round(submitted / eligible, 4) if eligible else None,
         },
         "open_report_count": count["open_report_count"],
+        # Shown on their own as PRD §11 lists them; both are also inside open_exception_count.
+        "failed_refund_count": count["failed_refund_count"],
+        "condition_conflict_count": count["condition_conflict_count"],
         "open_exception_count": (
             count["open_exception_count"]
             + count["failed_refund_count"]

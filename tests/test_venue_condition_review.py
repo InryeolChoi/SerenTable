@@ -72,6 +72,11 @@ def test_changed_conditions_require_current_review_without_changing_reservation(
         assert len(review) == 1
         item = review[0]
         assert item["resolvable"] is False
+        # PRD §11: the dashboard shows the unresolved condition conflict on its own.
+        (summary,) = operator.get(
+            "/api/admin/dashboard", params={"event_slot_id": original["event_slot_id"]}
+        ).json()["slots"]
+        assert summary["condition_conflict_count"] == 1
         assert (
             send(
                 operator,

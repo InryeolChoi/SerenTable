@@ -96,12 +96,12 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
   // before paying.
   const mock = participant.getByRole("region", { name: "모의 결제" });
   await expect(mock).toContainText("모의 결제 · 실제 결제가 발생하지 않습니다");
-  await expect(mock).toContainText("화요일 24:00 이후 환불 불가");
-  await expect(mock).toContainText("일반 취소의 세부 정책은 미정입니다");
+  await expect(mock).toContainText("모임 진행 2일 전(현행 기준 화요일 24:00) 이후에는 환불할 수");
+  await expect(mock).toContainText("신청 취소는 신청 마감 전까지 가능하며 자동 환불이 아닙니다");
   await expect(mock).toContainText(
-    "시스템 최종 매칭 실패의 미사용 1회권은 시간 제한 없이 전액 모의 환불",
+    "시스템 매칭 실패 시 미사용 1회권은 시간 제한 없이 전액 모의 환불",
   );
-  await expect(mock).toContainText("노쇼·취소 정책 미정");
+  await expect(mock).toContainText("당일 취소·노쇼 정책");
   await expect(mock).toContainText("결제 금액 9,900원");
   await mock.getByRole("checkbox", { name: /실패 시뮬레이션/ }).check();
   await mock.getByRole("button", { name: "모의 결제하기" }).click();
@@ -147,7 +147,7 @@ test("참가자가 이용권을 골라 모의 결제하고 실패 후 재시도�
   );
   // Submitted applicants can still open the full guidance; payment-stage notices stay expanded.
   await participant.getByText("신청·결제 안내", { exact: true }).click();
-  await expect(participant.getByText(/노쇼·취소 정책 미정/)).toBeVisible();
+  await expect(participant.getByText(/당일 취소·노쇼 정책/)).toBeVisible();
   const passes = participant.getByRole("list", { name: "내 이용권" });
   await expect(passes.getByRole("listitem")).toHaveCount(initialPassCount + 1);
   await expect(passes).toContainText("멤버십 1개월 · 이용 중");

@@ -28,6 +28,7 @@ def test_failed_refund_list_and_dashboard_agree_then_retry_clears_exception():
             "slots"
         ][0]
         assert summary["open_exception_count"] == 1
+        assert summary["failed_refund_count"] == 1
         assert (
             send(
                 operator,

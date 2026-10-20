@@ -11,6 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from serentable.admin_dashboard import router as dashboard_router
 from serentable.admin_exceptions import router as exceptions_router
+from serentable.admin_messages import router as admin_messages_router
 from serentable.applications import router as applications_router
 from serentable.attendance import router as attendance_router
 from serentable.audit import router as audit_router
@@ -50,6 +51,7 @@ app.include_router(exceptions_router)
 app.include_router(mock_refunds_router)
 app.include_router(audit_router)
 app.include_router(exports_router)
+app.include_router(admin_messages_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -165,6 +167,7 @@ def push_service_worker():
 @app.get("/participant/apply", include_in_schema=False)
 @app.get("/participant/apply/review", include_in_schema=False)
 @app.get("/admin/applications", include_in_schema=False)
+@app.get("/admin/messages", include_in_schema=False)
 def web_shell():
     if not (WEB_ROOT / "index.html").is_file():
         raise HTTPException(status_code=503, detail="web_build_unavailable")

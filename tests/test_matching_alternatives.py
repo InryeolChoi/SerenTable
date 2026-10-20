@@ -49,6 +49,8 @@ def test_unseated_participant_sees_open_alternatives_without_moving_or_spending(
             "matches_at",
             "capacity",
             "recruiting",
+            # PRD §7.4 group of this slot relative to the participant's own choices.
+            "preference",
         }
         assert participant.get(path).json() == body
         assert participant.get("/api/me/applications").json() == before

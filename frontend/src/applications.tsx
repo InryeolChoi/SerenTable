@@ -20,6 +20,14 @@ import {
 import { message, Notice, useScopedApi } from "./ui";
 import { TableExplanationView, MemberExplanationView } from "./matching-explanations";
 
+// PRD §7.4 순서: 신청한 날짜·지역과 가까운 일정부터 보여 준다(서버가 이 순서로 정렬).
+const preferenceLabels = {
+  same_date_same_region: "신청한 날짜·지역",
+  same_date_other_region: "신청한 날짜 · 다른 지역",
+  other_date_same_region: "다른 날짜 · 신청한 지역",
+  other_date_other_region: "다른 날짜·지역",
+} as const;
+
 const stateLabels: Record<Application["state"], string> = {
   DRAFT: "작성 중",
   SUBMITTED: "신청 완료",
@@ -396,7 +404,7 @@ function AlternativeSlots({
 }) {
   const request = useScopedApi();
   const [result, setResult] = useState<{
-    alternatives: EventSlot[];
+    alternatives: (EventSlot & { preference?: keyof typeof preferenceLabels })[];
     pending_candidates: EventSlot[];
     failure_run_id: string | null;
     refund_state: "REFUND_AVAILABLE" | null;
@@ -502,6 +510,11 @@ function AlternativeSlots({
               <ul className="candidates" aria-label="모집 중인 다른 일정">
                 {result.alternatives.map((slot) => (
                   <li key={slot.id}>
+                    {slot.preference && (
+                      <p className="small muted">
+                        {preferenceLabels[slot.preference]}
+                      </p>
+                    )}
                     <SlotSummary slot={slot} />
                     <button
                       disabled={loading}
@@ -726,6 +739,9 @@ function MatchHistory() {
                 · {run.attempt}번째 실행 · {runLabels[run.state] ?? run.state}
               </p>
               <p className="small">
+                {run.state === "SUCCEEDED" && run.finished_at
+                  ? `${run.seated_count ? "자동 확정" : "매칭 실패"} 시각 ${show(run.finished_at)} · `
+                  : ""}
                 확정 {run.seated_count}명 · 규칙 {run.rule_version}
                 {run.reason_code
                   ? ` · ${matchingReasons[run.reason_code] ?? run.reason_code}`
