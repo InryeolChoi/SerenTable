@@ -86,17 +86,14 @@ function Login({
   return (
     <section className="narrow">
       <h1>식탁을 시작하세요</h1>
-      <p className="lead">사전 발급된 합성 계정으로 로그인해 주세요.</p>
-      <p className="muted">
-        심사용 데모입니다. 실제 개인정보를 입력하지 마세요.
-      </p>
+      <p className="lead">발급받은 체험 계정으로 로그인해 주세요.</p>
       {expired && (
         <Notice error>
           세션이 만료되었습니다. 다시 로그인해 주세요. 저장하지 않은 프로필은 이
           탭에서 같은 계정으로 돌아올 때 유지됩니다.
         </Notice>
       )}
-      <form aria-label="합성 계정 로그인" onSubmit={submit}>
+      <form aria-label="계정 로그인" onSubmit={submit}>
         <label>
           계정 ID
           <input
@@ -305,7 +302,7 @@ function ProfilePage({
     <section className="narrow">
       <h1>내 프로필</h1>
       <p className="lead">
-        합성 정보만 입력해 주세요. 미완성 상태로도 저장할 수 있습니다.
+        미완성 상태로도 저장할 수 있습니다.
       </p>
       <p className="muted">
         이름은 본인 확인용이고, 표시명은 식탁에서 사용하는 이름입니다.
@@ -487,7 +484,7 @@ function ConsentPage() {
       <h1>동의 및 이용 안내</h1>
       <p className="lead">목적별 전문과 버전을 확인하고 직접 선택해 주세요.</p>
       <p className="muted">
-        합성 데이터 데모용 안내입니다. 정식 출시를 위한 법률 검토를 마친
+        체험용 서비스의 안내입니다. 정식 출시를 위한 법률 검토를 마친
         개인정보 처리방침은 아닙니다.
       </p>
       {loading ? (
@@ -638,6 +635,7 @@ function AdminPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState("");
+  const detailPanel = useRef<HTMLDivElement>(null);
   async function load() {
     setLoading(true);
     setError("");
@@ -668,6 +666,11 @@ function AdminPage() {
           `/api/admin/participants/${encodeURIComponent(person.id)}`,
         ),
       );
+      // 한 열 배치에서는 상세가 긴 목록 아래에 있으므로 선택한 상세로 이동한다.
+      if (window.matchMedia("(max-width: 959px)").matches)
+        requestAnimationFrame(() =>
+          detailPanel.current?.scrollIntoView({ block: "start" }),
+        );
     } catch (error) {
       setError(message(error));
     } finally {
@@ -676,7 +679,7 @@ function AdminPage() {
   }
   return (
     <section>
-      <h1>합성 참가자 관리</h1>
+      <h1>참가자 관리</h1>
       <p className="lead">
         권한이 있는 운영자만 상세 정보를 확인할 수 있습니다.
       </p>
@@ -687,33 +690,37 @@ function AdminPage() {
           {loading ? (
             <Notice>목록을 확인하고 있습니다…</Notice>
           ) : list.length ? (
-            <ul className="participants">
+            <ul className="person-list" aria-label="참가자 목록">
               {list.map((person) => (
                 <li key={person.id}>
-                  <strong>{person.display_name || "표시명 미입력"}</strong>
-                  <p className="small muted">
-                    {person.login_id} ·{" "}
-                    {profileStatus(
-                      person.profile_complete,
-                      person.profile_unreadable,
-                    )}
-                  </p>
                   <button
+                    type="button"
                     aria-label={`상세 보기: ${person.login_id}`}
                     aria-pressed={selected === person.id}
                     onClick={() => void show(person)}
                   >
-                    상세 보기
+                    <span className="person-name">
+                      {person.display_name || "표시명 미입력"}
+                    </span>
+                    <span className="person-meta">
+                      {person.login_id} ·{" "}
+                      {profileStatus(
+                        person.profile_complete,
+                        person.profile_unreadable,
+                      )}
+                    </span>
                   </button>
                 </li>
               ))}
             </ul>
           ) : (
-            <p>등록된 합성 참가자가 없습니다.</p>
+            <p>등록된 참가자가 없습니다.</p>
           )}
-          <button onClick={() => void load()}>목록 새로고침</button>
+          <button className="list-refresh" onClick={() => void load()}>
+            목록 새로고침
+          </button>
         </div>
-        <div>
+        <div className="detail-panel" ref={detailPanel}>
           <h2>참가자 상세</h2>
           {pending ? (
             <Notice>상세 정보를 확인하고 있습니다…</Notice>
@@ -893,7 +900,7 @@ function App() {
         본문으로 이동
       </a>
       <div className="demo-banner">
-        심사용 합성 데이터 · 실제 개인정보 입력 금지
+        체험용 서비스 · 실제 개인정보를 입력하지 마세요
       </div>
       <div
         className={user ? `shell signed-in ${user.role}` : "shell signed-out"}

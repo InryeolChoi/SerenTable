@@ -156,7 +156,7 @@ test("운영 화면 파일을 받지 못해도 다른 메뉴로 이동할 수 �
   ).toBeVisible();
   await page.getByRole("link", { name: "참가자 관리", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "합성 참가자 관리", exact: true }),
+    page.getByRole("heading", { name: "참가자 관리", exact: true }),
   ).toBeVisible();
 });
 
@@ -265,7 +265,7 @@ test("처음 접속한 참가자는 안내 카드를 건너뛸 수 있고 더보
     name: "우연한 식탁에 오신 것을 환영합니다",
   });
   await expect(guide).toBeVisible();
-  await expect(guide).toContainText("합성 계정으로 보는 심사용 화면입니다");
+  await expect(guide).toContainText("체험용 서비스입니다");
   for (const name of ["프로필 작성하기", "건너뛰기"]) {
     const box = await guide
       .getByRole("button", { name, exact: true })
@@ -340,6 +340,8 @@ test("작은 화면의 하단 메뉴 아래 여백은 바탕색으로 덮여 본
       bottom: style.bottom,
       height: parseFloat(style.height),
       zIndex: Number(style.zIndex),
+      background: style.backgroundColor,
+      image: style.backgroundImage,
     };
   });
   const navigation = page.locator(".app-navigation");
@@ -350,6 +352,9 @@ test("작은 화면의 하단 메뉴 아래 여백은 바탕색으로 덮여 본
   expect(cover.bottom).toBe("0px");
   // 덮개가 메뉴 아래 틈 전체를 덮고, 메뉴보다 아래 층에 있어 누르기를 막지 않는다.
   expect(cover.height).toBeGreaterThan(gap);
+  // 반투명이면 iOS 26 Safari의 떠 있는 툴바 주변으로 글자가 비친다. 바탕색으로 불투명하게 채운다.
+  expect(cover.background).toBe("rgb(255, 249, 237)");
+  expect(cover.image).toBe("none");
   expect(cover.zIndex).toBeLessThan(
     Number(await navigation.evaluate((el) => getComputedStyle(el).zIndex)),
   );
