@@ -3,25 +3,25 @@ import { type User } from "./api";
 import { AppDialog } from "./app-navigation";
 import { GUIDE_EVENT } from "./ui";
 
-// 처음 접속한 브라우저에 한 번 보여 주는 안내 카드. 건너뛸 수 있고 더보기에서 다시 연다.
+// 처음 접속한 기기에 한 번 보여 주는 안내 카드. 건너뛸 수 있고 더보기에서 다시 연다.
 //
-// 표시 여부는 sessionStorage에 남긴다. localStorage는 쓰지 않는다. 이 앱은 "기기에 아무것도
-// 남기지 않는다"를 계약으로 두고 e2e/shell.spec.ts가 localStorage가 비어 있음을 확인한다.
-// 안내 카드 하나 때문에 그 계약을 느슨하게 만들지 않는다. 대신 브라우저를 닫으면 다시 뜬다.
-// (최초 1회만 기억할지는 미결정 항목이다. ui-improvement-backlog.md 2번 참고.)
-const STORAGE_KEY = "serentable.guide.v1";
+// 표시 여부는 역할별로 localStorage에 "1"만 남긴다(ui-improvement-backlog.md 2번 결정).
+// 계정·세션을 알 수 있는 값은 남기지 않으며, e2e/shell.spec.ts가 이 키 외에는
+// localStorage가 비어 있음을 확인한다. 같은 기기에서 참가자와 운영자가 번갈아 써도
+// 각 역할의 안내는 처음 한 번씩 뜬다.
+const STORAGE_PREFIX = "serentable.guide.v1.";
 
-function seen() {
+function seen(role: User["role"]) {
   try {
-    return window.sessionStorage.getItem(STORAGE_KEY) === "1";
+    return window.localStorage.getItem(STORAGE_PREFIX + role) === "1";
   } catch {
     // 저장소를 쓸 수 없으면 매번 보여 준다.
     return false;
   }
 }
-function remember() {
+function remember(role: User["role"]) {
   try {
-    window.sessionStorage.setItem(STORAGE_KEY, "1");
+    window.localStorage.setItem(STORAGE_PREFIX + role, "1");
   } catch {
     // 저장 실패는 무시한다. 안내를 다시 보여 줄 뿐이다.
   }
@@ -64,15 +64,15 @@ export function FirstVisitGuide({
 }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
-    setOpen(!seen());
-  }, [user.id]);
+    setOpen(!seen(user.role));
+  }, [user.id, user.role]);
   useEffect(() => {
     const reopen = () => setOpen(true);
     window.addEventListener(GUIDE_EVENT, reopen);
     return () => window.removeEventListener(GUIDE_EVENT, reopen);
   }, []);
   function close() {
-    remember();
+    remember(user.role);
     setOpen(false);
   }
   if (!open) return null;

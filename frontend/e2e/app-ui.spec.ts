@@ -276,6 +276,14 @@ test("처음 접속한 참가자는 안내 카드를 건너뛸 수 있고 더보
   await expect(guide).not.toBeVisible();
   await page.reload();
   await expect(guide).not.toBeVisible();
+  // 탭을 새로 열어도(세션 저장소가 비어도) 이 기기에서는 다시 뜨지 않는다.
+  const another = await page.context().newPage();
+  await another.goto("/participant");
+  await expect(another.locator("main h1")).toBeVisible();
+  await expect(
+    another.getByRole("dialog", { name: "우연한 식탁에 오신 것을 환영합니다" }),
+  ).toHaveCount(0);
+  await another.close();
   await page.getByRole("button", { name: "더보기", exact: true }).click();
   await page
     .getByRole("dialog", { name: "더보기", exact: true })
@@ -316,4 +324,33 @@ test("운영자 회차 필터와 새로 고침은 작은 화면에서도 떨어�
     );
     expect(Math.max(xGap, yGap)).toBeGreaterThanOrEqual(15);
   }
+});
+
+test("작은 화면의 하단 메뉴 아래 여백은 바탕색으로 덮여 본문이 비치지 않는다", async ({
+  page,
+}) => {
+  await login(page, "participant-01", participantPassword);
+  const cover = await page.evaluate(() => {
+    const style = getComputedStyle(
+      document.querySelector(".shell.signed-in")!,
+      "::after",
+    );
+    return {
+      position: style.position,
+      bottom: style.bottom,
+      height: parseFloat(style.height),
+      zIndex: Number(style.zIndex),
+    };
+  });
+  const navigation = page.locator(".app-navigation");
+  const box = (await navigation.boundingBox())!;
+  const gap =
+    (await page.evaluate(() => window.innerHeight)) - (box.y + box.height);
+  expect(cover.position).toBe("fixed");
+  expect(cover.bottom).toBe("0px");
+  // 덮개가 메뉴 아래 틈 전체를 덮고, 메뉴보다 아래 층에 있어 누르기를 막지 않는다.
+  expect(cover.height).toBeGreaterThan(gap);
+  expect(cover.zIndex).toBeLessThan(
+    Number(await navigation.evaluate((el) => getComputedStyle(el).zIndex)),
+  );
 });
