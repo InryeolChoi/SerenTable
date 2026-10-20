@@ -1,4 +1,4 @@
-import { openScreen } from "./support";
+import { openScreen, storedKeysBeyondGuide } from "./support";
 import { test, expect, type Page } from "@playwright/test";
 import {
   login as signIn,
@@ -55,7 +55,7 @@ test("합성 참가자가 실제 로그인하고 권한 거절과 로그아웃�
     page.getByRole("form", { name: "합성 계정 로그인" }),
   ).toBeVisible();
   expect((await page.request.get("/api/me/profile")).status()).toBe(401);
-  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual([]);
+  expect(await storedKeysBeyondGuide(page)).toEqual([]);
 });
 
 test("미완성 프로필과 목적별 동의가 실제 DB에 저장되고 새로고침 후 유지된다", async ({
@@ -248,7 +248,7 @@ test("운영자는 합성 참가자 상세를 확인하고 모바일·데스크�
       fullPage: true,
     });
   }
-  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual([]);
+  expect(await storedKeysBeyondGuide(page)).toEqual([]);
   const session = await (await page.request.get("/api/auth/me")).json();
   expect(Object.keys(session)).toEqual(["user"]);
   expect(Object.keys(session.user).sort()).toEqual(["id", "login_id", "role"]);

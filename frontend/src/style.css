@@ -643,6 +643,17 @@ summary {
   .shell.signed-in {
     padding-bottom: calc(100px + env(safe-area-inset-bottom));
   }
+  /* Safari 탭에서는 하단 메뉴와 브라우저 툴바 사이 여백으로 본문이 비친다.
+     메뉴 아래쪽을 바탕색으로 덮어 그 띠에서 글자가 읽히지 않게 한다. */
+  .shell.signed-in::after {
+    content: "";
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 29;
+    height: calc(48px + env(safe-area-inset-bottom));
+    background: linear-gradient(rgb(255 249 237 / 0%), var(--color-bg) 50%);
+    pointer-events: none;
+  }
   header {
     min-height: 80px;
     padding: 12px 0;

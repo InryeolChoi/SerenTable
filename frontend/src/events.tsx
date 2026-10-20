@@ -56,6 +56,39 @@ const fieldLabels: Record<FormField, string> = {
   matches_at: "매칭 예정",
   capacity: "정원",
 };
+// 서버가 거절한 이유 코드를 같은 팝업·필드 문구로 바꾼다. 클라이언트 검사를 지나도
+// 제출 사이에 마감이 지나는 등 서버만 판단할 수 있는 경우가 있다.
+const serverReasons: Record<string, Problem> = {
+  closes_in_past: { field: "closes_at", message: "신청 마감은 지금 이후여야 합니다." },
+  region_unknown: { field: "region_code", message: "지역을 다시 선택해 주세요." },
+  ends_before_start: {
+    field: "ends_at",
+    message: "종료 시각은 시작 시각보다 늦어야 합니다.",
+  },
+  close_match_start_order: {
+    field: "matches_at",
+    message: "신청 마감 ≤ 매칭 예정 ≤ 시작 시각 순서여야 합니다.",
+  },
+};
+function serverProblems(detail: unknown): Problem[] {
+  if (!Array.isArray(detail)) return [];
+  const found: Problem[] = [];
+  for (const item of detail) {
+    const text = `${item?.type ?? ""} ${item?.msg ?? ""}`;
+    const known = Object.keys(serverReasons).find((code) => text.includes(code));
+    const field = Array.isArray(item?.loc)
+      ? (item.loc as unknown[]).find((part): part is FormField =>
+          typeof part === "string" && part in fieldLabels,
+        )
+      : undefined;
+    const problem = known
+      ? serverReasons[known]
+      : field && { field, message: `${fieldLabels[field]}의 입력 형식을 확인해 주세요.` };
+    if (problem && !found.some((other) => other.field === problem.field))
+      found.push(problem);
+  }
+  return found;
+}
 
 export function AdminEventsPage() {
   const request = useScopedApi();
@@ -96,7 +129,12 @@ export function AdminEventsPage() {
       if (!form[name]) found.push({ field: name, message: `${fieldLabels[name]}을 입력해 주세요.` });
     }
     if (found.length) return found;
+    const capacity = Number(form.capacity);
+    if (!Number.isInteger(capacity) || capacity < 4 || capacity > 100)
+      found.push({ field: "capacity", message: "정원은 4~100명 사이의 정수여야 합니다." });
     const at = (name: FormField) => new Date(seoulInstant(form[name]));
+    if (!(at("closes_at") > new Date()))
+      found.push({ field: "closes_at", message: "신청 마감은 지금 이후여야 합니다." });
     if (!(at("starts_at") < at("ends_at")))
       found.push({ field: "ends_at", message: "종료 시각은 시작 시각보다 늦어야 합니다." });
     if (!(at("closes_at") <= at("matches_at") && at("matches_at") <= at("starts_at")))
@@ -113,16 +151,16 @@ export function AdminEventsPage() {
     setProblems((previous) => previous.filter((problem) => problem.field !== name));
     setForm({ ...form, [name]: value });
   }
+  function showProblems(found: Problem[]) {
+    setProblems(found);
+    errorFocus.current = inputs.current[found[0].field] ?? null;
+    setDialogOpen(true);
+  }
   async function create(event: FormEvent) {
     event.preventDefault();
     setSaved("");
     const found = collectProblems();
-    if (found.length) {
-      setProblems(found);
-      errorFocus.current = inputs.current[found[0].field] ?? null;
-      setDialogOpen(true);
-      return;
-    }
+    if (found.length) return showProblems(found);
     setProblems([]);
     setPending(true);
     setError("");
@@ -147,6 +185,11 @@ export function AdminEventsPage() {
       );
       await load();
     } catch (error) {
+      const rejected =
+        error instanceof ApiError && error.status === 422
+          ? serverProblems(error.detail)
+          : [];
+      if (rejected.length) return showProblems(rejected);
       setError(
         error instanceof ApiError && error.status === 409
           ? "같은 지역·시작 시각의 회차가 이미 있습니다. 입력 내용은 유지됩니다."
@@ -200,7 +243,7 @@ export function AdminEventsPage() {
         </AppDialog>
       )}
       <div className="admin-grid">
-        <form aria-label="회차 만들기" onSubmit={create}>
+        <form aria-label="회차 만들기" onSubmit={create} noValidate>
           <fieldset disabled={pending || loading} className="form-body">
             <label>
               지역

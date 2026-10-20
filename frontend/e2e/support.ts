@@ -26,11 +26,21 @@ export const display = new Intl.DateTimeFormat("ko-KR", {
  * Mark the first-visit guide card as already seen for this page's context.
  * The card is a modal, so leaving it open blocks every later click. The card
  * itself is covered by its own test in app-ui.spec.ts, which does not call this.
- * The key mirrors STORAGE_KEY in src/guide.tsx.
+ * The keys mirror STORAGE_PREFIX in src/guide.tsx.
  */
 export async function skipGuide(page: Page) {
-  await page.addInitScript(() =>
-    window.sessionStorage.setItem("serentable.guide.v1", "1"),
+  await page.addInitScript(() => {
+    for (const role of ["participant", "operator"])
+      window.localStorage.setItem(`serentable.guide.v1.${role}`, "1");
+  });
+}
+
+/** localStorage keys other than the guide's "seen" flags; the app must leave none. */
+export async function storedKeysBeyondGuide(page: Page) {
+  return page.evaluate(() =>
+    Object.keys(localStorage).filter(
+      (key) => !key.startsWith("serentable.guide.v1."),
+    ),
   );
 }
 

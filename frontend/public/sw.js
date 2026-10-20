@@ -3,6 +3,7 @@ self.addEventListener("push", event => {
   event.waitUntil(self.registration.showNotification("우연한 식탁", {
     body: "새 안내가 도착했습니다. 앱에서 확인해 주세요.",
     tag: "serentable-guidance",
+    icon: "/apple-touch-icon.png",
     data: { url: "/participant/gatherings" },
   }));
 });
