@@ -48,7 +48,10 @@ def due_slot(operator, region="hongdae", days=7, close_in=3.0, capacity=24):
     starts = (datetime.now(SEOUL) + timedelta(days=days)).replace(
         hour=19, minute=0, second=0, microsecond=0
     )
-    closes = datetime.now(SEOUL) + timedelta(seconds=close_in)
+    # Deadlines are decided by PostgreSQL; do not assume the host/Docker clocks agree.
+    with database_engine().connect() as connection:
+        now = connection.execute(text("SELECT clock_timestamp()")).scalar_one()
+    closes = now + timedelta(seconds=close_in)
     response = send(
         operator,
         "POST",

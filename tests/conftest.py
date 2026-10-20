@@ -28,7 +28,7 @@ def seeded_database(monkeypatch):
                 """TRUNCATE event_slot, application, participant_profile, consent_record,
             participant_exclusion, participant_sanction,
             person_preference, safety_report, attendance_check_in, no_show_review,
-            table_feedback, push_subscription, app_notification"""
+            table_feedback, push_subscription, app_notification, gathering_exception"""
                 + (", operator_audit" if audit else "")
                 + " CASCADE"
             )

@@ -6,7 +6,6 @@ Expected counts come from the small hand-built scenarios below, not from the que
 import os
 import subprocess
 import sys
-import time
 import uuid
 from contextlib import ExitStack
 from datetime import datetime, timezone
@@ -19,7 +18,7 @@ from serentable.main import app
 from serentable.matching import run_due_matches
 from serentable.notifications import dispatch_notifications, enqueue_notification
 from sqlalchemy import text
-from support import login, send, truncate
+from support import login, send, truncate, wait_for_slot_matching
 from test_applications import apply, create_slot, make_ready
 from test_attendance import move_slot, user_id
 from test_matching_runner import apply_and_pay, due_slot, prepare
@@ -134,7 +133,8 @@ def test_worker_results_show_matching_venue_room_push_and_exception_counts():
             apply_and_pay(member, table_slot)
         for member in unseated:
             apply_and_pay(member, short_slot)
-        time.sleep(5.6)
+        wait_for_slot_matching(table_slot)
+        wait_for_slot_matching(short_slot)
         run_worker_once()
         table_view = slot_view(operator, table_slot)
         assert table_view["matching"] == {
@@ -177,7 +177,7 @@ def confirmed_table(operator, members, close_in=4):
     slot = due_slot(operator, close_in=close_in)
     for member in members:
         apply_and_pay(member, slot)
-    time.sleep(close_in + 0.6)
+    wait_for_slot_matching(slot)
     assert run_due_matches()[0]["seated_count"] == 4
     return slot
 

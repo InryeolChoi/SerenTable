@@ -7,7 +7,6 @@ reads the result over HTTP; only the isolated slot times are moved with SQL.
 import os
 import subprocess
 import sys
-import time
 from contextlib import ExitStack
 from datetime import datetime, timedelta
 
@@ -16,7 +15,7 @@ from fastapi.testclient import TestClient
 from serentable.database import database_engine
 from serentable.main import app
 from sqlalchemy import text
-from support import SEOUL, login, send, truncate
+from support import SEOUL, login, send, truncate, wait_for_slot_matching
 
 RATINGS = {
     "table_rating": 5,
@@ -80,7 +79,7 @@ def first_table(seeded_database):
         slot = due_slot(operator, close_in=4)
         for member in members:
             apply_and_pay(member, slot)
-        time.sleep(4.6)
+        wait_for_slot_matching(slot)
         assert run_due_matches()[0]["seated_count"] == 4
         table_id = members[0].get("/api/me/gatherings").json()["gatherings"][0]["id"]
         yield {
@@ -271,7 +270,7 @@ def test_the_next_matching_separates_excluded_pairs_and_spares_mutual_meet_again
     slot = due_slot(first_table["operator"], region="gangnam", close_in=6)
     for client in [*first_table["members"], *first_table["extras"]]:
         apply_and_pay(client, slot)
-    time.sleep(6.6)
+    wait_for_slot_matching(slot)
     if runner == "in_process":
         (summary,) = run_due_matches()
         seated = summary["seated_count"]
@@ -341,3 +340,21 @@ def test_recommendations_follow_active_sanctions_without_penalizing_warnings(fir
     assert [item[0] for item in recommendations(member)] == [slot]
     assert sanction(operator, user_id, "PERMANENT_BAN").status_code == 201
     assert recommendations(member) == []
+
+
+def test_client_clock_ahead_still_confirms_only_after_the_database_deadline(request, monkeypatch):
+    """The client fixture may lead Docker's clock; matching itself must stay untouched."""
+    import test_matching_runner
+
+    original = test_matching_runner.datetime
+
+    class Ahead(original):
+        @classmethod
+        def now(cls, tz=None):
+            return super().now(tz) + timedelta(seconds=1)
+
+    monkeypatch.setattr(test_matching_runner, "datetime", Ahead)
+    table = request.getfixturevalue("first_table")
+    (card,) = history(table["members"][0])
+    assert card["table_id"] == table["id"]
+    assert card["event_slot_id"] == table["slot"]
