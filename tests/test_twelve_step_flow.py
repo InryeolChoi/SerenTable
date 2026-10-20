@@ -175,8 +175,11 @@ def test_one_slot_runs_all_twelve_steps_without_operator_action_after_the_deadli
         notified = members[0].get("/api/me/notifications").json()["notifications"]
         assert {n["kind"] for n in notified} >= {"CONFIRMED", "VENUE_ASSIGNED"}
         # Each table announcement names the caller's own table, so a client can tell tables
-        # apart without guessing from text or time.
-        assert {n["table_id"] for n in notified} == {gathering["id"]}
+        # apart without guessing from text or time. Application and payment notices (PRD §14,
+        # ADR-0019) belong to no table and carry none.
+        table_kinds = {"CONFIRMED", "VENUE_ASSIGNED", "VENUE_PENDING", "START_CONTENT", "REMINDER"}
+        assert {n["table_id"] for n in notified if n["kind"] in table_kinds} == {gathering["id"]}
+        assert all(n["table_id"] is None for n in notified if n["kind"] not in table_kinds)
         body = members[0].get("/api/me/applications").text + str(messages)
         for secret in ("010-0000-0000", "synthetic_demo", "score", "components"):
             assert secret not in body

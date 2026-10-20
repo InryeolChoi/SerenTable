@@ -47,23 +47,26 @@ function paymentError(error: unknown) {
 }
 const newKey = () => crypto.randomUUID();
 
-/** FAQ Q1 current rule plus the still-undecided details (U04), shown before paying. */
+/** PAY-02: PRD "진행 2일 전 이후 환불 제한" with FAQ Q1's current cut-off (ADR-0019). */
 export function RefundNotice() {
   return (
     <p className="small muted">
-      환불 안내: 현행 기준 화요일 24:00 이후 환불 불가. 시스템 최종 매칭 실패의
-      미사용 1회권은 시간 제한 없이 전액 모의 환불할 수 있습니다. 일반 취소의
-      세부 정책은 미정입니다. 신청 취소는 자동 환불이 아닙니다.
+      환불 규정: 모임 진행 2일 전(현행 기준 화요일 24:00) 이후에는 환불할 수
+      없습니다. 신청 취소는 신청 마감 전까지 가능하며 자동 환불이 아닙니다.
+      시스템 매칭 실패 시 미사용 1회권은 시간 제한 없이 전액 모의 환불할 수
+      있습니다.
     </p>
   );
 }
 
-/** FAQ Q3 / U04: no-show and late-cancellation rules are not decided yet (PAY-02). */
+/** PAY-02 same-day cancellation and no-show rules (FAQ Q2·Q3, ADR-0014/0018/0019). */
 export function NoShowNotice() {
   return (
     <p className="small muted">
-      노쇼·취소 정책 미정: 노쇼 횟수·참여 제한·이용권 차감 기준과 당일 취소
-      처리는 아직 정해지지 않았습니다.
+      당일 취소·노쇼 정책: 매칭 확정 후에는 앱에서 취소할 수 없으며 당일 불참은
+      노쇼로 처리됩니다. 모임 종료 시각까지 체크인하지 않으면 노쇼 후보가 되고,
+      운영자가 확인해 노쇼로 확정하거나 사유를 인정합니다. 확정 노쇼는 경고·참가
+      제한 대상이 될 수 있으며 사용한 이용권은 돌려받지 않습니다.
     </p>
   );
 }

@@ -227,7 +227,7 @@ def test_worker_reminders_start_content_and_rollback_are_atomic(interest_sets, e
         from serentable.clock import SEOUL
 
         assert start.astimezone(SEOUL).strftime("%Y-%m-%d %H:%M") in reminder
-        for required in ("합성 식당", "합성 주소", "예약명:", "화요일 24:00", "노쇼", "미정"):
+        for required in ("합성 식당", "합성 주소", "예약명:", "2일 전", "화요일 24:00", "노쇼"):
             assert required in reminder
         notifications = members[0].get("/api/me/notifications").json()["notifications"]
         assert any(n["body"] == reminder for n in notifications)

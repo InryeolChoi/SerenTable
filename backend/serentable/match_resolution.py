@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from serentable import participant_notices as notices
 from serentable.auth import Principal, private_response, require_csrf_participant
 from serentable.clock import iso, locked_now
 from serentable.database import database_engine
@@ -318,6 +319,9 @@ def resolve(
                     WHERE application_id=:app"""),
                     {"app": application_id, "slot": payload.event_slot_id, "now": now},
                 )
+                notices.schedule_moved(
+                    connection, user.id, resolution_id, payload.event_slot_id, now
+                )
             else:
                 if single and payload.action != "REFUND":
                     connection.execute(
@@ -335,6 +339,9 @@ def resolve(
                     reason = (
                         "mock_refunded" if attempt["state"] == "SUCCEEDED" else "mock_refund_failed"
                     )
+                    notices.refund_finished(connection, user.id, resolution_id, attempt, now)
+                else:
+                    notices.pass_held(connection, user.id, resolution_id, single, now)
                 connection.execute(
                     text("""UPDATE match_participation SET state='NO_MATCH',
                     reason_code=:reason, updated_at=:now WHERE application_id=:app"""),

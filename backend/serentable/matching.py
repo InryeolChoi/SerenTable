@@ -677,6 +677,10 @@ def _execute(connection, slot_id):
             reason,
             now,
         )
+        if reason != OVERLAPPING_CONFIRMATION:
+            from serentable.participant_notices import matching_failed
+
+            matching_failed(connection, owners[application_id], application_id, run_id, reason, now)
     finished = locked_now(connection)
     connection.execute(
         text("""UPDATE match_run SET state = 'SUCCEEDED', seated_count = :seated,

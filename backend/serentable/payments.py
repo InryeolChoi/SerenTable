@@ -382,6 +382,9 @@ def complete_mock_payment(
         text("UPDATE payment SET state = 'PAID', completed_at = :now WHERE id = :id"),
         {"id": payment_id, "now": now},
     )
+    from serentable.participant_notices import payment_completed
+
+    payment_completed(connection, user_id, application_id, payment_id, product, now)
     single = product["kind"] == "SINGLE"
     entitlement_id = uuid.uuid4()
     connection.execute(

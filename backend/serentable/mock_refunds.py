@@ -272,6 +272,9 @@ def retry_refund(
             attempt = perform_refund(
                 connection, resolution_id, single, payload.request_key, now, operator.id
             )
+            from serentable.participant_notices import refund_finished
+
+            refund_finished(connection, row["user_id"], resolution_id, attempt, now)
             connection.execute(
                 text("""UPDATE match_participation SET reason_code=:reason,
                 updated_at=:now WHERE application_id=:app AND state='NO_MATCH'"""),
