@@ -45,5 +45,5 @@
 
 1. ~~운영 `check-feedback-reminder`~~ → PASS(2026-10-21)
 2. 심사위원용 계정 비밀번호 전달 경로 확정. 비밀번호는 문서·저장소에 적지 않는다.
-3. 결과 안내까지 Railway 비용·가용성 확인
+3. ~~결과 안내까지 Railway 비용·가용성 확인~~ → 2026-10-21 00:42 KST 사용자 대시보드 확인: 현재 사용 $0.39, 예상 청구 $0.77, 포함 사용량 $5.00, Compute 한도 $20.00. 세 서비스(SerenTable·serentable-worker·Postgres) 모두 Online
 4. Blaybus Task별 PR 링크·수행/검증 문구 기록, 제출서 작성(마감 2026-10-21 23:59 KST)
