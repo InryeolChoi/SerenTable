@@ -379,3 +379,13 @@ A3 사용자 추천안 승인 도착. ADR-0017에 기존 배정 유지·현재 �
 ### A7 추가 RED와 보완 (최종 전체 재실행 필요)
 
 2ea76c2 전체는377 PASS/1 FAIL/4 ERROR(15분31초). 발송 fixture3건 중2건, 추천 fixture4개에서 아직 실행 가능한 매칭 없음. 집중 묶음8 PASS라 전체 통과로 표시하지 않았다. 시험 입력의 호스트 시각1초 선행 probe로 같은 두 유형을 재현했고, 실제 DB 시각에서 짧은 마감 생성·DB matches_at 대기·직접 발송 fixture 시각 통일로 보완했다. 제품 시계/Worker/기한·기존 단언은 유지한다. 원래 실패 순간 시각 차이는 미측정이라 원래 원인을 확정하지 않는다. probe RED→각GREEN을 확인했고 영속 호스트 선행 회귀를 추가했다. 새 총383개 전체 단일 실행이 남아 있다.
+
+### PR #58 생성·외부 기록 (전체 검증 완료)
+
+- Draft PR https://github.com/InryeolChoi/SerenTable/pull/58, 코드/시험 기준 `04f585f`. 부모 Issue #10 댓글6291886213, 감사 PR #57 댓글6291887916에 구현·재현·미검증을 연결했다. Work를 자동 종료하지 않았다.
+- A7 보완 후 집계·예외·교착·발송·추천 연속19 PASS(111.38초). 입력 시각1초 선행 발송/추천 probe도 각각 RED→GREEN. Mac 호스트 Python→PG17 단일 전체는 195 PASS/1 FAIL 중단(`closes_in_past`, 같은 범위 재실행196 PASS, 원인 미확정). Linux Python 컨테이너·PG17 새 DB 단일 전체는 **383 PASS**(885.70초).
+- GitHub CI39429893880 전체 필수 검사 성공(백엔드383 PASS, Chromium24/WebKit24). 제품 빌드 기준 Chromium24/WebKit24·Ruff·TypeScript/Vite는 통과했다. 신규 운영 작업 없음.
+
+### 2026-10-20 Claude Code 인수·기록 마감
+
+Codex 용량 전환 후 Claude Code가 이어받았다. 제품 코드는 바꾸지 않고 Linux 컨테이너 단일 전체 383 PASS 결과를 이 기록·감사 보완 문서·ADR-0017 상태에 반영하고 PR #58 브랜치에 push했다. 남은 일: 사용자 PR 검토·Ready 전환, 신규 migration 포함 운영 반영 별도 승인, 배포 후 인수·제출 증거. 운영 DB·배포·main 병합 없음. Mac 단일 1 FAIL 원인 미확정.
