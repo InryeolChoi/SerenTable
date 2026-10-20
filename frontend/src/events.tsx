@@ -68,6 +68,7 @@ export function AdminEventsPage() {
   const [saved, setSaved] = useState("");
   const [problems, setProblems] = useState<Problem[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const errorFocus = useRef<HTMLElement | null>(null);
   const inputs = useRef<Partial<Record<FormField, HTMLElement | null>>>({});
   async function load() {
     setLoading(true);
@@ -118,6 +119,7 @@ export function AdminEventsPage() {
     const found = collectProblems();
     if (found.length) {
       setProblems(found);
+      errorFocus.current = inputs.current[found[0].field] ?? null;
       setDialogOpen(true);
       return;
     }
@@ -187,11 +189,8 @@ export function AdminEventsPage() {
       {dialogOpen && (
         <AppDialog
           label="입력을 확인해 주세요"
-          onClose={() => {
-            setDialogOpen(false);
-            const first = problems[0]?.field;
-            if (first) inputs.current[first]?.focus();
-          }}
+          returnFocus={errorFocus}
+          onClose={() => setDialogOpen(false)}
         >
           <ul>
             {problems.map((problem) => (

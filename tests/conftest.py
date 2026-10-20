@@ -15,8 +15,9 @@ def seeded_database(monkeypatch):
     monkeypatch.setenv("DEMO_PARTICIPANT_PASSWORD", "synthetic-participant-password")
     monkeypatch.setenv("DEMO_OPERATOR_PASSWORD", "synthetic-operator-password")
     subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=True)
-    # Safety preferences and restrictions are deliberately durable in the product.
-    # Independent test scenarios must not inherit another test's exclusions or sanctions.
+    # Product records are durable, but independent test scenarios must not inherit
+    # another scenario's slots, applications, profiles, consent or safety restrictions.
+    # This cleanup is test-only; production lifecycle behavior is unchanged.
     from serentable.database import database_engine
     from sqlalchemy import text
 
@@ -24,7 +25,8 @@ def seeded_database(monkeypatch):
         audit = connection.execute(text("SELECT to_regclass('public.operator_audit')")).scalar()
         connection.execute(
             text(
-                """TRUNCATE participant_exclusion, participant_sanction,
+                """TRUNCATE event_slot, application, participant_profile, consent_record,
+            participant_exclusion, participant_sanction,
             person_preference, safety_report, attendance_check_in, no_show_review,
             table_feedback, push_subscription, app_notification"""
                 + (", operator_audit" if audit else "")

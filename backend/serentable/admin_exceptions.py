@@ -16,6 +16,7 @@ from serentable.audit import record_audit
 from serentable.auth import Principal, private_response, require_csrf_operator, require_operator
 from serentable.clock import iso
 from serentable.database import database_engine
+from serentable.matching_exceptions import MATCHING_FAILURE_SELECT
 from serentable.mock_refunds import list_refund_exceptions
 
 router = APIRouter()
@@ -43,7 +44,7 @@ def gathering_json(row):
         "state": row["state"],
         "resolution_note": row["resolution_note"],
         "resolved_by": str(row["resolved_by"]) if row["resolved_by"] else None,
-        "resolvable": row["state"] == "OPEN",
+        "resolvable": row["state"] == "OPEN" and row["category"] != "VENUE_CONDITIONS",
     }
 
 
@@ -73,6 +74,22 @@ def alternative_json(row):
     }
 
 
+def matching_failure_json(row):
+    return {
+        "kind": "matching_failure",
+        "id": str(row["id"]),
+        "category": "MATCHING_FAILURE",
+        "event_slot_id": str(row["event_slot_id"]),
+        "dining_table_id": None,
+        "reason_code": row["reason_code"],
+        "occurred_at": iso(row["finished_at"]),
+        "state": "OPEN",
+        "resolution_note": None,
+        "resolved_by": None,
+        "resolvable": False,
+    }
+
+
 @router.get("/api/admin/exceptions")
 def list_exceptions(
     user: Annotated[Principal, Depends(require_operator)],
@@ -92,6 +109,10 @@ def list_exceptions(
         ]
         items += list_refund_exceptions(connection, state)
         if state != "RESOLVED":
+            items += [
+                matching_failure_json(row)
+                for row in connection.execute(text(MATCHING_FAILURE_SELECT)).mappings()
+            ]
             items += [
                 alternative_json(row)
                 for row in connection.execute(
@@ -115,7 +136,7 @@ def resolve_exception(
     operator: Annotated[Principal, Depends(require_csrf_operator)],
 ):
     """Record the outcome once; an identical repeat returns the same result."""
-    if kind == "alternative_overdue":
+    if kind in {"alternative_overdue", "matching_failure"}:
         # Listed for visibility only; the participant's own choice is never made for them.
         raise HTTPException(409, "exception_resolution_unsupported")
     if kind != "gathering":
@@ -131,6 +152,8 @@ def resolve_exception(
             )
             if row is None:
                 raise HTTPException(404, "exception_not_found")
+            if row["category"] == "VENUE_CONDITIONS":
+                raise HTTPException(409, "exception_resolution_unsupported")
             if row["state"] == "OPEN":
                 connection.execute(
                     text("""UPDATE gathering_exception SET state='RESOLVED', resolution_note=:note,

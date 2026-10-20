@@ -35,6 +35,7 @@ from serentable.database import database_engine
 from serentable.eligibility import CANDIDATES, ELIGIBLE
 from serentable.events import SLOT_COLUMNS, slot_json
 from serentable.match_resolution import extend_final_failure, lock_matching
+from serentable.matching_explanations import member_explanation, table_explanation
 from serentable.matching_score import (
     MAX_AGE_GAP,
     Member,
@@ -557,12 +558,24 @@ def _execute(connection, slot_id):
     rows = connection.execute(text(TARGET_SQL), {"slot_id": slot_id, "now": now}).mappings().all()
     owners = {str(row["application_id"]): row["user_id"] for row in rows}
     users = [row["user_id"] for row in rows]
+    participants = [_participant(row) for row in rows if not row["overlap_confirmed"]]
+    by_application = {p.application_id: p.member() for p in participants}
+    penalized_pairs = _pairs(connection, MET_SQL, users, slot_id)
+    previous_pairs = _pairs(connection, PREVIOUS_MET_SQL, users, slot_id)
+    transfers = dict(
+        connection.execute(
+            text("""SELECT application_id,count(*)
+        FROM match_resolution WHERE action='TRANSFER' AND application_id=ANY(:ids)
+        GROUP BY application_id"""),
+            {"ids": [row["application_id"] for row in rows]},
+        ).all()
+    )
     plan = plan_allocation(
-        [_participant(row) for row in rows if not row["overlap_confirmed"]],
+        participants,
         slot["capacity"],
         policy=policy,
         exclusions=_pairs(connection, EXCLUSION_SQL, users),
-        met_pairs=_pairs(connection, MET_SQL, users, slot_id),
+        met_pairs=penalized_pairs,
     )
     unseated = plan.unseated + tuple(
         (str(row["application_id"]), OVERLAPPING_CONFIRMATION)
@@ -573,15 +586,20 @@ def _execute(connection, slot_id):
         plan.tables, plan.table_scores, plan.table_components, strict=True
     ):
         table_id = uuid.uuid4()
+        seated_members = [by_application[application_id] for application_id in members]
         connection.execute(
             text("""INSERT INTO dining_table
-            (id, match_run_id, event_slot_id, member_count, score, components)
-            VALUES (:id, :run, :slot, :count, :score, CAST(:components AS jsonb))"""),
+            (id, match_run_id, event_slot_id, member_count, score, components, explanation)
+            VALUES (:id, :run, :slot, :count, :score, CAST(:components AS jsonb),
+                    CAST(:explanation AS jsonb))"""),
             {
                 "id": table_id,
                 "run": run_id,
                 "slot": slot_id,
                 "count": len(members),
+                "explanation": json.dumps(
+                    table_explanation(seated_members, previous_pairs, penalized_pairs)
+                ),
                 "score": _two_places(score),
                 "components": json.dumps(
                     {k: None if v is None else _two_places(v) for k, v in components.items()}
@@ -604,13 +622,23 @@ def _execute(connection, slot_id):
             )
             connection.execute(
                 text("""INSERT INTO match_run_member
-                (match_run_id, application_id, user_id, outcome, dining_table_id)
-                VALUES (:run, :application, :user, 'SEATED', :table)"""),
+                (match_run_id, application_id, user_id, outcome, dining_table_id, explanation)
+                VALUES (:run, :application, :user, 'SEATED', :table,
+                        CAST(:explanation AS jsonb))"""),
                 {
                     "run": run_id,
                     "application": application_id,
                     "user": user_id,
                     "table": table_id,
+                    "explanation": json.dumps(
+                        member_explanation(
+                            by_application[application_id],
+                            [p for p in seated_members if p.user_id != str(user_id)],
+                            previous_pairs,
+                            transfers.get(uuid.UUID(application_id), 0),
+                            _two_places,
+                        )
+                    ),
                 },
             )
             _record_participation(
@@ -682,15 +710,19 @@ def _execute(connection, slot_id):
 # for the other (at any shared table) is not counted as previously met (ADR-0014 U08).
 EXCLUSION_SQL = """SELECT DISTINCT user_low, user_high FROM participant_exclusion
     WHERE user_low = ANY(:users) AND user_high = ANY(:users)"""
-MET_SQL = """SELECT DISTINCT a.user_id, b.user_id FROM table_assignment a
+PREVIOUS_MET_SQL = """SELECT DISTINCT a.user_id, b.user_id FROM table_assignment a
     JOIN table_assignment b ON b.dining_table_id = a.dining_table_id AND b.user_id <> a.user_id
     JOIN dining_table t ON t.id = a.dining_table_id
     JOIN match_run m ON m.id = t.match_run_id AND m.state = 'SUCCEEDED'
-    WHERE a.user_id = ANY(:users) AND b.user_id = ANY(:users) AND t.event_slot_id <> :slot
+    WHERE a.user_id = ANY(:users) AND b.user_id = ANY(:users) AND t.event_slot_id <> :slot"""
+MET_SQL = (
+    PREVIOUS_MET_SQL
+    + """
       AND NOT (EXISTS (SELECT 1 FROM person_preference p WHERE p.rater_id = a.user_id
                        AND p.target_id = b.user_id AND p.choice = 'MEET_AGAIN')
                AND EXISTS (SELECT 1 FROM person_preference p WHERE p.rater_id = b.user_id
                            AND p.target_id = a.user_id AND p.choice = 'MEET_AGAIN'))"""
+)
 
 
 def _pairs(connection, sql, users, slot_id=None):
@@ -899,7 +931,7 @@ def list_match_runs(operator: Principal = Depends(require_operator)):
             members, tables = {}, {}
             if runs:
                 for row in connection.execute(
-                    text("""SELECT match_run_id, id, member_count, score, components
+                    text("""SELECT match_run_id, id, member_count, score, components, explanation
                     FROM dining_table WHERE match_run_id = ANY(:ids)
                     ORDER BY score DESC NULLS LAST, id"""),
                     {"ids": [run["run_id"] for run in runs]},
@@ -911,11 +943,12 @@ def list_match_runs(operator: Principal = Depends(require_operator)):
                             # Runs before ADR-0011 recorded no score.
                             "score": None if row["score"] is None else f"{row['score']:.2f}",
                             "components": row["components"],
+                            "explanation": row["explanation"],
                         }
                     )
                 for row in connection.execute(
                     text("""SELECT m.match_run_id, m.outcome, m.reason_code, m.dining_table_id,
-                    m.application_id, u.login_id
+                    m.application_id, u.login_id, m.explanation
                     FROM match_run_member m
                     JOIN app_user u ON u.id = m.user_id
                     WHERE m.match_run_id = ANY(:ids)
@@ -926,6 +959,7 @@ def list_match_runs(operator: Principal = Depends(require_operator)):
                         {
                             "application_id": str(row["application_id"]),
                             "login_id": row["login_id"],
+                            "explanation": row["explanation"],
                             "outcome": row["outcome"],
                             "reason_code": row["reason_code"],
                             "dining_table_id": (

@@ -18,6 +18,7 @@ import {
   useCatalog,
 } from "./payments";
 import { message, Notice, useScopedApi } from "./ui";
+import { TableExplanationView, MemberExplanationView } from "./matching-explanations";
 
 const stateLabels: Record<Application["state"], string> = {
   DRAFT: "작성 중",
@@ -739,11 +740,12 @@ function MatchHistory() {
                     : ""}
                 </p>
               )}
-              {run.tables.some((table) => table.score !== null) && (
+              {run.tables.length > 0 && (
                 <ul className="candidates" aria-label="테이블 점수">
                   {run.tables.map((table) => (
                     <li key={table.id}>
-                      {table.member_count}명 · 테이블 점수 {table.score}
+                      {table.member_count}명 · 테이블 점수 {table.score ?? "미기록"}
+                      <TableExplanationView explanation={table.explanation} components={table.components} year={Number(run.event_slot.starts_at.slice(0, 4))} />
                     </li>
                   ))}
                 </ul>
@@ -757,6 +759,7 @@ function MatchHistory() {
                       {member.reason_code
                         ? ` (${matchingReasons[member.reason_code] ?? member.reason_code})`
                         : ""}
+                      {member.outcome === "SEATED" && <MemberExplanationView explanation={member.explanation} />}
                     </li>
                   ))}
                 </ul>

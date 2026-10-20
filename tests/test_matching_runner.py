@@ -161,9 +161,52 @@ def test_the_run_records_policy_and_table_scores_for_the_operator_only():
         assert table["score"] == "84.62"
         assert table["components"]["gender"] is None
         assert table["components"]["trait"] == "0.00"
+        assert table["explanation"] == {
+            "version": 1,
+            "birth_year_min": 1995,
+            "birth_year_max": 1995,
+            "gender_counts": {},
+            "gender_unknown_count": 4,
+            "mbti_counts": {},
+            "mbti_unknown_count": 4,
+            "shared_interests": [{"code": "reading", "count": 4}],
+            "previous_pair_count": 0,
+            "newness_penalized_pair_count": 0,
+        }
+        for member in run["members"]:
+            assert member["explanation"] == {
+                "version": 1,
+                "trait_satisfaction": {"different": "0.00"},
+                "previous_peer_count": 0,
+                "transfer_count": 0,
+            }
+        assert (
+            send(
+                members[0],
+                "PUT",
+                "/api/me/profile",
+                {**COMPLETE_PROFILE, "birth_year": 1990, "interests": ["music"]},
+            ).status_code
+            == 200
+        )
+        history = operator.get("/api/admin/match-runs").json()["match_runs"][0]
+        assert history["tables"] == run["tables"]
+        assert history["members"] == run["members"]
+        assert run_slot_matching(slot_id) is None
+        assert (
+            operator.get("/api/admin/match-runs").json()["match_runs"][0]["tables"] == run["tables"]
+        )
+        with database_engine().begin() as connection:
+            connection.execute(text("UPDATE dining_table SET explanation=NULL"))
+            connection.execute(text("UPDATE match_run_member SET explanation=NULL"))
+        legacy = operator.get("/api/admin/match-runs").json()["match_runs"][0]
+        assert legacy["tables"][0]["explanation"] is None
+        assert all(member["explanation"] is None for member in legacy["members"])
+        assert members[0].get("/api/admin/match-runs").status_code == 403
         for participant in members:
             body = participant.get("/api/me/applications").text
             assert "score" not in body and "components" not in body
+            assert "explanation" not in body
 
 
 def test_the_planner_seats_as_many_as_the_oracle_and_never_breaks_a_hard_constraint():
@@ -362,6 +405,31 @@ def test_a_database_failure_rolls_back_all_confirmations_and_rights_before_retry
             )
         try:
             assert run_slot_matching(slot)["state"] == "FAILED"
+            failures = operator.get("/api/admin/exceptions").json()["exceptions"]
+            failure = [item for item in failures if item["event_slot_id"] == slot]
+            assert len(failure) == 1
+            assert failure[0]["kind"] == "matching_failure"
+            assert failure[0]["resolvable"] is False
+            assert (
+                operator.get("/api/admin/exceptions", params={"state": "RESOLVED"}).json()[
+                    "exceptions"
+                ]
+                == []
+            )
+            assert (
+                send(
+                    operator,
+                    "POST",
+                    f"/api/admin/exceptions/matching_failure/{failure[0]['id']}/resolve",
+                    {"note": "재시도 대기"},
+                ).status_code
+                == 409
+            )
+            summary = operator.get("/api/admin/dashboard", params={"event_slot_id": slot}).json()[
+                "slots"
+            ][0]
+            assert summary["open_exception_count"] == 1
+            assert members[0].get("/api/admin/exceptions").status_code == 403
             for participant in members:
                 (application,) = participant.get("/api/me/applications").json()["applications"]
                 assert application["matching"]["state"] == "EXCEPTION"
@@ -383,6 +451,11 @@ def test_a_database_failure_rolls_back_all_confirmations_and_rights_before_retry
             runs = operator.get("/api/admin/match-runs").json()["match_runs"]
             assert [run["state"] for run in runs] == ["SUCCEEDED", "FAILED"]
             assert [run["seated_count"] for run in runs] == [4, 0]
+            assert operator.get("/api/admin/exceptions").json()["exceptions"] == []
+            summary = operator.get("/api/admin/dashboard", params={"event_slot_id": slot}).json()[
+                "slots"
+            ][0]
+            assert summary["open_exception_count"] == 0
         finally:
             with database_engine().begin() as connection:
                 connection.execute(text("DROP TRIGGER test_confirmation_failure ON match_run"))

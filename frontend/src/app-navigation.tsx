@@ -103,7 +103,7 @@ export function AppDialog({
 }: {
   label: string;
   onClose: () => void;
-  returnFocus?: RefObject<HTMLButtonElement | null>;
+  returnFocus?: RefObject<HTMLElement | null>;
   open?: boolean;
   children: ReactNode;
 }) {

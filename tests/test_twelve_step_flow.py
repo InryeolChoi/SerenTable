@@ -235,6 +235,12 @@ def test_one_slot_runs_all_twelve_steps_without_operator_action_after_the_deadli
         # ADR-0011 new = 100 x (1 - met pairs / 6). Six pairs met; the mutual
         # MEET_AGAIN pair is not counted (ADR-0014 U08), so 5 / 6 remain.
         assert table_components(next_slot)["new"] == "16.67"
+        history = operator.get("/api/admin/match-runs").json()["match_runs"]
+        next_run = next(r for r in history if r["event_slot"]["id"] == next_slot)
+        explanation = next_run["tables"][0]["explanation"]
+        assert explanation["previous_pair_count"] == 6
+        assert explanation["newness_penalized_pair_count"] == 5
+        assert all(m["explanation"]["previous_peer_count"] == 3 for m in next_run["members"])
 
         # Step 12: the normal path needed no operator action after the deadline, and
         # no unresolved exception is left for the operator.
