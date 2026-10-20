@@ -570,6 +570,15 @@ def _execute(connection, slot_id):
             {"ids": [row["application_id"] for row in rows]},
         ).all()
     )
+    unseated_before = dict(
+        connection.execute(
+            text("""SELECT mm.application_id,count(*) FROM match_run_member mm
+        JOIN match_run m ON m.id=mm.match_run_id
+        WHERE mm.outcome='UNSEATED' AND m.state='SUCCEEDED' AND mm.application_id=ANY(:ids)
+        GROUP BY mm.application_id"""),
+            {"ids": [row["application_id"] for row in rows]},
+        ).all()
+    )
     plan = plan_allocation(
         participants,
         slot["capacity"],
@@ -636,6 +645,11 @@ def _execute(connection, slot_id):
                             [p for p in seated_members if p.user_id != str(user_id)],
                             previous_pairs,
                             transfers.get(uuid.UUID(application_id), 0),
+                            max(
+                                0,
+                                unseated_before.get(uuid.UUID(application_id), 0)
+                                - transfers.get(uuid.UUID(application_id), 0),
+                            ),
                             _two_places,
                         )
                     ),

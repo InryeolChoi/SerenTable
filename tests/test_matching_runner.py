@@ -182,6 +182,7 @@ def test_the_run_records_policy_and_table_scores_for_the_operator_only():
                 "trait_satisfaction": {"different": "0.00"},
                 "previous_peer_count": 0,
                 "transfer_count": 0,
+                "reallocation_count": 0,
             }
         assert (
             send(

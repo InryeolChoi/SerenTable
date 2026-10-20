@@ -17,6 +17,7 @@ type SlotDashboard = {
     confirmed_count: number;
     table_count: number;
     alternative_offered_count: number;
+    success_rate: number | null;
   };
   gathering: {
     venue_assigned: number;
@@ -31,6 +32,8 @@ type SlotDashboard = {
     feedback_rate: number | null;
   };
   open_report_count: number;
+  failed_refund_count: number;
+  condition_conflict_count: number;
   open_exception_count: number;
 };
 
@@ -75,6 +78,7 @@ function SlotCard({ item }: { item: SlotDashboard }) {
       "확정 인원·테이블",
       `${matching.confirmed_count}명 · ${matching.table_count}개`,
     ],
+    ["매칭 성공률", rate(matching.success_rate)],
     ["대안 선택 대기", `${matching.alternative_offered_count}건`],
     [
       "식당 배정",
@@ -91,7 +95,9 @@ function SlotCard({ item }: { item: SlotDashboard }) {
       `${rate(attendance.feedback_rate)} (${attendance.feedback_submitted}/${attendance.feedback_eligible})`,
     ],
     ["미처리 신고", `${item.open_report_count}건`],
-    ["열린 예외", `${item.open_exception_count}건`],
+    ["식사 조건 충돌(재검토)", `${item.condition_conflict_count}건`],
+    ["자동 환불 실패", `${item.failed_refund_count}건`],
+    ["열린 예외(전체)", `${item.open_exception_count}건`],
   ];
   return (
     <article className="panel">

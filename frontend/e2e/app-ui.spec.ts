@@ -359,3 +359,21 @@ test("작은 화면의 하단 메뉴 아래 여백은 바탕색으로 덮여 본
     Number(await navigation.evaluate((el) => getComputedStyle(el).zIndex)),
   );
 });
+
+test("운영자는 더보기에서 테이블 상세와 자동 메시지 화면을 연다", async ({ page }) => {
+  const { operatorPassword } = await import("./support");
+  await login(page, "operator", operatorPassword);
+  await page.getByRole("button", { name: "더보기", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "더보기", exact: true })
+    .getByRole("link", { name: /테이블·메시지/ })
+    .click();
+  await expect(page.getByRole("heading", { name: "테이블·메시지", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "테이블 상세" })).toBeVisible();
+  const templates = page.getByRole("table", { name: "자동 메시지 종류" });
+  await expect(templates).toContainText("매칭 실패");
+  await expect(templates).toContainText("행사 1일 전 리마인드");
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+  ).toBeTruthy();
+});

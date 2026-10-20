@@ -143,6 +143,7 @@ def test_worker_results_show_matching_venue_room_push_and_exception_counts():
             "confirmed_count": 4,
             "table_count": 1,
             "alternative_offered_count": 0,
+            "success_rate": 1.0,
         }
         # No inventory was registered: one table waits for a venue with an open exception.
         assert table_view["gathering"] == {"venue_assigned": 0, "venue_pending": 1, "room_count": 1}
@@ -156,6 +157,7 @@ def test_worker_results_show_matching_venue_room_push_and_exception_counts():
             "confirmed_count": 0,
             "table_count": 0,
             "alternative_offered_count": 3,
+            "success_rate": 0.0,
         }
         assert short_view["gathering"] == {"venue_assigned": 0, "venue_pending": 0, "room_count": 0}
         assert short_view["push"] == {"PENDING": 0, "SENT": 0, "FAILED": 0, "UNAVAILABLE": 0}
@@ -167,6 +169,7 @@ def test_worker_results_show_matching_venue_room_push_and_exception_counts():
             "confirmed_count": 0,
             "table_count": 0,
             "alternative_offered_count": 0,
+            "success_rate": None,
         }
 
 

@@ -140,7 +140,9 @@ export type TableExplanation = {
 };
 export type MatchRunMember = {
   explanation: { version: number; trait_satisfaction: Record<string, string>;
-    previous_peer_count: number; transfer_count: number } | null;
+    previous_peer_count: number; transfer_count: number;
+    /** Absent on runs recorded before PRD §7.2 follow-up (ADR-0019). */
+    reallocation_count?: number } | null;
   application_id: string;
   login_id: string;
   outcome: "SEATED" | "UNSEATED" | "EXCEPTION";
