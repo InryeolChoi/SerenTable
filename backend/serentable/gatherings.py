@@ -154,6 +154,11 @@ def admin_tables(operator: Principal = Depends(require_operator)):
                 .mappings()
                 .first()
             )
+            open_review = connection.execute(
+                text("""SELECT 1 FROM gathering_exception
+                WHERE event_key=:key AND state='OPEN'"""),
+                {"key": f"table:{table['id']}:venue-conditions"},
+            ).scalar()
             result.append(
                 {
                     "id": str(table["id"]),
@@ -164,7 +169,8 @@ def admin_tables(operator: Principal = Depends(require_operator)):
                     if allocation
                     else None,
                     "review_required": bool(
-                        allocation and allocation["reviewed_conditions_snapshot"] != digest
+                        allocation
+                        and (allocation["reviewed_conditions_snapshot"] != digest or open_review)
                     ),
                     "conditions": records,
                 }
@@ -229,7 +235,7 @@ def approve_food(
                 "operator": operator.id,
             },
         ).scalar()
-        reviewed = False
+        reviewed = resolved = False
         if allocation:
             reviewed = bool(
                 connection.execute(
@@ -239,14 +245,16 @@ def approve_food(
                     {"id": table["id"], "digest": digest},
                 ).scalar()
             )
-            connection.execute(
-                text("""UPDATE gathering_exception SET state='RESOLVED',
+            resolved = bool(
+                connection.execute(
+                    text("""UPDATE gathering_exception SET state='RESOLVED',
                 updated_at=clock_timestamp(),resolved_by=:operator,
                 resolution_note='current_conditions_verified'
-                WHERE event_key=:key AND state='OPEN'"""),
-                {"key": f"table:{table['id']}:venue-conditions", "operator": operator.id},
+                WHERE event_key=:key AND state='OPEN' RETURNING 1"""),
+                    {"key": f"table:{table['id']}:venue-conditions", "operator": operator.id},
+                ).scalar()
             )
-        if inserted or reviewed:
+        if inserted or reviewed or resolved:
             # Only the snapshot digest is kept; members' food conditions stay out of the trail.
             record_audit(
                 connection,

@@ -22,7 +22,7 @@ export function TableExplanationView({ explanation: e, components, year }: {
       <p>성비: {counts(e.gender_counts)} · 분류 불가 {e.gender_unknown_count}명</p>
       <p>MBTI: {counts(e.mbti_counts)} · 미기록 {e.mbti_unknown_count}명. 복수 선택은 중복 집계합니다.</p>
       <p>공유 관심사: {e.shared_interests.map(i => `${labels[i.code] ?? i.code} ${i.count}명`).join(" · ") || "없음"}</p>
-      <p>이전 만남 {e.previous_pair_count}쌍 · 새로운 사람 점수에 반영 {e.newness_penalized_pair_count}쌍(상호 재만남 희망은 면제)</p>
+      <p>이전 만남 {e.previous_pair_count}쌍 · 새로운 사람 점수에 반영 {e.newness_penalized_pair_count}쌍(상호 재만남 희망은 면제). 이전 확정 동석 기록 기준이며 실제 참석 확인과 구분합니다.</p>
     </> : <p>당시 구성 설명 미기록 · 현재 프로필로 소급 계산하지 않습니다.</p>}
     {components && <p>{Object.entries(components).map(([key, value]) => `${labels[key] ?? key} ${value ?? "계산 제외"}`).join(" · ")}</p>}
   </details>;

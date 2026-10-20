@@ -213,7 +213,8 @@ def test_profile_update_during_review_commits_then_requires_new_review(seeded_da
         engine = database_engine()
 
         def after_sql(connection, cursor, statement, params, context, many):
-            if "FOR SHARE OF p" in statement and threading.current_thread().name == "review":
+            # Synchronous HTTP handlers run on AnyIO threads, not the calling client thread.
+            if "FOR SHARE OF p" in statement and not profile_locked.is_set():
                 profile_locked.set()
                 assert user_locked.wait(10)
             if "SELECT id FROM app_user WHERE id=" in statement and profile_locked.is_set():
@@ -249,3 +250,104 @@ def test_profile_update_during_review_commits_then_requires_new_review(seeded_da
         assert members[0].get("/api/me/gatherings").json()["gatherings"][0] == gathering
         audit = operator.get("/api/admin/audit").text
         assert "합성 조건" not in audit
+
+
+def test_returning_to_verified_conditions_still_allows_review_with_one_audit(seeded_database):
+    with ExitStack() as stack:
+        operator, members, inventory, gathering = allocation(stack)
+        from concurrent.futures import ThreadPoolExecutor
+
+        second_operator = stack.enter_context(TestClient(app))
+        login(second_operator, "operator")
+        for attempt in range(2):
+            assert (
+                send(
+                    members[0],
+                    "PUT",
+                    "/api/me/profile",
+                    {**CLEAR, "allergies": {"status": "specified", "details": "합성 변경"}},
+                ).status_code
+                == 200
+            )
+            run_gathering_jobs()
+            assert send(members[0], "PUT", "/api/me/profile", CLEAR).status_code == 200
+            run_gathering_jobs()
+            current = operator.get("/api/admin/gathering-tables").json()["tables"][0]
+            assert current["food_clear"] is True
+            assert current["review_required"] is True
+            payload = {
+                "dining_table_id": current["id"],
+                "food_snapshot": current["food_snapshot"],
+                "confirmed_suitable": True,
+            }
+            path = f"/api/admin/venue-inventory/{inventory['id']}/food-approvals"
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                futures = [
+                    pool.submit(send, client, "POST", path, payload)
+                    for client in (operator, second_operator)
+                ]
+                assert [f.result(timeout=15).status_code for f in futures] == [200, 200]
+            assert send(operator, "POST", path, payload).status_code == 200
+            assert operator.get("/api/admin/exceptions?state=OPEN").json()["exceptions"] == []
+            audit = operator.get("/api/admin/audit").json()["audit"]
+            assert sum(a["action"] == "venue_food.approve" for a in audit) == attempt + 1
+        assert members[0].get("/api/me/gatherings").json()["gatherings"][0] == gathering
+
+
+def test_failed_review_audit_rolls_back_baseline_approval_and_exception(seeded_database):
+    from serentable.database import database_engine
+    from sqlalchemy import text
+
+    with ExitStack() as stack:
+        operator, members, inventory, _ = allocation(stack)
+        fault_client = stack.enter_context(TestClient(app, raise_server_exceptions=False))
+        login(fault_client, "operator")
+        assert (
+            send(
+                members[0],
+                "PUT",
+                "/api/me/profile",
+                {**CLEAR, "allergies": {"status": "specified", "details": "합성 검토"}},
+            ).status_code
+            == 200
+        )
+        run_gathering_jobs()
+        current = operator.get("/api/admin/gathering-tables").json()["tables"][0]
+        payload = {
+            "dining_table_id": current["id"],
+            "food_snapshot": current["food_snapshot"],
+            "confirmed_suitable": True,
+        }
+        path = f"/api/admin/venue-inventory/{inventory['id']}/food-approvals"
+        with database_engine().begin() as connection:
+            connection.execute(
+                text("""CREATE FUNCTION test_review_audit_fault() RETURNS trigger
+                LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic audit failure'; END $$""")
+            )
+            connection.execute(
+                text("""CREATE TRIGGER test_review_audit_fault BEFORE INSERT
+                ON operator_audit FOR EACH ROW EXECUTE FUNCTION test_review_audit_fault()""")
+            )
+        try:
+            assert send(fault_client, "POST", path, payload).status_code == 503
+            assert (
+                operator.get("/api/admin/gathering-tables").json()["tables"][0]["review_required"]
+                is True
+            )
+            assert len(operator.get("/api/admin/exceptions?state=OPEN").json()["exceptions"]) == 1
+            with database_engine().connect() as connection:
+                assert (
+                    connection.execute(
+                        text(
+                            "SELECT count(*) FROM venue_food_approval WHERE food_snapshot=:digest"
+                        ),
+                        {"digest": current["food_snapshot"]},
+                    ).scalar_one()
+                    == 0
+                )
+        finally:
+            with database_engine().begin() as connection:
+                connection.execute(text("DROP TRIGGER test_review_audit_fault ON operator_audit"))
+                connection.execute(text("DROP FUNCTION test_review_audit_fault()"))
+        assert send(operator, "POST", path, payload).status_code == 200
+        assert operator.get("/api/admin/exceptions?state=OPEN").json()["exceptions"] == []
