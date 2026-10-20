@@ -44,6 +44,7 @@ test("운영자가 만든 회차를 참가자가 서울 시각으로 확인한�
     .getByRole("button", { name: "입력을 확인해 주세요 닫기", exact: true })
     .click();
   await expect(problems).not.toBeVisible();
+  await expect(form.getByLabel("매칭 예정", { exact: true })).toBeFocused();
   await expect(form.getByLabel("정원")).toHaveValue("12");
   await form
     .getByLabel("매칭 예정", { exact: true })

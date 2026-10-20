@@ -6,7 +6,7 @@ import { message, Notice, useScopedApi } from "./ui";
 // Resolving only records the operator's note; it never re-runs or approves a normal flow.
 type ExceptionState = "OPEN" | "RESOLVED";
 type ExceptionItem = {
-  kind: "gathering" | "alternative_overdue" | "mock_refund";
+  kind: "gathering" | "alternative_overdue" | "mock_refund" | "matching_failure";
   retryable?: boolean;
   amount_krw?: number;
   id: string;
@@ -23,11 +23,16 @@ type ExceptionItem = {
 
 const CATEGORIES: Record<string, string> = {
   MOCK_REFUND: "모의 환불 실패",
+  MATCHING_FAILURE: "자동 매칭 실행 실패",
   VENUE: "식당 배정 부족",
+  VENUE_CONDITIONS: "배정 후 식사 조건 재검토",
   PUSH_DELIVERY: "푸시 발송 반복 실패",
   MATCHING_ALTERNATIVE: "대안 미응답(회차 시작 경과)",
 };
 const REASONS: Record<string, string> = {
+  runner_error: "매칭 저장 실패 · 자동 재시도 대기",
+  allocated_conditions_changed: "배정 후 식사 조건 변경 · 현재 조건 재확인 필요",
+  condition_baseline_missing: "기존 배정의 조건 확인 기준 미기록 · 재확인 필요",
   no_verified_inventory: "확인된 식당 재고 없음",
   push_attempts_exhausted: "3회 발송 실패",
   mock_refund_storage_failed: "모의 환불 저장 실패",
@@ -153,7 +158,7 @@ export function ExceptionsSection() {
             <ResolveForm item={item} onDone={() => void load()} />
           ) : (
             item.state === "OPEN" && (
-              <p className="muted">참가자 선택을 기다리는 항목으로 조회만 할 수 있습니다.</p>
+              <p className="muted">{item.kind === "matching_failure" ? "자동 실행기의 재시도를 기다립니다. 성공하면 목록에서 해소됩니다." : item.category === "VENUE_CONDITIONS" ? <>기존 배정·예약은 유지됩니다. <a href="/admin/venues">식당 배정 관리</a>에서 현재 조건의 적합성을 확인하세요.</> : "참가자 선택을 기다리는 항목으로 조회만 할 수 있습니다."}</p>
             )
           )}
         </article>

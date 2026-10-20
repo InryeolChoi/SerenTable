@@ -77,6 +77,10 @@ def test_alternative_selection_keeps_payment_and_reaches_worker_confirmation():
             apply_and_pay(member, target)
         time.sleep(3.6)
         assert run_slot_matching(target)["seated_count"] == 4
+        history = operator.get("/api/admin/match-runs").json()["match_runs"]
+        confirmed_run = next(r for r in history if r["event_slot"]["id"] == target)
+        moved = next(m for m in confirmed_run["members"] if m["application_id"] == application)
+        assert moved["explanation"]["transfer_count"] == 1
         mine = owner.get("/api/me/applications").json()["applications"][0]
         assert mine["matching"]["state"] == "CONFIRMED"
         assert owner.get("/api/me/entitlements").json()["entitlements"][0]["state"] == "USED"

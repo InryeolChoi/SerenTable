@@ -13,6 +13,7 @@ from serentable.attendance import CANDIDATES
 from serentable.auth import Principal, private_response, require_operator
 from serentable.database import database_engine
 from serentable.events import SLOT_COLUMNS, slot_json
+from serentable.matching_exceptions import MATCHING_FAILURE_SELECT
 
 router = APIRouter()
 
@@ -74,6 +75,11 @@ STATE_QUERIES = {
 
 # name -> (slot column, query with a {0} slot filter); each yields (slot id, count) rows.
 COUNT_QUERIES = {
+    "matching_failure_count": (
+        "m.event_slot_id",
+        f"""SELECT m.event_slot_id,count(*) FROM ({MATCHING_FAILURE_SELECT}) m
+        WHERE {{0}} GROUP BY 1""",
+    ),
     "confirmed_count": (
         "mp.event_slot_id",
         """SELECT mp.event_slot_id,count(*) FROM match_participation mp
@@ -224,6 +230,7 @@ def slot_summary(slot, now, sections, counts, run):
             count["open_exception_count"]
             + count["failed_refund_count"]
             + count["alternative_overdue_count"]
+            + count["matching_failure_count"]
         ),
     }
 

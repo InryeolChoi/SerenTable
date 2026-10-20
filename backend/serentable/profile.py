@@ -242,9 +242,9 @@ def get_profile(user: Principal = Depends(require_participant)):
 def save_profile(payload: Profile, user: Principal = Depends(require_csrf_participant)):
     try:
         with database_engine().begin() as connection:
-            # Serialize with application submission, which checks completeness under this lock.
+            # Serialize with submission without blocking notification foreign-key KEY SHARE locks.
             connection.execute(
-                text("SELECT id FROM app_user WHERE id=:id FOR UPDATE"), {"id": user.id}
+                text("SELECT id FROM app_user WHERE id=:id FOR NO KEY UPDATE"), {"id": user.id}
             )
             connection.execute(
                 text("""INSERT INTO participant_profile(user_id,data)

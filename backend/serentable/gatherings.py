@@ -3,6 +3,7 @@
 import hashlib
 import json
 import uuid
+from collections import Counter
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,6 +18,7 @@ from serentable.auth import (
     require_operator,
     require_participant,
 )
+from serentable.clock import SEOUL
 from serentable.database import database_engine
 from serentable.profile import OPTIONS
 
@@ -117,6 +119,7 @@ def food_state(members):
     records = [
         {
             "user_id": str(m["user_id"]),
+            "meal_budget_bands": sorted(set(m["data"].get("meal_budget_bands", []))),
             **{
                 key: m["data"].get(key, {"status": "unknown"})
                 for key in ("food_restrictions", "allergies")
@@ -124,7 +127,9 @@ def food_state(members):
         }
         for m in members
     ]
-    digest = hashlib.sha256(json.dumps(records, sort_keys=True).encode()).hexdigest()
+    digest = hashlib.sha256(
+        json.dumps({"version": 1, "conditions": records}, sort_keys=True).encode()
+    ).hexdigest()
     clear = bool(records) and all(
         item[key].get("status") == "none"
         for item in records
@@ -140,12 +145,33 @@ def admin_tables(operator: Principal = Depends(require_operator)):
         result = []
         for table in tables.mappings().all():
             digest, clear, records = food_state(members_for(connection, table["id"]))
+            allocation = (
+                connection.execute(
+                    text("""SELECT inventory_id,reviewed_conditions_snapshot
+                FROM venue_allocation WHERE dining_table_id=:id"""),
+                    {"id": table["id"]},
+                )
+                .mappings()
+                .first()
+            )
+            open_review = connection.execute(
+                text("""SELECT 1 FROM gathering_exception
+                WHERE event_key=:key AND state='OPEN'"""),
+                {"key": f"table:{table['id']}:venue-conditions"},
+            ).scalar()
             result.append(
                 {
                     "id": str(table["id"]),
                     "event_slot_id": str(table["event_slot_id"]),
                     "food_snapshot": digest,
                     "food_clear": clear,
+                    "allocated_inventory_id": str(allocation["inventory_id"])
+                    if allocation
+                    else None,
+                    "review_required": bool(
+                        allocation
+                        and (allocation["reviewed_conditions_snapshot"] != digest or open_review)
+                    ),
                     "conditions": records,
                 }
             )
@@ -178,7 +204,23 @@ def approve_food(
         )
         if not table or not inventory or table["event_slot_id"] != inventory["event_slot_id"]:
             raise HTTPException(404, "inventory_table_not_found")
-        digest, _, _ = food_state(members_for(connection, table["id"]))
+        members = members_for(connection, table["id"])
+        digest, _, _ = food_state(members)
+        allocation = (
+            connection.execute(
+                text("""SELECT * FROM venue_allocation
+            WHERE dining_table_id=:id"""),
+                {"id": table["id"]},
+            )
+            .mappings()
+            .first()
+        )
+        if allocation and allocation["inventory_id"] != inventory_id:
+            raise HTTPException(409, "allocated_inventory_mismatch")
+        if not members or len(members) > inventory["capacity"]:
+            raise HTTPException(409, "venue_capacity_mismatch")
+        if not price_suitable(inventory["price_krw"], members):
+            raise HTTPException(409, "venue_budget_mismatch")
         if digest != payload.food_snapshot:
             raise HTTPException(409, "food_conditions_changed")
         inserted = connection.execute(
@@ -193,7 +235,26 @@ def approve_food(
                 "operator": operator.id,
             },
         ).scalar()
-        if inserted:
+        reviewed = resolved = False
+        if allocation:
+            reviewed = bool(
+                connection.execute(
+                    text("""UPDATE venue_allocation
+                SET reviewed_conditions_snapshot=:digest WHERE dining_table_id=:id
+                AND reviewed_conditions_snapshot IS DISTINCT FROM :digest RETURNING 1"""),
+                    {"id": table["id"], "digest": digest},
+                ).scalar()
+            )
+            resolved = bool(
+                connection.execute(
+                    text("""UPDATE gathering_exception SET state='RESOLVED',
+                updated_at=clock_timestamp(),resolved_by=:operator,
+                resolution_note='current_conditions_verified'
+                WHERE event_key=:key AND state='OPEN' RETURNING 1"""),
+                    {"key": f"table:{table['id']}:venue-conditions", "operator": operator.id},
+                ).scalar()
+            )
+        if inserted or reviewed or resolved:
             # Only the snapshot digest is kept; members' food conditions stay out of the trail.
             record_audit(
                 connection,
@@ -278,19 +339,43 @@ def emit(connection, table_id, room_id, members, event, body, now):
         )
 
 
+def price_suitable(price, members):
+    band = "10000_20000" if price < 20000 else "20000_30000" if price < 30000 else "30000_plus"
+    return all(band in m["data"].get("meal_budget_bands", []) for m in members)
+
+
 def allocate_venue(connection, table, members, now):
     existing = (
         connection.execute(
-            text("""SELECT v.*,a.reservation_name FROM venue_allocation a
+            text("""SELECT v.*,a.reservation_name,a.reviewed_conditions_snapshot
+        FROM venue_allocation a
         JOIN venue_inventory v ON v.id=a.inventory_id WHERE a.dining_table_id=:id"""),
             {"id": table["id"]},
         )
         .mappings()
         .first()
     )
-    if existing:
-        return existing
     digest, clear, _ = food_state(members)
+    if existing:
+        if existing["reviewed_conditions_snapshot"] != digest:
+            connection.execute(
+                text("""INSERT INTO gathering_exception
+                (id,dining_table_id,event_key,kind,state,reason_code,created_at,updated_at)
+                VALUES (:id,:table,:key,'VENUE_CONDITIONS','OPEN',:reason,:now,:now)
+                ON CONFLICT(event_key) DO UPDATE SET state='OPEN',reason_code=EXCLUDED.reason_code,
+                updated_at=EXCLUDED.updated_at,resolved_by=NULL,resolution_note=NULL
+                WHERE gathering_exception.state='RESOLVED'"""),
+                {
+                    "id": uuid.uuid4(),
+                    "table": table["id"],
+                    "key": f"table:{table['id']}:venue-conditions",
+                    "now": now,
+                    "reason": "allocated_conditions_changed"
+                    if existing["reviewed_conditions_snapshot"]
+                    else "condition_baseline_missing",
+                },
+            )
+        return existing
     inventory = (
         connection.execute(
             text("""SELECT v.* FROM venue_inventory v
@@ -303,14 +388,7 @@ def allocate_venue(connection, table, members, now):
         .all()
     )
     for venue in inventory:
-        band = (
-            "10000_20000"
-            if venue["price_krw"] < 20000
-            else "20000_30000"
-            if venue["price_krw"] < 30000
-            else "30000_plus"
-        )
-        if not all(band in m["data"].get("meal_budget_bands", []) for m in members):
+        if not price_suitable(venue["price_krw"], members):
             continue
         if (
             not clear
@@ -324,18 +402,36 @@ def allocate_venue(connection, table, members, now):
         reservation = f"우연한식탁-{str(table['id'])[:8]}"
         connection.execute(
             text("""INSERT INTO venue_allocation
-            (id,dining_table_id,inventory_id,reservation_name,created_at)
-            VALUES (:id,:table,:inventory,:name,:now)"""),
+            (id,dining_table_id,inventory_id,reservation_name,created_at,reviewed_conditions_snapshot)
+            VALUES (:id,:table,:inventory,:name,:now,:digest)"""),
             {
                 "id": uuid.uuid4(),
                 "table": table["id"],
                 "inventory": venue["id"],
                 "name": reservation,
+                "digest": digest,
                 "now": now,
             },
         )
         return {**venue, "reservation_name": reservation}
     return None
+
+
+def reminder_body(table, venue):
+    start = table["starts_at"].astimezone(SEOUL).strftime("%Y-%m-%d %H:%M")
+    place = (
+        f"식당: {venue['name']} · 주소: {venue['address']} · 예약명: {venue['reservation_name']}. "
+        if venue
+        else "식당·장소·예약명: 운영자 확인 중(미배정). 배정되면 별도 안내합니다. "
+    )
+    return (
+        f"모임이 하루 안에 시작합니다. 집합 시각: {start} (서울). "
+        + place
+        + "취소·환불 안내: 현행 기준 화요일 24:00 이후 환불 불가. "
+        "시스템 최종 매칭 실패의 미사용 1회권은 시간 제한 없이 전액 모의 환불할 수 있습니다. "
+        "일반 취소·당일 취소·노쇼의 세부 제한 기준은 미정입니다. "
+        "신청 취소는 자동 환불이 아닙니다. 신청 현황에서 취소 가능 여부를 확인하세요."
+    )
 
 
 def process_table(connection, table_id):
@@ -402,16 +498,17 @@ def process_table(connection, table_id):
             now,
         )
     if now >= table["starts_at"]:
-        interests = sorted({i for m in members for i in m["data"].get("interests", [])})
-        label = (
-            OPTIONS["interests"].get(interests[0], "새로운 경험") if interests else "새로운 경험"
+        interests = Counter(i for m in members for i in set(m["data"].get("interests", [])))
+        shared = sorted(
+            (i for i, count in interests.items() if count >= 2), key=lambda i: (-interests[i], i)
         )
+        label = OPTIONS["interests"].get(shared[0], "새로운 경험") if shared else "새로운 경험"
         traits = {t for m in members for t in m["data"].get("self_traits", [])}
         style = "차분하게 서로의 이야기를 듣고" if "listener" in traits else "가볍게 돌아가며"
         body = (
             f"오늘의 대화 주제 ① {label}에 관심을 갖게 된 계기는 무엇인가요? "
-            f"② {label}와 관련해 추천하고 싶은 경험은? "
-            f"③ {style} {label}를 함께 즐길 방법을 이야기해 보세요. "
+            f"② 관심 주제인 {label} 관련해서 추천하고 싶은 경험은? "
+            f"③ {style} 관심 주제를 함께 즐길 방법을 이야기해 보세요. "
             "아이스브레이킹: 서로 표시명과 오늘 기대하는 한 가지를 돌아가며 소개해 주세요."
         )
         emit(connection, table_id, room, members, "START_CONTENT", body, now)
@@ -422,7 +519,7 @@ def process_table(connection, table_id):
             room,
             members,
             "REMINDER",
-            "모임이 하루 안에 시작합니다. 모임 시각과 식당 배정 상태를 확인해 주세요.",
+            reminder_body(table, venue),
             now,
         )
 

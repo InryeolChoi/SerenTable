@@ -6,7 +6,9 @@ import type { EventSlot } from "./api";
 type Venue = { name: string; address: string; map_url: string; price_krw: number; reservation_name: string };
 type Gathering = { id: string; starts_at: string; region_name: string; venue: Venue | null };
 type Inventory = Venue & { id: string; event_slot_id: string; capacity: number };
-type Table = { id: string; event_slot_id: string; food_snapshot: string; food_clear: boolean; conditions: { user_id: string; food_restrictions: {status: string; details?: string}; allergies: {status: string; details?: string} }[] };
+type Table = { id: string; event_slot_id: string; food_snapshot: string; food_clear: boolean; allocated_inventory_id: string | null; review_required: boolean; conditions: { user_id: string; meal_budget_bands: string[]; food_restrictions: {status: string; details?: string}; allergies: {status: string; details?: string} }[] };
+
+const budgetLabels: Record<string, string> = { "10000_20000": "1~2만원", "20000_30000": "2~3만원", "30000_plus": "3만원 이상" };
 
 export function GatheringsPage() {
   const request = useScopedApi();
@@ -52,7 +54,8 @@ export function AdminVenuesPage() {
     setPending(true); setError(""); setSaved("");
     try {
       await request(`/api/admin/venue-inventory/${v.id}/food-approvals`, {method: "POST", body: JSON.stringify({dining_table_id: t.id, food_snapshot: t.food_snapshot, confirmed_suitable: true})});
-      setSaved("현재 음식 조건의 적합성 확인을 기록했습니다. 다음 작업 실행에서 배정을 시도합니다.");
+      await load();
+      setSaved("현재 음식·알레르기·식비 조건의 적합성을 기록했습니다. 기존 배정은 유지하며 미배정은 다음 작업 실행에서 시도합니다.");
     } catch(e) {setError(message(e));} finally {setPending(false);}
   }
   return <section><h1>식당 배정 관리</h1><p>한 건은 해당 회차에서 예약 가능한 테이블 하나입니다. 실제 식당 예약을 실행하지 않습니다.</p>
@@ -63,9 +66,10 @@ export function AdminVenuesPage() {
       <button disabled={pending}>가상 재고 등록</button>
     </form>
     <h2>등록한 재고</h2>{inventory.map(v => <p key={v.id}>{v.name} · {v.price_krw.toLocaleString()}원 · {v.capacity}석</p>)}
-    <h2>테이블 음식 조건 확인</h2><p>식당에 현재 조건의 적합성을 직접 확인한 경우에만 확인 버튼을 누르십시오.</p>
+    <h2>테이블 식사 조건 확인</h2><p>식당에 현재 음식·알레르기·식비 조건의 적합성을 직접 확인한 경우에만 확인 버튼을 누르십시오. 배정 뒤 조건이 바뀌면 예약을 유지하며 재검토합니다.</p>
     {tables.map(t => <article className="panel" key={t.id}><h3>테이블 {t.id.slice(0,8)}</h3>
-      {t.food_clear ? <p>전원 음식 제한·알레르기 없음</p> : <>{t.conditions.map(c => <p key={c.user_id}>음식 제한: {c.food_restrictions.details || c.food_restrictions.status} / 알레르기: {c.allergies.details || c.allergies.status}</p>)}{inventory.filter(v => v.event_slot_id === t.event_slot_id).map(v => <button key={v.id} disabled={pending} onClick={() => void approve(v,t)}>{v.name} 적합성 확인 완료</button>)}</>}
+      {t.review_required && <Notice>식사 조건 재검토가 필요합니다. 기존 예약은 유지됩니다.</Notice>}
+      {t.food_clear && !t.review_required ? <p>전원 음식 제한·알레르기 없음</p> : <>{t.conditions.map(c => <p key={c.user_id}>음식 제한: {c.food_restrictions.details || c.food_restrictions.status} / 알레르기: {c.allergies.details || c.allergies.status} / 허용 식비: {c.meal_budget_bands.map(b => budgetLabels[b] ?? b).join(", ") || "미기록"}</p>)}{inventory.filter(v => v.event_slot_id === t.event_slot_id && (!t.allocated_inventory_id || v.id === t.allocated_inventory_id)).map(v => <button key={v.id} disabled={pending} onClick={() => void approve(v,t)}>{v.name} 적합성 확인 완료</button>)}</>}
     </article>)}
   </section>;
 }

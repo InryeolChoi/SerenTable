@@ -6,7 +6,7 @@ weights are rescaled. Arithmetic is exact so ties compare the same on every mach
 """
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from fractions import Fraction
 from itertools import combinations, permutations
 
@@ -104,6 +104,21 @@ def _trait_satisfaction(wanting, other):
 def _mean(values):
     present = [value for value in values if value is not None]
     return Fraction(sum(present), len(present)) if present else None
+
+
+def individual_trait_scores(member, peers):
+    """Per desired trait, use the same satisfaction arithmetic as the table score."""
+    return (
+        {
+            code: 100
+            * _mean(
+                _trait_satisfaction(replace(member, desired_traits=(code,)), peer) for peer in peers
+            )
+            for code in member.desired_traits
+        }
+        if peers
+        else {}
+    )
 
 
 def component_scores(members, met_pairs=frozenset()):

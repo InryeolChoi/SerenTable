@@ -113,7 +113,15 @@ def test_unknown_food_is_an_exception_then_verified_inventory_allocates_once():
         assert members[0].get("/api/admin/gathering-tables").status_code == 403
 
 
-def test_worker_reminders_start_content_and_rollback_are_atomic():
+@pytest.mark.parametrize(
+    ("interest_sets", "expected_topic"),
+    [
+        ([["reading"]] * 4, "독서"),
+        ([["exercise", "music"], ["music"], ["music"], ["music"]], "음악"),
+        ([["exercise"], ["music"], ["reading"], ["travel"]], "새로운 경험"),
+    ],
+)
+def test_worker_reminders_start_content_and_rollback_are_atomic(interest_sets, expected_topic):
     import os
     import subprocess
     import sys
@@ -140,6 +148,7 @@ def test_worker_reminders_start_content_and_rollback_are_atomic():
                     "/api/me/profile",
                     {
                         **COMPLETE_PROFILE,
+                        "interests": interest_sets[i - 1],
                         "food_restrictions": {"status": "none"},
                         "allergies": {"status": "none"},
                     },
@@ -210,6 +219,18 @@ def test_worker_reminders_start_content_and_rollback_are_atomic():
         path = f"/api/me/rooms/{gathering['room_id']}/messages"
         messages = members[0].get(path).json()["messages"]
         assert len(messages) == 3  # confirmation + allocation + 24h reminder once
+        reminder = next(m["body"] for m in messages if "하루 안" in m["body"])
+        with database_engine().connect() as c:
+            start = c.execute(
+                text("SELECT starts_at FROM event_slot WHERE id=:id"), {"id": slot}
+            ).scalar_one()
+        from serentable.clock import SEOUL
+
+        assert start.astimezone(SEOUL).strftime("%Y-%m-%d %H:%M") in reminder
+        for required in ("합성 식당", "합성 주소", "예약명:", "화요일 24:00", "노쇼", "미정"):
+            assert required in reminder
+        notifications = members[0].get("/api/me/notifications").json()["notifications"]
+        assert any(n["body"] == reminder for n in notifications)
         with database_engine().begin() as c:
             c.execute(
                 text("UPDATE event_slot SET starts_at=now()-interval '30 seconds' WHERE id=:id"),
@@ -223,9 +244,42 @@ def test_worker_reminders_start_content_and_rollback_are_atomic():
             and "②" in messages[-1]["body"]
             and "③" in messages[-1]["body"]
         )
-        assert "독서" in messages[-1]["body"] and "아이스브레이킹" in messages[-1]["body"]
+        assert expected_topic in messages[-1]["body"] and "아이스브레이킹" in messages[-1]["body"]
         run_gathering_jobs()
         assert len(members[0].get(path).json()["messages"]) == 4
         # Existing confirmation, payment and table remain intact throughout retries.
         mine = members[0].get("/api/me/applications").json()["applications"][0]
         assert mine["matching"]["state"] == "CONFIRMED"
+
+
+def test_pending_venue_reminder_names_unknown_details_without_inventing_a_reservation():
+    from contextlib import ExitStack
+
+    from serentable.database import database_engine
+    from serentable.gatherings import run_gathering_jobs
+    from sqlalchemy import text
+    from test_admin_exceptions import venue_shortage
+
+    with ExitStack() as stack:
+        _, members, slot = venue_shortage(stack)
+        with database_engine().begin() as connection:
+            connection.execute(
+                text("""UPDATE event_slot SET closes_at=now()-interval '2 minutes',
+                matches_at=now()-interval '1 minute', starts_at=now()+interval '30 minutes',
+                ends_at=now()+interval '3 hours' WHERE id=:id"""),
+                {"id": slot},
+            )
+        run_gathering_jobs()
+        notices = members[0].get("/api/me/notifications").json()["notifications"]
+        reminder = next(n["body"] for n in notices if n["kind"] == "REMINDER")
+        assert "집합 시각:" in reminder and "(서울)" in reminder
+        assert "식당·장소·예약명: 운영자 확인 중(미배정)" in reminder
+        assert "화요일 24:00" in reminder and "노쇼" in reminder
+        run_gathering_jobs()
+        assert (
+            sum(
+                n["kind"] == "REMINDER"
+                for n in members[0].get("/api/me/notifications").json()["notifications"]
+            )
+            == 1
+        )

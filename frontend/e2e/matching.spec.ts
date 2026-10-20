@@ -196,6 +196,12 @@ test("마감된 회차가 운영자 개입 없이 매칭되어 참가자와 운�
   await expect(run).toContainText("최소 점수 60");
   await expect(run).toContainText("테이블 점수 85.58");
   await expect(run).toContainText("participant-01");
+  await run.getByText("확정 당시 구성과 점수 근거", { exact: true }).click();
+  await expect(run).toContainText("출생연도 1994~1997년");
+  await expect(run).toContainText("음악 4명");
+  await expect(run).toContainText("이전 만남 0쌍");
+  await expect(run).toContainText("비슷한 성향 100.00%");
+  await expect(run).toContainText("동의한 대안 이동 0회");
   await expect(history.filter({ hasText: partial.name })).toContainText(
     "확정 0명",
   );

@@ -1,5 +1,6 @@
 """Helpers shared by the real-PostgreSQL HTTP tests (the fixture lives in conftest.py)."""
 
+import time
 from datetime import timedelta, timezone
 
 ORIGIN = "http://testserver"
@@ -31,3 +32,25 @@ def truncate(tables):
 
     with database_engine().begin() as connection:
         connection.execute(text(f"TRUNCATE {tables} CASCADE"))
+
+
+def wait_for_slot_matching(slot, timeout=30):
+    """Wait for the actual PG deadline; host/Docker wall clocks need not agree."""
+    from serentable.database import database_engine
+    from sqlalchemy import text
+
+    deadline = time.monotonic() + timeout
+    with database_engine().connect() as connection:
+        while True:
+            remaining = connection.execute(
+                text(
+                    "SELECT extract(epoch FROM matches_at-clock_timestamp()) "
+                    "FROM event_slot WHERE id=:id"
+                ),
+                {"id": slot},
+            ).scalar_one()
+            if remaining <= 0:
+                return
+            if time.monotonic() >= deadline:
+                raise AssertionError("isolated_slot_matching_deadline_not_reached")
+            time.sleep(min(float(remaining), 0.25))

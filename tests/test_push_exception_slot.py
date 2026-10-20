@@ -1,7 +1,6 @@
 """Push exceptions keep their known event slot across listing and resolution."""
 
 from contextlib import ExitStack
-from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 from serentable.database import database_engine
@@ -37,7 +36,7 @@ def test_failed_table_push_keeps_slot_but_unrelated_notification_stays_unattribu
                 "private-notification-title",
                 "private-notification-body",
                 "/participant",
-                datetime.now(timezone.utc),
+                connection.execute(text("SELECT clock_timestamp()")).scalar_one(),
             )
         for _ in range(3):
             assert dispatch_notifications(session=provider) == 3

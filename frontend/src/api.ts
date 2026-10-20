@@ -130,7 +130,17 @@ export type MatchParticipation = {
   /** Current confirmed table: only approved display names are introduced. */
   table: { id: string; member_count: number; members: { display_name: string }[] } | null;
 };
+export type TableExplanation = {
+  version: number;
+  birth_year_min: number; birth_year_max: number;
+  gender_counts: Record<string, number>; gender_unknown_count: number;
+  mbti_counts: Record<string, number>; mbti_unknown_count: number;
+  shared_interests: { code: string; count: number }[];
+  previous_pair_count: number; newness_penalized_pair_count: number;
+};
 export type MatchRunMember = {
+  explanation: { version: number; trait_satisfaction: Record<string, string>;
+    previous_peer_count: number; transfer_count: number } | null;
   application_id: string;
   login_id: string;
   outcome: "SEATED" | "UNSEATED" | "EXCEPTION";
@@ -156,6 +166,7 @@ export type MatchRun = {
     member_count: number;
     score: string | null;
     components: Record<string, string | null> | null;
+    explanation: TableExplanation | null;
   }[];
   members: MatchRunMember[];
 };
